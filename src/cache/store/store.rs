@@ -123,4 +123,14 @@ mod tests {
         let value = store.get(&"topic");
         assert_eq!(None, value);
     }
+
+    #[test]
+    fn delete_a_non_existing_key() {
+        let clock = SystemClock::boxed();
+        let store = Store::new(clock);
+        store.delete(&"non-existing");
+
+        let value: Option<&str> = store.get(&"non-existing");
+        assert_eq!(None, value);
+    }
 }
