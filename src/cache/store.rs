@@ -19,11 +19,10 @@ impl<Key, Value> Store<Key, Value>
           Value: Clone {
 
     pub(crate) fn new(clock: ClockType) -> Arc<Store <Key, Value>> {
-        let store = Arc::new(Store {
+        return Arc::new(Store {
             store: DashMap::new(),
             clock,
         });
-        return store;
     }
 
     pub(crate) fn put(&self, key: Key, value: Value) {
