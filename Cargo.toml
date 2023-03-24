@@ -5,6 +5,9 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[dev-dependencies]
+tokio = { version = "1.26.0", features = ["full"] }
+
 [dependencies]
 crossbeam-channel = "0.5.7"
 dashmap = "5.4.0"
