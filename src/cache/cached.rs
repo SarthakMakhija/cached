@@ -6,7 +6,7 @@ use crate::cache::acknowledgement::CommandAcknowledgement;
 use crate::cache::clock::SystemClock;
 use crate::cache::command::CommandType;
 use crate::cache::command_sender::CommandSender;
-use crate::cache::store::Store;
+use crate::cache::store::store::Store;
 
 pub struct CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + 'static,

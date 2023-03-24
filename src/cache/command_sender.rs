@@ -7,7 +7,7 @@ use crossbeam_channel::Receiver;
 use crate::cache::acknowledgement::CommandAcknowledgement;
 
 use crate::cache::command::CommandType;
-use crate::cache::store::Store;
+use crate::cache::store::store::Store;
 
 struct  CommandAcknowledgementPair<Key, Value> {
     command: CommandType<Key, Value>,
@@ -70,7 +70,7 @@ mod tests {
     use crate::cache::clock::SystemClock;
     use crate::cache::command::CommandType;
     use crate::cache::command_sender::CommandSender;
-    use crate::cache::store::Store;
+    use crate::cache::store::store::Store;
 
     #[tokio::test]
     async fn puts_a_key_value() {

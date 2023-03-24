@@ -5,7 +5,7 @@ use std::time::Duration;
 use dashmap::DashMap;
 
 use crate::cache::clock::ClockType;
-use crate::cache::stored_value::StoredValue;
+use crate::cache::store::stored_value::StoredValue;
 
 pub(crate) struct Store<Key, Value>
     where Key: Hash + Eq,
@@ -48,8 +48,8 @@ mod tests {
     use setup::FutureClock;
 
     use crate::cache::clock::SystemClock;
-    use crate::cache::store::Store;
-    use crate::cache::stored_value::StoredValue;
+    use crate::cache::store::store::Store;
+    use crate::cache::store::stored_value::StoredValue;
 
     mod setup {
         use std::ops::Add;

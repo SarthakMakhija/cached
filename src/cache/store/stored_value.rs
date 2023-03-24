@@ -43,8 +43,8 @@ mod tests {
     use std::time::{Duration, SystemTime};
 
     use crate::cache::clock::{ClockType, SystemClock};
-    use crate::cache::stored_value::StoredValue;
-    use crate::cache::stored_value::tests::setup::{UnixEpochClock, FutureClock};
+    use crate::cache::store::stored_value::StoredValue;
+    use crate::cache::store::stored_value::tests::setup::{UnixEpochClock, FutureClock};
 
     mod setup {
         use std::ops::Add;
