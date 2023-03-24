@@ -11,3 +11,4 @@ tokio = { version = "1.26.0", features = ["full"] }
 [dependencies]
 crossbeam-channel = "0.5.7"
 dashmap = "5.4.0"
+rand = "0.8.5"
