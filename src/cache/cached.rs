@@ -1,18 +1,20 @@
 use std::hash::Hash;
+use std::sync::Arc;
 use std::time::Duration;
 
-use crate::cache::clock::{ClockType, SystemClock};
+use crate::cache::clock::SystemClock;
 use crate::cache::store::Store;
 
 pub struct CacheD<Key, Value>
     where Key: Hash + Eq,
           Value: Clone {
-    store: Store<Key, Value>,
+    store: Arc<Store<Key, Value>>,
 }
 
 impl<Key, Value> CacheD<Key, Value>
     where Key: Hash + Eq,
           Value: Clone {
+
     pub fn new() -> Self {
         return CacheD {
             store: Store::new(SystemClock::boxed()),
@@ -20,7 +22,7 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     #[cfg(test)]
-    pub fn new_with_clock(clock: ClockType) -> Self {
+    pub fn new_with_clock(clock: crate::cache::clock::ClockType) -> Self {
         return CacheD {
             store: Store::new(clock),
         };

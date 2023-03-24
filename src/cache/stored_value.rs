@@ -32,10 +32,6 @@ impl<Value> StoredValue<Value>
         return true;
     }
 
-    pub(crate) fn value_ref(&self) -> &Value {
-        return &self.value;
-    }
-
     pub(crate) fn value(&self) -> Value {
         return self.value.clone();
     }
@@ -43,11 +39,12 @@ impl<Value> StoredValue<Value>
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::ops::Add;
+    use std::time::{Duration, SystemTime};
 
     use crate::cache::clock::{ClockType, SystemClock};
     use crate::cache::stored_value::StoredValue;
-    use crate::cache::stored_value::tests::setup::FutureClock;
+    use crate::cache::stored_value::tests::setup::{UnixEpochClock, FutureClock};
 
     mod setup {
         use std::ops::Add;
@@ -57,11 +54,27 @@ mod tests {
 
         pub(crate) struct FutureClock;
 
+        pub(crate) struct UnixEpochClock;
+
         impl Clock for FutureClock {
             fn now(&self) -> SystemTime {
                 return SystemTime::now().add(Duration::from_secs(10));
             }
         }
+
+        impl Clock for UnixEpochClock {
+            fn now(&self) -> SystemTime {
+                return SystemTime::UNIX_EPOCH;
+            }
+        }
+    }
+
+    #[test]
+    fn expiration_time() {
+        let clock: ClockType = Box::new(UnixEpochClock {});
+        let stored_value = StoredValue::expiring("SSD", Duration::from_secs(10), &clock);
+
+        assert!(stored_value.expire_after.unwrap().eq(&SystemTime::UNIX_EPOCH.add(Duration::from_secs(10))));
     }
 
     #[test]

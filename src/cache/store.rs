@@ -1,4 +1,5 @@
 use std::hash::Hash;
+use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
@@ -16,11 +17,13 @@ pub(crate) struct Store<Key, Value>
 impl<Key, Value> Store<Key, Value>
     where Key: Hash + Eq,
           Value: Clone {
-    pub(crate) fn new(clock: ClockType) -> Self {
-        return Store {
+
+    pub(crate) fn new(clock: ClockType) -> Arc<Store <Key, Value>> {
+        let store = Arc::new(Store {
             store: DashMap::new(),
             clock,
-        };
+        });
+        return store;
     }
 
     pub(crate) fn put(&self, key: Key, value: Value) {
@@ -47,6 +50,7 @@ mod tests {
 
     use crate::cache::clock::SystemClock;
     use crate::cache::store::Store;
+    use crate::cache::stored_value::StoredValue;
 
     mod setup {
         use std::ops::Add;
@@ -76,19 +80,19 @@ mod tests {
     #[test]
     fn get_value_for_a_non_existing_key() {
         let clock = SystemClock::boxed();
-        let store: Store<&str, &str> = Store::new(clock);
+        let store = Store::new(clock);
 
-        let value = store.get(&"non-existing");
+        let value: Option<&str> = store.get(&"non-existing");
         assert_eq!(None, value);
     }
 
     #[test]
     fn get_value_for_an_expired_key() {
-        let clock = SystemClock::boxed();
-        let mut store = Store::new(clock);
-
-        store.put_with_ttl("topic", "microservices", Duration::from_secs(5));
-        store.clock = Box::new(FutureClock {});
+        let store = Store::new(Box::new(FutureClock {}));
+        {
+            let clock = SystemClock::boxed();
+            store.store.insert("topic", StoredValue::expiring("microservices", Duration::from_secs(5), &clock));
+        }
 
         let value = store.get(&"topic");
         assert_eq!(None, value);
@@ -96,11 +100,11 @@ mod tests {
 
     #[test]
     fn get_value_for_an_unexpired_key() {
-        let clock = SystemClock::boxed();
-        let mut store = Store::new(clock);
-
-        store.put_with_ttl("topic", "microservices", Duration::from_secs(15));
-        store.clock = Box::new(FutureClock {});
+        let store = Store::new(Box::new(FutureClock {}));
+        {
+            let clock = SystemClock::boxed();
+            store.store.insert("topic", StoredValue::expiring("microservices", Duration::from_secs(15), &clock));
+        }
 
         let value = store.get(&"topic");
         assert_eq!(Some("microservices"), value);
