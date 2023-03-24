@@ -1,11 +1,11 @@
 use std::hash::Hash;
 use std::sync::Arc;
 use std::time::Duration;
-use crate::cache::acknowledgement::CommandAcknowledgement;
 
 use crate::cache::clock::SystemClock;
-use crate::cache::command::CommandType;
-use crate::cache::command_sender::CommandSender;
+use crate::cache::command::acknowledgement::CommandAcknowledgement;
+use crate::cache::command::command::CommandType;
+use crate::cache::command::command_sender::CommandSender;
 use crate::cache::store::store::Store;
 
 pub struct CacheD<Key, Value>

@@ -4,21 +4,21 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 
 use crossbeam_channel::Receiver;
-use crate::cache::acknowledgement::CommandAcknowledgement;
+use crate::cache::command::acknowledgement::CommandAcknowledgement;
+use crate::cache::command::command::CommandType;
 
-use crate::cache::command::CommandType;
 use crate::cache::store::store::Store;
-
-struct  CommandAcknowledgementPair<Key, Value> {
-    command: CommandType<Key, Value>,
-    acknowledgement: Arc<CommandAcknowledgement>
-}
 
 pub(crate) struct CommandSender<Key, Value>
     where Key: Hash + Eq + Send + Sync + 'static,
           Value: Send + Sync + Clone + 'static {
     sender: crossbeam_channel::Sender<CommandAcknowledgementPair<Key, Value>>,
     keep_running: Arc<AtomicBool>,
+}
+
+struct  CommandAcknowledgementPair<Key, Value> {
+    command: CommandType<Key, Value>,
+    acknowledgement: Arc<CommandAcknowledgement>
 }
 
 impl<Key, Value> CommandSender<Key, Value>
@@ -35,6 +35,7 @@ impl<Key, Value> CommandSender<Key, Value>
 
     fn spin(&self, receiver: Receiver<CommandAcknowledgementPair<Key, Value>>, store: Arc<Store<Key, Value>>) {
         let keep_running = self.keep_running.clone();
+
         thread::spawn(move || {
             while let Ok(pair) = receiver.recv() {
                 let command = pair.command;
@@ -54,7 +55,10 @@ impl<Key, Value> CommandSender<Key, Value>
 
     pub(crate) fn send(&self, command: CommandType<Key, Value>) -> Arc<CommandAcknowledgement> {
         let acknowledgement = CommandAcknowledgement::new();
-        self.sender.send(CommandAcknowledgementPair{command, acknowledgement: acknowledgement.clone() }).unwrap(); //TODO: Remove unwrap
+        self.sender.send(CommandAcknowledgementPair{
+            command,
+            acknowledgement: acknowledgement.clone()
+        }).unwrap(); //TODO: Remove unwrap
         return acknowledgement;
     }
 
@@ -68,8 +72,8 @@ mod tests {
     use std::time::Duration;
 
     use crate::cache::clock::SystemClock;
-    use crate::cache::command::CommandType;
-    use crate::cache::command_sender::CommandSender;
+    use crate::cache::command::command::CommandType;
+    use crate::cache::command::command_sender::CommandSender;
     use crate::cache::store::store::Store;
 
     #[tokio::test]

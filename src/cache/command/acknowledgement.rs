@@ -74,7 +74,7 @@ impl Future for &CommandAcknowledgementHandle {
 
 #[cfg(test)]
 mod tests {
-    use crate::cache::acknowledgement::CommandAcknowledgement;
+    use crate::cache::command::acknowledgement::CommandAcknowledgement;
 
     #[tokio::test]
     async fn acknowledge() {
