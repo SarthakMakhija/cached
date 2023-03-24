@@ -1,47 +1,52 @@
-use std::collections::HashMap;
 use std::hash::Hash;
 use std::time::Duration;
 
-use crate::cache::clock::Clock;
+use dashmap::DashMap;
+
+use crate::cache::clock::ClockType;
 use crate::cache::stored_value::StoredValue;
 
 pub(crate) struct Store<Key, Value>
-    where Key: Hash + Eq {
-    store: HashMap<Key, StoredValue<Value>>,
-    clock: Box<dyn Clock>,
+    where Key: Hash + Eq,
+          Value: Clone {
+    store: DashMap<Key, StoredValue<Value>>,
+    clock: ClockType,
 }
 
 impl<Key, Value> Store<Key, Value>
-    where Key: Hash + Eq {
-    pub(crate) fn new(clock: Box<dyn Clock>) -> Self {
+    where Key: Hash + Eq,
+          Value: Clone {
+    pub(crate) fn new(clock: ClockType) -> Self {
         return Store {
-            store: HashMap::new(),
+            store: DashMap::new(),
             clock,
         };
     }
 
-    pub(crate) fn put(&mut self, key: Key, value: Value) {
+    pub(crate) fn put(&self, key: Key, value: Value) {
         self.store.insert(key, StoredValue::never_expiring(value));
     }
 
-    pub(crate) fn put_with_ttl(&mut self, key: Key, value: Value, time_to_live: Duration) {
+    pub(crate) fn put_with_ttl(&self, key: Key, value: Value, time_to_live: Duration) {
         self.store.insert(key, StoredValue::expiring(value, time_to_live, &self.clock));
     }
 
-    pub(crate) fn get(&self, key: &Key) -> Option<&Value> {
-        let maybe_value = self.store.get(&key);
+    pub(crate) fn get(&self, key: &Key) -> Option<Value> {
+        let maybe_value = self.store.get(key);
         return maybe_value
             .filter(|stored_value| stored_value.is_alive(&self.clock))
-            .map(|stored_value| stored_value.value());
+            .map(|stored_value| { stored_value.value().value() });
     }
 }
 
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
+
+    use setup::FutureClock;
+
     use crate::cache::clock::SystemClock;
     use crate::cache::store::Store;
-    use setup::FutureClock;
 
     mod setup {
         use std::ops::Add;
@@ -61,11 +66,11 @@ mod tests {
     #[test]
     fn get_value_for_an_existing_key() {
         let clock = SystemClock::boxed();
-        let mut store = Store::new(clock);
+        let store = Store::new(clock);
         store.put("topic", "microservices");
 
         let value = store.get(&"topic");
-        assert_eq!(Some(&"microservices"), value);
+        assert_eq!(Some("microservices"), value);
     }
 
     #[test]
@@ -98,6 +103,6 @@ mod tests {
         store.clock = Box::new(FutureClock {});
 
         let value = store.get(&"topic");
-        assert_eq!(Some(&"microservices"), value);
+        assert_eq!(Some("microservices"), value);
     }
 }

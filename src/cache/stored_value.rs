@@ -1,14 +1,16 @@
 use std::ops::Add;
 use std::time::{Duration, SystemTime};
 
-use crate::cache::clock::Clock;
+use crate::cache::clock::ClockType;
 
-pub(crate) struct StoredValue<Value> {
+pub(crate) struct StoredValue<Value>
+    where Value: Clone {
     value: Value,
     expire_after: Option<SystemTime>,
 }
 
-impl<Value> StoredValue<Value> {
+impl<Value> StoredValue<Value>
+    where Value: Clone {
     pub(crate) fn never_expiring(value: Value) -> Self {
         return StoredValue {
             value,
@@ -16,22 +18,26 @@ impl<Value> StoredValue<Value> {
         };
     }
 
-    pub(crate) fn expiring(value: Value, time_to_live: Duration, clock: &Box<dyn Clock>) -> Self {
+    pub(crate) fn expiring(value: Value, time_to_live: Duration, clock: &ClockType) -> Self {
         return StoredValue {
             value,
-            expire_after: Some(clock.now().add(time_to_live))
+            expire_after: Some(clock.now().add(time_to_live)),
         };
     }
 
-    pub(crate) fn is_alive(&self, clock: &Box<dyn Clock>) -> bool {
+    pub(crate) fn is_alive(&self, clock: &ClockType) -> bool {
         if let Some(expire_after) = self.expire_after {
             return !clock.has_passed(&expire_after);
         }
         return true;
     }
 
-    pub(crate) fn value(&self) -> &Value {
+    pub(crate) fn value_ref(&self) -> &Value {
         return &self.value;
+    }
+
+    pub(crate) fn value(&self) -> Value {
+        return self.value.clone();
     }
 }
 
@@ -39,7 +45,7 @@ impl<Value> StoredValue<Value> {
 mod tests {
     use std::time::Duration;
 
-    use crate::cache::clock::{Clock, SystemClock};
+    use crate::cache::clock::{ClockType, SystemClock};
     use crate::cache::stored_value::StoredValue;
     use crate::cache::stored_value::tests::setup::FutureClock;
 
@@ -70,7 +76,7 @@ mod tests {
         let system_clock = SystemClock::boxed();
         let stored_value = StoredValue::expiring("storage-engine", Duration::from_secs(5), &system_clock);
 
-        let future_clock: Box<dyn Clock> = Box::new(FutureClock {});
+        let future_clock: ClockType = Box::new(FutureClock {});
         assert_eq!(false, stored_value.is_alive(&future_clock));
     }
 }

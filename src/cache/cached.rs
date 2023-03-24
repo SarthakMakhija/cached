@@ -1,16 +1,18 @@
 use std::hash::Hash;
 use std::time::Duration;
 
-use crate::cache::clock::{SystemClock};
+use crate::cache::clock::{ClockType, SystemClock};
 use crate::cache::store::Store;
 
 pub struct CacheD<Key, Value>
-    where Key: Hash + Eq {
+    where Key: Hash + Eq,
+          Value: Clone {
     store: Store<Key, Value>,
 }
 
 impl<Key, Value> CacheD<Key, Value>
-    where Key: Hash + Eq {
+    where Key: Hash + Eq,
+          Value: Clone {
     pub fn new() -> Self {
         return CacheD {
             store: Store::new(SystemClock::boxed()),
@@ -18,7 +20,7 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     #[cfg(test)]
-    pub fn new_with_clock(clock: Box<dyn crate::cache::clock::Clock>) -> Self {
+    pub fn new_with_clock(clock: ClockType) -> Self {
         return CacheD {
             store: Store::new(clock),
         };
@@ -32,7 +34,7 @@ impl<Key, Value> CacheD<Key, Value>
         self.store.put_with_ttl(key, value, time_to_live);
     }
 
-    pub fn get(&self, key: Key) -> Option<&Value> {
+    pub fn get(&self, key: Key) -> Option<Value> {
         return self.store.get(&key);
     }
 }
@@ -62,7 +64,7 @@ mod tests {
         cached.put("topic", "microservices");
 
         let value = cached.get("topic");
-        assert_eq!(Some(&"microservices"), value);
+        assert_eq!(Some("microservices"), value);
     }
 
     #[test]

@@ -1,6 +1,8 @@
 use std::time::SystemTime;
 
-pub trait Clock {
+pub type ClockType = Box<dyn Clock + Send + Sync>;
+
+pub trait Clock: Send + Sync {
     fn now(&self) -> SystemTime;
 
     fn has_passed(&self, time: &SystemTime) -> bool {
@@ -21,7 +23,7 @@ impl SystemClock {
         return SystemClock {};
     }
 
-    pub(crate) fn boxed() -> Box<dyn Clock> {
+    pub(crate) fn boxed() -> ClockType {
         return Box::new(SystemClock::new());
     }
 }
