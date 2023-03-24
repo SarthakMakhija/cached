@@ -5,14 +5,14 @@ use std::time::Duration;
 use crate::cache::clock::SystemClock;
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
 use crate::cache::command::command::CommandType;
-use crate::cache::command::command_sender::CommandSender;
+use crate::cache::command::command_executor::CommandExecutor;
 use crate::cache::store::store::Store;
 
 pub struct CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + 'static,
           Value: Send + Sync + Clone + 'static {
     store: Arc<Store<Key, Value>>,
-    command_sender: CommandSender<Key, Value>,
+    command_sender: CommandExecutor<Key, Value>,
 }
 
 impl<Key, Value> CacheD<Key, Value>
@@ -22,7 +22,7 @@ impl<Key, Value> CacheD<Key, Value>
         let store = Store::new(SystemClock::boxed());
         return CacheD {
             store: store.clone(),
-            command_sender: CommandSender::new(store),
+            command_sender: CommandExecutor::new(store),
         };
     }
 
@@ -31,7 +31,7 @@ impl<Key, Value> CacheD<Key, Value>
         let store = Store::new(clock);
         return CacheD {
             store: store.clone(),
-            command_sender: CommandSender::new(store),
+            command_sender: CommandExecutor::new(store),
         };
     }
 
