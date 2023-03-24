@@ -86,6 +86,7 @@ mod tests {
         let command_sender = CommandSender::new(
             store.clone()
         );
+
         let command_acknowledgement = command_sender.send(CommandType::Put(
             "topic",
             "microservices"
@@ -102,6 +103,7 @@ mod tests {
         let command_sender = CommandSender::new(
             store.clone()
         );
+
         let acknowledgement = command_sender.send(CommandType::Put(
             "topic",
             "microservices"

@@ -74,6 +74,7 @@ mod tests {
     #[tokio::test]
     async fn get_value_for_an_existing_key() {
         let mut cached = CacheD::new();
+
         let acknowledgement = cached.put("topic", "microservices");
         acknowledgement.handle().await;
 
@@ -92,6 +93,7 @@ mod tests {
     #[tokio::test]
     async fn delete_a_key() {
         let mut cached = CacheD::new();
+
         let acknowledgement = cached.put("topic", "microservices");
         acknowledgement.handle().await;
 

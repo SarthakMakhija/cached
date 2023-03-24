@@ -74,6 +74,7 @@ mod tests {
     fn get_value_for_an_existing_key() {
         let clock = SystemClock::boxed();
         let store = Store::new(clock);
+
         store.put("topic", "microservices");
 
         let value = store.get(&"topic");
@@ -117,6 +118,7 @@ mod tests {
     fn delete_a_key() {
         let clock = SystemClock::boxed();
         let store = Store::new(clock);
+
         store.put("topic", "microservices");
         store.delete(&"topic");
 
@@ -128,6 +130,7 @@ mod tests {
     fn delete_a_non_existing_key() {
         let clock = SystemClock::boxed();
         let store = Store::new(clock);
+
         store.delete(&"non-existing");
 
         let value: Option<&str> = store.get(&"non-existing");
