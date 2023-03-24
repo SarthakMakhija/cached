@@ -44,6 +44,8 @@ impl<Key, Value> CommandSender<Key, Value>
                         store.put(key, value),
                     CommandType::PutWithTTL(key, value, ttl) =>
                         store.put_with_ttl(key, value, ttl),
+                    CommandType::Delete(key) =>
+                        store.delete(&key)
                 }
                 pair.acknowledgement.done();
                 if !keep_running.load(Ordering::Acquire) {
@@ -53,12 +55,14 @@ impl<Key, Value> CommandSender<Key, Value>
         });
     }
 
+    //TODO: Remove unwrap
     pub(crate) fn send(&self, command: CommandType<Key, Value>) -> Arc<CommandAcknowledgement> {
         let acknowledgement = CommandAcknowledgement::new();
         self.sender.send(CommandAcknowledgementPair{
             command,
             acknowledgement: acknowledgement.clone()
-        }).unwrap(); //TODO: Remove unwrap
+        }).unwrap();
+
         return acknowledgement;
     }
 
@@ -86,10 +90,9 @@ mod tests {
             "topic",
             "microservices"
         ));
-
         command_acknowledgement.handle().await;
-        command_sender.shutdown();
 
+        command_sender.shutdown();
         assert_eq!(Some("microservices"), store.get(&"topic"));
     }
 
@@ -107,11 +110,10 @@ mod tests {
             "disk",
             "SSD"
         ));
-
         acknowledgement.handle().await;
         other_acknowledgment.handle().await;
-        command_sender.shutdown();
 
+        command_sender.shutdown();
         assert_eq!(Some("microservices"), store.get(&"topic"));
         assert_eq!(Some("SSD"), store.get(&"disk"));
     }
@@ -128,10 +130,30 @@ mod tests {
             "microservices",
             Duration::from_secs(10)
         ));
-
         acknowledgement.handle().await;
-        command_sender.shutdown();
 
+        command_sender.shutdown();
         assert_eq!(Some("microservices"), store.get(&"topic"));
+    }
+
+    #[tokio::test]
+    async fn deletes_a_key() {
+        let store = Store::new(SystemClock::boxed());
+        let command_sender = CommandSender::new(
+            store.clone()
+        );
+
+        let acknowledgement = command_sender.send(CommandType::PutWithTTL(
+            "topic",
+            "microservices",
+            Duration::from_secs(10)
+        ));
+        acknowledgement.handle().await;
+
+        let acknowledgement = command_sender.send(CommandType::Delete("topic"));
+        acknowledgement.handle().await;
+
+        command_sender.shutdown();
+        assert_eq!(None, store.get(&"topic"));
     }
 }

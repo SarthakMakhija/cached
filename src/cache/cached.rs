@@ -11,7 +11,6 @@ use crate::cache::store::store::Store;
 pub struct CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + 'static,
           Value: Send + Sync + Clone + 'static {
-
     store: Arc<Store<Key, Value>>,
     command_sender: CommandSender<Key, Value>,
 }
@@ -42,6 +41,10 @@ impl<Key, Value> CacheD<Key, Value>
 
     pub fn put_with_ttl(&mut self, key: Key, value: Value, time_to_live: Duration) -> Arc<CommandAcknowledgement> {
         return self.command_sender.send(CommandType::PutWithTTL(key, value, time_to_live));
+    }
+
+    pub fn delete(&mut self, key: Key) -> Arc<CommandAcknowledgement> {
+        return self.command_sender.send(CommandType::Delete(key));
     }
 
     pub fn get(&self, key: Key) -> Option<Value> {
@@ -83,6 +86,19 @@ mod tests {
         let cached: CacheD<&str, &str> = CacheD::new();
 
         let value = cached.get("non-existing");
+        assert_eq!(None, value);
+    }
+
+    #[tokio::test]
+    async fn delete_a_key() {
+        let mut cached = CacheD::new();
+        let acknowledgement = cached.put("topic", "microservices");
+        acknowledgement.handle().await;
+
+        let acknowledgement = cached.delete("topic");
+        acknowledgement.handle().await;
+
+        let value = cached.get("topic");
         assert_eq!(None, value);
     }
 }

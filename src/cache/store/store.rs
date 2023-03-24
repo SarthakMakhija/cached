@@ -33,6 +33,10 @@ impl<Key, Value> Store<Key, Value>
         self.store.insert(key, StoredValue::expiring(value, time_to_live, &self.clock));
     }
 
+    pub(crate) fn delete(&self, key: &Key) {
+        self.store.remove(key);
+    }
+
     pub(crate) fn get(&self, key: &Key) -> Option<Value> {
         let maybe_value = self.store.get(key);
         return maybe_value
@@ -107,5 +111,16 @@ mod tests {
 
         let value = store.get(&"topic");
         assert_eq!(Some("microservices"), value);
+    }
+
+    #[test]
+    fn delete_a_key() {
+        let clock = SystemClock::boxed();
+        let store = Store::new(clock);
+        store.put("topic", "microservices");
+        store.delete(&"topic");
+
+        let value = store.get(&"topic");
+        assert_eq!(None, value);
     }
 }
