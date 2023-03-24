@@ -26,6 +26,7 @@ version = "0.1.0"
 dependencies = [
  "crossbeam-channel",
  "dashmap",
+ "parking_lot",
  "rand",
  "tokio",
 ]

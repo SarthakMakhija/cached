@@ -1,8 +1,9 @@
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::task::{Context, Poll, Waker};
+use parking_lot::Mutex;
 
 pub struct CommandAcknowledgement {
     handle: CommandAcknowledgementHandle,
@@ -43,7 +44,7 @@ impl CommandAcknowledgement {
 impl CommandAcknowledgementHandle {
     pub(crate) fn done(&self) {
         self.done.store(true, Ordering::Release);
-        if let Some(waker) = &self.waker_state.lock().unwrap().waker {
+        if let Some(waker) = &self.waker_state.lock().waker {
             waker.wake_by_ref();
         }
     }
@@ -53,7 +54,7 @@ impl Future for &CommandAcknowledgementHandle {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut guard = self.waker_state.lock().unwrap();
+        let mut guard = self.waker_state.lock();
         match guard.waker.as_ref() {
             Some(waker) => {
                 if !waker.will_wake(context.waker()) {
