@@ -4,9 +4,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 
 use crossbeam_channel::Receiver;
+
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
 use crate::cache::command::command::CommandType;
-
 use crate::cache::store::store::Store;
 
 pub(crate) struct CommandExecutor<Key, Value>
@@ -16,20 +16,22 @@ pub(crate) struct CommandExecutor<Key, Value>
     keep_running: Arc<AtomicBool>,
 }
 
-struct  CommandAcknowledgementPair<Key, Value> {
+struct CommandAcknowledgementPair<Key, Value> {
     command: CommandType<Key, Value>,
-    acknowledgement: Arc<CommandAcknowledgement>
+    acknowledgement: Arc<CommandAcknowledgement>,
 }
 
 impl<Key, Value> CommandExecutor<Key, Value>
     where Key: Hash + Eq + Send + Sync + 'static,
           Value: Send + Sync + Clone + 'static {
 
-    pub(crate) fn new(store: Arc<Store<Key, Value>>) -> Self {
-        let (sender, receiver) = crossbeam_channel::bounded(100);
-        let command_executor = CommandExecutor { sender, keep_running: Arc::new(AtomicBool::new(true)) };
-        command_executor.spin(receiver, store);
+    pub(crate) fn new(store: Arc<Store<Key, Value>>, buffer_size: usize) -> Self {
+        let (sender, receiver)
+            = crossbeam_channel::bounded(buffer_size);
+        let command_executor
+            = CommandExecutor { sender, keep_running: Arc::new(AtomicBool::new(true)) };
 
+        command_executor.spin(receiver, store);
         return command_executor;
     }
 
@@ -58,9 +60,9 @@ impl<Key, Value> CommandExecutor<Key, Value>
     //TODO: Remove unwrap
     pub(crate) fn send(&self, command: CommandType<Key, Value>) -> Arc<CommandAcknowledgement> {
         let acknowledgement = CommandAcknowledgement::new();
-        self.sender.send(CommandAcknowledgementPair{
+        self.sender.send(CommandAcknowledgementPair {
             command,
-            acknowledgement: acknowledgement.clone()
+            acknowledgement: acknowledgement.clone(),
         }).unwrap();
 
         return acknowledgement;
@@ -84,12 +86,13 @@ mod tests {
     async fn puts_a_key_value() {
         let store = Store::new(SystemClock::boxed());
         let command_executor = CommandExecutor::new(
-            store.clone()
+            store.clone(),
+            10,
         );
 
         let command_acknowledgement = command_executor.send(CommandType::Put(
             "topic",
-            "microservices"
+            "microservices",
         ));
         command_acknowledgement.handle().await;
 
@@ -101,16 +104,17 @@ mod tests {
     async fn puts_a_couple_of_key_values() {
         let store = Store::new(SystemClock::boxed());
         let command_executor = CommandExecutor::new(
-            store.clone()
+            store.clone(),
+            10
         );
 
         let acknowledgement = command_executor.send(CommandType::Put(
             "topic",
-            "microservices"
+            "microservices",
         ));
-        let other_acknowledgment  = command_executor.send(CommandType::Put(
+        let other_acknowledgment = command_executor.send(CommandType::Put(
             "disk",
-            "SSD"
+            "SSD",
         ));
         acknowledgement.handle().await;
         other_acknowledgment.handle().await;
@@ -124,13 +128,14 @@ mod tests {
     async fn puts_a_key_value_with_ttl() {
         let store = Store::new(SystemClock::boxed());
         let command_executor = CommandExecutor::new(
-            store.clone()
+            store.clone(),
+            10
         );
 
         let acknowledgement = command_executor.send(CommandType::PutWithTTL(
             "topic",
             "microservices",
-            Duration::from_secs(10)
+            Duration::from_secs(10),
         ));
         acknowledgement.handle().await;
 
@@ -142,13 +147,14 @@ mod tests {
     async fn deletes_a_key() {
         let store = Store::new(SystemClock::boxed());
         let command_executor = CommandExecutor::new(
-            store.clone()
+            store.clone(),
+            10
         );
 
         let acknowledgement = command_executor.send(CommandType::PutWithTTL(
             "topic",
             "microservices",
-            Duration::from_secs(10)
+            Duration::from_secs(10),
         ));
         acknowledgement.handle().await;
 

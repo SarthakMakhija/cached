@@ -11,6 +11,7 @@ pub struct Config<Key>
     pub key_hash: Box<HashFn<Key>>,
     pub clock: ClockType,
     pub counters: u64,
+    pub command_buffer_size: usize,
     pub(crate) access_pool_size: PoolSize,
     pub(crate) access_buffer_size: BufferSize,
 }
@@ -21,6 +22,7 @@ pub struct ConfigBuilder<Key>
     clock: ClockType,
     access_pool_size: PoolSize,
     access_buffer_size: BufferSize,
+    command_buffer_size: usize,
     counters: u64,
 }
 
@@ -38,6 +40,7 @@ impl<Key> ConfigBuilder<Key>
             clock: SystemClock::boxed(),
             access_pool_size: PoolSize(30),
             access_buffer_size: BufferSize(64),
+            command_buffer_size: 100,
             counters: 0,
         };
     }
@@ -62,6 +65,11 @@ impl<Key> ConfigBuilder<Key>
         return self;
     }
 
+    pub fn command_buffer_size(mut self, command_buffer_size: usize) -> ConfigBuilder<Key> {
+        self.command_buffer_size = command_buffer_size;
+        return self;
+    }
+
     pub fn counters(mut self, counters: u64) -> ConfigBuilder<Key> {
         self.counters = counters;
         return self;
@@ -73,6 +81,7 @@ impl<Key> ConfigBuilder<Key>
             clock: self.clock,
             access_pool_size: self.access_pool_size,
             access_buffer_size: self.access_buffer_size,
+            command_buffer_size: self.command_buffer_size,
             counters: self.counters,
         };
     }

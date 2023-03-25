@@ -16,7 +16,7 @@ pub struct CacheD<Key, Value>
           Value: Send + Sync + Clone + 'static {
     config: Config<Key>,
     store: Arc<Store<Key, Value>>,
-    command_sender: CommandExecutor<Key, Value>,
+    command_executor: CommandExecutor<Key, Value>,
     policy: Rc<AdmissionPolicy>,
     pool: Pool<AdmissionPolicy>,
 }
@@ -30,26 +30,27 @@ impl<Key, Value> CacheD<Key, Value>
         let store = Store::new((&config.clock).clone_box());
         let admission_policy = Rc::new(AdmissionPolicy::new(config.counters));
         let pool = Pool::new(*&config.access_pool_size, *&config.access_buffer_size, admission_policy.clone());
+        let command_buffer_size = *&config.command_buffer_size;
 
         return CacheD {
             config,
             store: store.clone(),
-            command_sender: CommandExecutor::new(store),
+            command_executor: CommandExecutor::new(store, command_buffer_size),
             policy: admission_policy,
             pool,
         };
     }
 
     pub fn put(&self, key: Key, value: Value) -> Arc<CommandAcknowledgement> {
-        return self.command_sender.send(CommandType::Put(key, value));
+        return self.command_executor.send(CommandType::Put(key, value));
     }
 
     pub fn put_with_ttl(&self, key: Key, value: Value, time_to_live: Duration) -> Arc<CommandAcknowledgement> {
-        return self.command_sender.send(CommandType::PutWithTTL(key, value, time_to_live));
+        return self.command_executor.send(CommandType::PutWithTTL(key, value, time_to_live));
     }
 
     pub fn delete(&self, key: Key) -> Arc<CommandAcknowledgement> {
-        return self.command_sender.send(CommandType::Delete(key));
+        return self.command_executor.send(CommandType::Delete(key));
     }
 
     pub fn get(&self, key: Key) -> Option<Value> {
