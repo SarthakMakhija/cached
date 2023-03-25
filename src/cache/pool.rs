@@ -111,6 +111,9 @@ mod tests {
         pool.add("LRU");
         pool.add("cache");
 
-        assert_eq!(4, consumer.total_keys.load(Ordering::SeqCst));
+        //it is possible that one buffer gets full, it gets flushed to the consumer.
+        //for the remaining 2 keys, it is possible that 1 key might go in buffer 0 and the other key might go in buffer 1
+        let total_keys = consumer.total_keys.load(Ordering::SeqCst);
+        assert!(total_keys == 4 || total_keys == 2);
     }
 }
