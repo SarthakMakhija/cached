@@ -101,7 +101,7 @@ impl CountMinSketch {
 
 #[cfg(test)]
 mod tests {
-    use crate::cache::tiny_lfu::count_min_sketch::CountMinSketch;
+    use crate::cache::lfu::count_min_sketch::CountMinSketch;
 
     #[test]
     fn total_counters() {
