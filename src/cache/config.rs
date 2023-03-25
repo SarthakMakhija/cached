@@ -6,6 +6,10 @@ use crate::cache::pool::{BufferSize, PoolSize};
 
 type HashFn<Key> = dyn Fn(&Key) -> u64;
 
+const COMMAND_BUFFER_SIZE: usize = 32 * 1024;
+const ACCESS_POOL_SIZE: PoolSize = PoolSize(30);
+const ACCESS_BUFFER_SIZE: BufferSize = BufferSize(64);
+
 pub struct Config<Key>
     where Key: Hash {
     pub key_hash: Box<HashFn<Key>>,
@@ -38,9 +42,9 @@ impl<Key> ConfigBuilder<Key>
         return ConfigBuilder {
             key_hash: Box::new(key_hash),
             clock: SystemClock::boxed(),
-            access_pool_size: PoolSize(30),
-            access_buffer_size: BufferSize(64),
-            command_buffer_size: 100,
+            access_pool_size: ACCESS_POOL_SIZE,
+            access_buffer_size: ACCESS_BUFFER_SIZE,
+            command_buffer_size: COMMAND_BUFFER_SIZE,
             counters: 0,
         };
     }
