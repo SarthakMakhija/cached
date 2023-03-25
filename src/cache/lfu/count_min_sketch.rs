@@ -1,11 +1,11 @@
 use rand::Rng;
 
 #[repr(transparent)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct Row(Vec<u8>);
 
 impl Row {
-    pub(crate) fn increment_at(&mut self, position: u64) {
+    fn increment_at(&mut self, position: u64) {
         let index = (position / 2) as usize;
         let shift = (position & 0x01) * 4;
         let is_less_than15 = (self.0[index] >> shift) & 0x0f < 0x0f;
@@ -15,11 +15,17 @@ impl Row {
         }
     }
 
-    pub(crate) fn get_at(&self, position: u64) -> u8 {
+    fn get_at(&self, position: u64) -> u8 {
         let index = (position / 2) as usize;
         let shift = (position & 0x01) * 4;
 
         return (self.0[index] >> shift) & 0x0f;
+    }
+
+    fn half_counters(&mut self) {
+        self.0.iter_mut().for_each(|slice| {
+            *slice = (*slice >> 1) & 0x77;
+        });
     }
 }
 
@@ -63,6 +69,13 @@ impl CountMinSketch {
         return min;
     }
 
+    pub(crate) fn reset(&mut self) {
+        (0..ROWS).for_each(|index| {
+            let row = &mut self.matrix[index];
+            row.half_counters();
+        });
+    }
+
     fn next_power_2(counters: u64) -> u64 {
         let mut updated_counters = counters;
 
@@ -101,7 +114,7 @@ impl CountMinSketch {
 
 #[cfg(test)]
 mod tests {
-    use crate::cache::lfu::count_min_sketch::CountMinSketch;
+    use crate::cache::lfu::count_min_sketch::{CountMinSketch, Row};
 
     #[test]
     fn total_counters() {
@@ -139,5 +152,34 @@ mod tests {
 
         assert_eq!(2, count_min_sketch.estimate(10));
         assert_eq!(2, count_min_sketch.estimate(15));
+    }
+
+    #[test]
+    fn reset_count_for_a_row() {
+        let mut row = Row(vec![15, 10, 240, 255]);
+
+        row.half_counters();
+
+        assert_eq!(7, row.0[0]);
+        assert_eq!(5, row.0[1]);
+        assert_eq!(112, row.0[2]); // 240/2 is 120 but it can not be represented without using both the lower and the upper 4 bits of our counter
+        assert_eq!(7, row.0[3] & 0x0f); //lower 4 bits
+        assert_eq!(7, row.0[3] >> 4 & 0x0f); //upper 4 bits
+    }
+
+    #[test]
+    fn reset_count() {
+        let mut count_min_sketch = CountMinSketch::new(2);
+        count_min_sketch.matrix[0] = Row(vec![15, 240]);
+        count_min_sketch.matrix[1] = Row(vec![64, 7]);
+        count_min_sketch.matrix[2] = Row(vec![192, 10]);
+        count_min_sketch.matrix[3] = Row(vec![48, 14]);
+
+        count_min_sketch.reset();
+
+        assert_eq!(Row(vec![7, 112]), count_min_sketch.matrix[0]);
+        assert_eq!(Row(vec![32, 3]), count_min_sketch.matrix[1]);
+        assert_eq!(Row(vec![96, 5]), count_min_sketch.matrix[2]);
+        assert_eq!(Row(vec![16, 7]), count_min_sketch.matrix[3]);
     }
 }

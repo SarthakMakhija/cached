@@ -2,12 +2,16 @@ use crate::cache::lfu::count_min_sketch::CountMinSketch;
 
 pub(crate) struct TinyLFU {
     key_access_frequency: CountMinSketch,
+    total_increments: u64,
+    reset_counters_at: u64,
 }
 
 impl TinyLFU {
     pub(crate) fn new(counters: u64) -> TinyLFU {
         return TinyLFU {
-            key_access_frequency: CountMinSketch::new(counters)
+            key_access_frequency: CountMinSketch::new(counters),
+            total_increments: 0,
+            reset_counters_at: counters,
         };
     }
 
@@ -23,6 +27,15 @@ impl TinyLFU {
     fn increment_access_for(&mut self, key_hash: u64) {
         //TODO: Doorkeeper
         self.key_access_frequency.increment(key_hash);
+        self.total_increments = self.total_increments + 1;
+        if self.total_increments >= self.reset_counters_at {
+            self.reset();
+        }
+    }
+
+    fn reset(&mut self) {
+        self.total_increments = 0;
+        self.key_access_frequency.reset();
     }
 }
 
@@ -37,5 +50,21 @@ mod tests {
 
         assert_eq!(3, tiny_lfu.estimate(10));
         assert_eq!(1, tiny_lfu.estimate(20));
+    }
+
+    #[test]
+    fn total_increments() {
+        let mut tiny_lfu = TinyLFU::new(10);
+        tiny_lfu.add(vec![10, 10, 10, 20]);
+
+        assert_eq!(4, tiny_lfu.total_increments);
+    }
+
+    #[test]
+    fn reset() {
+        let mut tiny_lfu = TinyLFU::new(2);
+        tiny_lfu.add(vec![10, 10]);
+
+        assert_eq!(0, tiny_lfu.total_increments);
     }
 }
