@@ -6,7 +6,7 @@ use std::time::Duration;
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
 use crate::cache::command::command::CommandType;
 use crate::cache::command::command_executor::CommandExecutor;
-use crate::cache::config::Config;
+use crate::cache::config::config::Config;
 use crate::cache::policy::admission_policy::AdmissionPolicy;
 use crate::cache::pool::Pool;
 use crate::cache::store::store::Store;
@@ -72,7 +72,7 @@ mod tests {
     use std::time::Duration;
 
     use crate::cache::cached::CacheD;
-    use crate::cache::config::ConfigBuilder;
+    use crate::cache::config::config::ConfigBuilder;
 
     #[tokio::test]
     async fn get_value_for_an_existing_key() {
