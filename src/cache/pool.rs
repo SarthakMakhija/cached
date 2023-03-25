@@ -5,11 +5,11 @@ use rand::{Rng, thread_rng};
 
 #[repr(transparent)]
 #[derive(Copy, Clone)]
-pub(crate) struct PoolSize(usize);
+pub(crate) struct PoolSize(pub(crate) usize);
 
 #[repr(transparent)]
 #[derive(Copy, Clone)]
-pub(crate) struct BufferSize(usize);
+pub(crate) struct BufferSize(pub(crate) usize);
 
 pub(crate) struct Pool<Consumer: BufferConsumer> {
     buffers: Vec<RwLock<Buffer<Consumer>>>,

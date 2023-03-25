@@ -2,10 +2,10 @@ use std::hash::Hash;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::cache::clock::SystemClock;
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
 use crate::cache::command::command::CommandType;
 use crate::cache::command::command_executor::CommandExecutor;
+use crate::cache::config::Config;
 use crate::cache::store::store::Store;
 
 pub struct CacheD<Key, Value>
@@ -18,15 +18,15 @@ pub struct CacheD<Key, Value>
 impl<Key, Value> CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + 'static,
           Value: Send + Sync + Clone + 'static {
-    pub fn new() -> Self {
-        let store = Store::new(SystemClock::boxed());
+
+    pub fn new(config: Config<Key>) -> Self {
+        let store = Store::new(config.clock);
         return CacheD {
             store: store.clone(),
             command_sender: CommandExecutor::new(store),
         };
     }
 
-    #[cfg(test)]
     pub fn new_with_clock(clock: crate::cache::clock::ClockType) -> Self {
         let store = Store::new(clock);
         return CacheD {
@@ -55,25 +55,11 @@ impl<Key, Value> CacheD<Key, Value>
 #[cfg(test)]
 mod tests {
     use crate::cache::cached::CacheD;
-
-    mod setup {
-        use std::ops::Add;
-        use std::time::{Duration, SystemTime};
-
-        use crate::cache::clock::Clock;
-
-        pub(crate) struct FutureClock;
-
-        impl Clock for FutureClock {
-            fn now(&self) -> SystemTime {
-                return SystemTime::now().add(Duration::from_secs(10));
-            }
-        }
-    }
+    use crate::cache::config::ConfigBuilder;
 
     #[tokio::test]
     async fn get_value_for_an_existing_key() {
-        let mut cached = CacheD::new();
+        let mut cached = CacheD::new(ConfigBuilder::new().build());
 
         let acknowledgement = cached.put("topic", "microservices");
         acknowledgement.handle().await;
@@ -84,7 +70,7 @@ mod tests {
 
     #[test]
     fn get_value_for_a_non_existing_key() {
-        let cached: CacheD<&str, &str> = CacheD::new();
+        let cached: CacheD<&str, &str> = CacheD::new(ConfigBuilder::new().build());
 
         let value = cached.get("non-existing");
         assert_eq!(None, value);
@@ -92,7 +78,7 @@ mod tests {
 
     #[tokio::test]
     async fn delete_a_key() {
-        let mut cached = CacheD::new();
+        let mut cached = CacheD::new(ConfigBuilder::new().build());
 
         let acknowledgement = cached.put("topic", "microservices");
         acknowledgement.handle().await;

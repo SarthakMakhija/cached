@@ -1,4 +1,5 @@
 pub mod cached;
+pub mod config;
 pub(crate) mod clock;
 pub(crate) mod store;
 pub(crate) mod command;
