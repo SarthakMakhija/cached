@@ -1,4 +1,5 @@
 use std::hash::Hash;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -6,13 +7,17 @@ use crate::cache::command::acknowledgement::CommandAcknowledgement;
 use crate::cache::command::command::CommandType;
 use crate::cache::command::command_executor::CommandExecutor;
 use crate::cache::config::Config;
+use crate::cache::policy::admission_policy::AdmissionPolicy;
+use crate::cache::pool::{BufferSize, Pool, PoolSize};
 use crate::cache::store::store::Store;
 
 pub struct CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + 'static,
           Value: Send + Sync + Clone + 'static {
+    config: Config<Key>,
     store: Arc<Store<Key, Value>>,
     command_sender: CommandExecutor<Key, Value>,
+    pool: Pool<AdmissionPolicy>
 }
 
 impl<Key, Value> CacheD<Key, Value>
@@ -20,10 +25,12 @@ impl<Key, Value> CacheD<Key, Value>
           Value: Send + Sync + Clone + 'static {
 
     pub fn new(config: Config<Key>) -> Self {
-        let store = Store::new(config.clock);
+        let store = Store::new((&config.clock).clone_box());
         return CacheD {
+            config,
             store: store.clone(),
             command_sender: CommandExecutor::new(store),
+            pool: Pool::new(PoolSize(1), BufferSize(1), Rc::new(AdmissionPolicy::new(10)))
         };
     }
 
@@ -40,7 +47,15 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn get(&self, key: Key) -> Option<Value> {
-        return self.store.get(&key);
+        if let Some(value) =  self.store.get(&key) {
+            self.mark_key_accessed(&key);
+            return Some(value);
+        }
+        return None;
+    }
+
+    fn mark_key_accessed(&self, key: &Key) {
+        self.pool.add((self.config.key_hash)(&key));
     }
 }
 
