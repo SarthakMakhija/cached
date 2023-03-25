@@ -1,6 +1,8 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+
 use crate::cache::clock::{ClockType, SystemClock};
+use crate::cache::pool::{BufferSize, PoolSize};
 
 type HashFn<Key> = dyn Fn(&Key) -> u64;
 
@@ -8,12 +10,18 @@ pub struct Config<Key>
     where Key: Hash {
     pub key_hash: Box<HashFn<Key>>,
     pub clock: ClockType,
+    pub counters: u64,
+    pub(crate) access_pool_size: PoolSize,
+    pub(crate) access_buffer_size: BufferSize,
 }
 
 pub struct ConfigBuilder<Key>
     where Key: Hash {
     key_hash: Box<HashFn<Key>>,
     clock: ClockType,
+    access_pool_size: PoolSize,
+    access_buffer_size: BufferSize,
+    counters: u64,
 }
 
 impl<Key> ConfigBuilder<Key>
@@ -28,21 +36,44 @@ impl<Key> ConfigBuilder<Key>
         return ConfigBuilder {
             key_hash: Box::new(key_hash),
             clock: SystemClock::boxed(),
+            access_pool_size: PoolSize(30),
+            access_buffer_size: BufferSize(64),
+            counters: 0,
         };
     }
 
-    pub fn key_hash(&mut self, key_hash: Box<HashFn<Key>>) {
+    pub fn key_hash(mut self, key_hash: Box<HashFn<Key>>) -> ConfigBuilder<Key> {
         self.key_hash = key_hash;
+        return self;
     }
 
-    pub fn clock(&mut self, clock: ClockType) {
+    pub fn clock(mut self, clock: ClockType) -> ConfigBuilder<Key> {
         self.clock = clock;
+        return self;
+    }
+
+    pub fn access_pool_size(mut self, pool_size: usize) -> ConfigBuilder<Key> {
+        self.access_pool_size = PoolSize(pool_size);
+        return self;
+    }
+
+    pub fn access_buffer_size(mut self, buffer_size: usize) -> ConfigBuilder<Key> {
+        self.access_buffer_size = BufferSize(buffer_size);
+        return self;
+    }
+
+    pub fn counters(mut self, counters: u64) -> ConfigBuilder<Key> {
+        self.counters = counters;
+        return self;
     }
 
     pub fn build(self) -> Config<Key> {
         return Config {
             key_hash: self.key_hash,
             clock: self.clock,
+            access_pool_size: self.access_pool_size,
+            access_buffer_size: self.access_buffer_size,
+            counters: self.counters,
         };
     }
 }

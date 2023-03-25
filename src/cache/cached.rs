@@ -8,7 +8,7 @@ use crate::cache::command::command::CommandType;
 use crate::cache::command::command_executor::CommandExecutor;
 use crate::cache::config::Config;
 use crate::cache::policy::admission_policy::AdmissionPolicy;
-use crate::cache::pool::{BufferSize, Pool, PoolSize};
+use crate::cache::pool::Pool;
 use crate::cache::store::store::Store;
 
 pub struct CacheD<Key, Value>
@@ -17,20 +17,23 @@ pub struct CacheD<Key, Value>
     config: Config<Key>,
     store: Arc<Store<Key, Value>>,
     command_sender: CommandExecutor<Key, Value>,
-    pool: Pool<AdmissionPolicy>
+    pool: Pool<AdmissionPolicy>,
 }
 
 impl<Key, Value> CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + 'static,
           Value: Send + Sync + Clone + 'static {
-
     pub fn new(config: Config<Key>) -> Self {
+        assert!(config.counters > 0);
+
         let store = Store::new((&config.clock).clone_box());
+        let pool = Pool::new(*&config.access_pool_size, *&config.access_buffer_size, Rc::new(AdmissionPolicy::new(config.counters)));
+
         return CacheD {
             config,
             store: store.clone(),
             command_sender: CommandExecutor::new(store),
-            pool: Pool::new(PoolSize(1), BufferSize(1), Rc::new(AdmissionPolicy::new(10)))
+            pool,
         };
     }
 
@@ -47,7 +50,7 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn get(&self, key: Key) -> Option<Value> {
-        if let Some(value) =  self.store.get(&key) {
+        if let Some(value) = self.store.get(&key) {
             self.mark_key_accessed(&key);
             return Some(value);
         }
@@ -66,7 +69,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_value_for_an_existing_key() {
-        let mut cached = CacheD::new(ConfigBuilder::new().build());
+        let mut cached = CacheD::new(ConfigBuilder::new().counters(10).build());
 
         let acknowledgement = cached.put("topic", "microservices");
         acknowledgement.handle().await;
@@ -77,7 +80,7 @@ mod tests {
 
     #[test]
     fn get_value_for_a_non_existing_key() {
-        let cached: CacheD<&str, &str> = CacheD::new(ConfigBuilder::new().build());
+        let cached: CacheD<&str, &str> = CacheD::new(ConfigBuilder::new().counters(10).build());
 
         let value = cached.get("non-existing");
         assert_eq!(None, value);
@@ -85,7 +88,7 @@ mod tests {
 
     #[tokio::test]
     async fn delete_a_key() {
-        let mut cached = CacheD::new(ConfigBuilder::new().build());
+        let mut cached = CacheD::new(ConfigBuilder::new().counters(10).build());
 
         let acknowledgement = cached.put("topic", "microservices");
         acknowledgement.handle().await;
