@@ -17,6 +17,7 @@ pub struct CacheD<Key, Value>
     config: Config<Key>,
     store: Arc<Store<Key, Value>>,
     command_sender: CommandExecutor<Key, Value>,
+    policy: Rc<AdmissionPolicy>,
     pool: Pool<AdmissionPolicy>,
 }
 
@@ -27,25 +28,27 @@ impl<Key, Value> CacheD<Key, Value>
         assert!(config.counters > 0);
 
         let store = Store::new((&config.clock).clone_box());
-        let pool = Pool::new(*&config.access_pool_size, *&config.access_buffer_size, Rc::new(AdmissionPolicy::new(config.counters)));
+        let admission_policy = Rc::new(AdmissionPolicy::new(config.counters));
+        let pool = Pool::new(*&config.access_pool_size, *&config.access_buffer_size, admission_policy.clone());
 
         return CacheD {
             config,
             store: store.clone(),
             command_sender: CommandExecutor::new(store),
+            policy: admission_policy,
             pool,
         };
     }
 
-    pub fn put(&mut self, key: Key, value: Value) -> Arc<CommandAcknowledgement> {
+    pub fn put(&self, key: Key, value: Value) -> Arc<CommandAcknowledgement> {
         return self.command_sender.send(CommandType::Put(key, value));
     }
 
-    pub fn put_with_ttl(&mut self, key: Key, value: Value, time_to_live: Duration) -> Arc<CommandAcknowledgement> {
+    pub fn put_with_ttl(&self, key: Key, value: Value, time_to_live: Duration) -> Arc<CommandAcknowledgement> {
         return self.command_sender.send(CommandType::PutWithTTL(key, value, time_to_live));
     }
 
-    pub fn delete(&mut self, key: Key) -> Arc<CommandAcknowledgement> {
+    pub fn delete(&self, key: Key) -> Arc<CommandAcknowledgement> {
         return self.command_sender.send(CommandType::Delete(key));
     }
 
@@ -64,12 +67,15 @@ impl<Key, Value> CacheD<Key, Value>
 
 #[cfg(test)]
 mod tests {
+    use std::thread;
+    use std::time::Duration;
+
     use crate::cache::cached::CacheD;
     use crate::cache::config::ConfigBuilder;
 
     #[tokio::test]
     async fn get_value_for_an_existing_key() {
-        let mut cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
 
         let acknowledgement = cached.put("topic", "microservices");
         acknowledgement.handle().await;
@@ -88,7 +94,7 @@ mod tests {
 
     #[tokio::test]
     async fn delete_a_key() {
-        let mut cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
 
         let acknowledgement = cached.put("topic", "microservices");
         acknowledgement.handle().await;
@@ -98,5 +104,25 @@ mod tests {
 
         let value = cached.get("topic");
         assert_eq!(None, value);
+    }
+
+    #[tokio::test]
+    async fn get_access_frequency() {
+        let cached = CacheD::new(ConfigBuilder::new().access_pool_size(1).access_buffer_size(3).counters(10).build());
+
+        let acknowledgement_topic = cached.put("topic", "microservices");
+        let acknowledgement_disk = cached.put("disk", "SSD");
+
+        acknowledgement_topic.handle().await;
+        acknowledgement_disk.handle().await;
+
+        cached.get("topic");
+        cached.get("disk");
+        cached.get("topic");
+        thread::sleep(Duration::from_secs(2));
+
+        let hasher = &(cached.config.key_hash);
+        assert_eq!(2, cached.policy.estimate(hasher(&"topic")));
+        assert_eq!(1, cached.policy.estimate(hasher(&"disk")));
     }
 }
