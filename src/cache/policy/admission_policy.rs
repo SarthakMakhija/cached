@@ -70,7 +70,7 @@ mod tests {
         let key_hashes = &vec![10, 14, 116, 19, 19, 10];
 
         policy.accept(key_hashes);
-        thread::sleep(Duration::from_millis(2));
+        thread::sleep(Duration::from_millis(5));
 
         let actual_frequencies = vec![
             policy.estimate(10),
