@@ -61,6 +61,7 @@ mod tests {
 
         use crate::cache::clock::Clock;
 
+        #[derive(Clone)]
         pub(crate) struct FutureClock;
 
         impl Clock for FutureClock {

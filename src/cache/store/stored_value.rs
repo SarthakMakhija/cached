@@ -52,8 +52,10 @@ mod tests {
 
         use crate::cache::clock::Clock;
 
+        #[derive(Clone)]
         pub(crate) struct FutureClock;
 
+        #[derive(Clone)]
         pub(crate) struct UnixEpochClock;
 
         impl Clock for FutureClock {

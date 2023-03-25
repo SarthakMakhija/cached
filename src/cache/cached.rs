@@ -27,14 +27,6 @@ impl<Key, Value> CacheD<Key, Value>
         };
     }
 
-    pub fn new_with_clock(clock: crate::cache::clock::ClockType) -> Self {
-        let store = Store::new(clock);
-        return CacheD {
-            store: store.clone(),
-            command_sender: CommandExecutor::new(store),
-        };
-    }
-
     pub fn put(&mut self, key: Key, value: Value) -> Arc<CommandAcknowledgement> {
         return self.command_sender.send(CommandType::Put(key, value));
     }
