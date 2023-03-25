@@ -24,7 +24,7 @@ struct Buffer<Consumer: BufferConsumer> {
 }
 
 pub(crate) trait BufferConsumer {
-    fn accept(&self, key_hashes: &Vec<u64>);
+    fn accept(&self, key_hashes: Vec<u64>);
 }
 
 impl<Consumer> Buffer<Consumer>
@@ -41,7 +41,7 @@ impl<Consumer> Buffer<Consumer>
         self.key_hashes.push(key_hash);
 
         if self.key_hashes.len() >= self.capacity.0 {
-            self.consumer.accept(&self.key_hashes);
+            self.consumer.accept(self.key_hashes.clone());
             self.key_hashes.clear();
         }
     }
@@ -83,7 +83,7 @@ mod tests {
         }
 
         impl BufferConsumer for TestBufferConsumer {
-            fn accept(&self, keys: &Vec<u64>) {
+            fn accept(&self, keys: Vec<u64>) {
                 self.total_keys.fetch_add(keys.len(), Ordering::SeqCst);
             }
         }

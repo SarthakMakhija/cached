@@ -50,10 +50,10 @@ impl AdmissionPolicy {
 }
 
 impl BufferConsumer for AdmissionPolicy {
-    fn accept(&self, key_hashes: &Vec<u64>) {
+    fn accept(&self, key_hashes: Vec<u64>) {
         //TODO: Decide if we need to clone this
         //TODO: Remove unwrap
-        self.sender.clone().send(key_hashes.clone()).unwrap();
+        self.sender.clone().send(key_hashes).unwrap();
     }
 }
 
@@ -67,7 +67,7 @@ mod tests {
     #[test]
     fn increase_access_frequency() {
         let policy = AdmissionPolicy::new(10);
-        let key_hashes = &vec![10, 14, 116, 19, 19, 10];
+        let key_hashes = vec![10, 14, 116, 19, 19, 10];
 
         policy.accept(key_hashes);
         thread::sleep(Duration::from_millis(5));
