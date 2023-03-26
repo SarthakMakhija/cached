@@ -17,12 +17,11 @@ pub(crate) struct Store<Key, Value>
 impl<Key, Value> Store<Key, Value>
     where Key: Hash + Eq,
           Value: Clone {
-
-    pub(crate) fn new(clock: ClockType) -> Arc<Store <Key, Value>> {
-        return Arc::new(Store {
+    pub(crate) fn new(clock: ClockType) -> Arc<Store<Key, Value>> {
+        Arc::new(Store {
             store: DashMap::new(),
             clock,
-        });
+        })
     }
 
     pub(crate) fn put(&self, key: Key, value: Value) {
@@ -39,9 +38,9 @@ impl<Key, Value> Store<Key, Value>
 
     pub(crate) fn get(&self, key: &Key) -> Option<Value> {
         let maybe_value = self.store.get(key);
-        return maybe_value
+        maybe_value
             .filter(|stored_value| stored_value.is_alive(&self.clock))
-            .map(|stored_value| { stored_value.value().value() });
+            .map(|stored_value| { stored_value.value().value() })
     }
 }
 
