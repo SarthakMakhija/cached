@@ -13,7 +13,7 @@ pub trait Clock: Send + Sync + BoxedClockClone {
     fn now(&self) -> SystemTime;
 
     fn has_passed(&self, time: &SystemTime) -> bool {
-        return self.now().gt(time);
+        self.now().gt(time)
     }
 }
 
@@ -33,16 +33,16 @@ impl Clone for Box<dyn Clock> {
 
 impl Clock for SystemClock {
     fn now(&self) -> SystemTime {
-        return SystemTime::now();
+        SystemTime::now()
     }
 }
 
 impl SystemClock {
     pub fn new() -> SystemClock {
-        return SystemClock {};
+        SystemClock {}
     }
 
     pub(crate) fn boxed() -> ClockType {
-        return Box::new(SystemClock::new());
+        Box::new(SystemClock::new())
     }
 }
