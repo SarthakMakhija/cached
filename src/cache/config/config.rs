@@ -9,6 +9,7 @@ type HashFn<Key> = dyn Fn(&Key) -> u64;
 const COMMAND_BUFFER_SIZE: usize = 32 * 1024;
 const ACCESS_POOL_SIZE: PoolSize = PoolSize(30);
 const ACCESS_BUFFER_SIZE: BufferSize = BufferSize(64);
+const COUNTERS: u64 = 1_000_000;
 
 pub struct Config<Key>
     where Key: Hash {
@@ -30,6 +31,13 @@ pub struct ConfigBuilder<Key>
     counters: u64,
 }
 
+impl<Key> Default for ConfigBuilder<Key>
+    where Key: Hash {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<Key> ConfigBuilder<Key>
     where Key: Hash {
     pub fn new() -> Self {
@@ -45,48 +53,48 @@ impl<Key> ConfigBuilder<Key>
             access_pool_size: ACCESS_POOL_SIZE,
             access_buffer_size: ACCESS_BUFFER_SIZE,
             command_buffer_size: COMMAND_BUFFER_SIZE,
-            counters: 0,
+            counters: COUNTERS,
         };
     }
 
     pub fn key_hash(mut self, key_hash: Box<HashFn<Key>>) -> ConfigBuilder<Key> {
         self.key_hash = key_hash;
-        return self;
+        self
     }
 
     pub fn clock(mut self, clock: ClockType) -> ConfigBuilder<Key> {
         self.clock = clock;
-        return self;
+        self
     }
 
     pub fn access_pool_size(mut self, pool_size: usize) -> ConfigBuilder<Key> {
         self.access_pool_size = PoolSize(pool_size);
-        return self;
+        self
     }
 
     pub fn access_buffer_size(mut self, buffer_size: usize) -> ConfigBuilder<Key> {
         self.access_buffer_size = BufferSize(buffer_size);
-        return self;
+        self
     }
 
     pub fn command_buffer_size(mut self, command_buffer_size: usize) -> ConfigBuilder<Key> {
         self.command_buffer_size = command_buffer_size;
-        return self;
+        self
     }
 
     pub fn counters(mut self, counters: u64) -> ConfigBuilder<Key> {
         self.counters = counters;
-        return self;
+        self
     }
 
     pub fn build(self) -> Config<Key> {
-        return Config {
+        Config {
             key_hash: self.key_hash,
             clock: self.clock,
             access_pool_size: self.access_pool_size,
             access_buffer_size: self.access_buffer_size,
             command_buffer_size: self.command_buffer_size,
             counters: self.counters,
-        };
+        }
     }
 }
