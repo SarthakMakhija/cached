@@ -8,11 +8,11 @@ pub(crate) struct TinyLFU {
 
 impl TinyLFU {
     pub(crate) fn new(counters: u64) -> TinyLFU {
-        return TinyLFU {
+        TinyLFU {
             key_access_frequency: FrequencyCounter::new(counters),
             total_increments: 0,
             reset_counters_at: counters,
-        };
+        }
     }
 
     pub(crate) fn add(&mut self, key_hashes: Vec<u64>) {
@@ -21,13 +21,13 @@ impl TinyLFU {
 
     pub(crate) fn estimate(&self, key_hash: u64) -> u8 {
         //TODO: Doorkeeper
-        return self.key_access_frequency.estimate(key_hash);
+        self.key_access_frequency.estimate(key_hash)
     }
 
     fn increment_access_for(&mut self, key_hash: u64) {
         //TODO: Doorkeeper
         self.key_access_frequency.increment(key_hash);
-        self.total_increments = self.total_increments + 1;
+        self.total_increments += 1;
         if self.total_increments >= self.reset_counters_at {
             self.reset();
         }
