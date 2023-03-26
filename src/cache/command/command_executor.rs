@@ -32,7 +32,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
             = CommandExecutor { sender, keep_running: Arc::new(AtomicBool::new(true)) };
 
         command_executor.spin(receiver, store);
-        return command_executor;
+        command_executor
     }
 
     fn spin(&self, receiver: Receiver<CommandAcknowledgementPair<Key, Value>>, store: Arc<Store<Key, Value>>) {
@@ -65,7 +65,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
             acknowledgement: acknowledgement.clone(),
         }).unwrap();
 
-        return acknowledgement;
+        acknowledgement
     }
 
     pub(crate) fn shutdown(&self) {
