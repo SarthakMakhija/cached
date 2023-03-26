@@ -1,7 +1,7 @@
-use crate::cache::lfu::count_min_sketch::CountMinSketch;
+use crate::cache::lfu::frequency_counter::FrequencyCounter;
 
 pub(crate) struct TinyLFU {
-    key_access_frequency: CountMinSketch,
+    key_access_frequency: FrequencyCounter,
     total_increments: u64,
     reset_counters_at: u64,
 }
@@ -9,7 +9,7 @@ pub(crate) struct TinyLFU {
 impl TinyLFU {
     pub(crate) fn new(counters: u64) -> TinyLFU {
         return TinyLFU {
-            key_access_frequency: CountMinSketch::new(counters),
+            key_access_frequency: FrequencyCounter::new(counters),
             total_increments: 0,
             reset_counters_at: counters,
         };

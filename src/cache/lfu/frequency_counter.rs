@@ -31,16 +31,17 @@ impl Row {
 
 const ROWS: usize = 4;
 
-pub(crate) struct CountMinSketch {
+//Implementation of count-min sketch
+pub(crate) struct FrequencyCounter {
     matrix: [Row; ROWS],
     seeds: [u64; ROWS],
     total_counters: u64,
 }
 
-impl CountMinSketch {
-    pub(crate) fn new(counters: u64) -> CountMinSketch {
+impl FrequencyCounter {
+    pub(crate) fn new(counters: u64) -> FrequencyCounter {
         let total_counters = Self::next_power_2(counters);
-        return CountMinSketch {
+        return FrequencyCounter {
             matrix: Self::matrix(total_counters),
             seeds: Self::seeds(),
             total_counters,
@@ -114,44 +115,44 @@ impl CountMinSketch {
 
 #[cfg(test)]
 mod tests {
-    use crate::cache::lfu::count_min_sketch::{CountMinSketch, Row};
+    use crate::cache::lfu::frequency_counter::{FrequencyCounter, Row};
 
     #[test]
     fn total_counters() {
-        let count_min_sketch = CountMinSketch::new(18);
-        assert_eq!(32, count_min_sketch.total_counters);
+        let frequency_counter = FrequencyCounter::new(18);
+        assert_eq!(32, frequency_counter.total_counters);
     }
 
     #[test]
     fn increment_one_key_single_time() {
-        let mut count_min_sketch = CountMinSketch::new(10);
-        count_min_sketch.increment(10);
+        let mut frequency_counter = FrequencyCounter::new(10);
+        frequency_counter.increment(10);
 
-        let count = count_min_sketch.estimate(10);
+        let count = frequency_counter.estimate(10);
         assert_eq!(1, count)
     }
 
     #[test]
     fn increment_one_key_multiple_times() {
-        let mut count_min_sketch = CountMinSketch::new(10);
-        count_min_sketch.increment(10);
-        count_min_sketch.increment(10);
-        count_min_sketch.increment(10);
+        let mut frequency_counter = FrequencyCounter::new(10);
+        frequency_counter.increment(10);
+        frequency_counter.increment(10);
+        frequency_counter.increment(10);
 
-        let count = count_min_sketch.estimate(10);
+        let count = frequency_counter.estimate(10);
         assert_eq!(3, count)
     }
 
     #[test]
     fn increment_2_keys() {
-        let mut count_min_sketch = CountMinSketch::new(10);
-        count_min_sketch.increment(10);
-        count_min_sketch.increment(10);
-        count_min_sketch.increment(15);
-        count_min_sketch.increment(15);
+        let mut frequency_counter = FrequencyCounter::new(10);
+        frequency_counter.increment(10);
+        frequency_counter.increment(10);
+        frequency_counter.increment(15);
+        frequency_counter.increment(15);
 
-        assert_eq!(2, count_min_sketch.estimate(10));
-        assert_eq!(2, count_min_sketch.estimate(15));
+        assert_eq!(2, frequency_counter.estimate(10));
+        assert_eq!(2, frequency_counter.estimate(15));
     }
 
     #[test]
@@ -169,17 +170,17 @@ mod tests {
 
     #[test]
     fn reset_count() {
-        let mut count_min_sketch = CountMinSketch::new(2);
-        count_min_sketch.matrix[0] = Row(vec![15, 240]);
-        count_min_sketch.matrix[1] = Row(vec![64, 7]);
-        count_min_sketch.matrix[2] = Row(vec![192, 10]);
-        count_min_sketch.matrix[3] = Row(vec![48, 14]);
+        let mut frequency_counter = FrequencyCounter::new(2);
+        frequency_counter.matrix[0] = Row(vec![15, 240]);
+        frequency_counter.matrix[1] = Row(vec![64, 7]);
+        frequency_counter.matrix[2] = Row(vec![192, 10]);
+        frequency_counter.matrix[3] = Row(vec![48, 14]);
 
-        count_min_sketch.reset();
+        frequency_counter.reset();
 
-        assert_eq!(Row(vec![7, 112]), count_min_sketch.matrix[0]);
-        assert_eq!(Row(vec![32, 3]), count_min_sketch.matrix[1]);
-        assert_eq!(Row(vec![96, 5]), count_min_sketch.matrix[2]);
-        assert_eq!(Row(vec![16, 7]), count_min_sketch.matrix[3]);
+        assert_eq!(Row(vec![7, 112]), frequency_counter.matrix[0]);
+        assert_eq!(Row(vec![32, 3]), frequency_counter.matrix[1]);
+        assert_eq!(Row(vec![96, 5]), frequency_counter.matrix[2]);
+        assert_eq!(Row(vec![16, 7]), frequency_counter.matrix[3]);
     }
 }

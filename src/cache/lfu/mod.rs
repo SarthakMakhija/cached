@@ -1,2 +1,2 @@
-pub(crate) mod count_min_sketch;
+pub(crate) mod frequency_counter;
 pub(crate) mod tiny_lfu;
