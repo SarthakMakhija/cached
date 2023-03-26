@@ -27,30 +27,30 @@ impl<Key, Value> CacheD<Key, Value>
     pub fn new(config: Config<Key>) -> Self {
         assert!(config.counters > 0);
 
-        let store = Store::new((&config.clock).clone_box());
+        let store = Store::new((config.clock).clone_box());
         let admission_policy = Rc::new(AdmissionPolicy::new(config.counters));
-        let pool = Pool::new(*&config.access_pool_size, *&config.access_buffer_size, admission_policy.clone());
-        let command_buffer_size = *&config.command_buffer_size;
+        let pool = Pool::new(config.access_pool_size, config.access_buffer_size, admission_policy.clone());
+        let command_buffer_size = config.command_buffer_size;
 
-        return CacheD {
+        CacheD {
             config,
             store: store.clone(),
             command_executor: CommandExecutor::new(store, command_buffer_size),
             policy: admission_policy,
             pool,
-        };
+        }
     }
 
     pub fn put(&self, key: Key, value: Value) -> Arc<CommandAcknowledgement> {
-        return self.command_executor.send(CommandType::Put(key, value));
+        self.command_executor.send(CommandType::Put(key, value))
     }
 
     pub fn put_with_ttl(&self, key: Key, value: Value, time_to_live: Duration) -> Arc<CommandAcknowledgement> {
-        return self.command_executor.send(CommandType::PutWithTTL(key, value, time_to_live));
+        self.command_executor.send(CommandType::PutWithTTL(key, value, time_to_live))
     }
 
     pub fn delete(&self, key: Key) -> Arc<CommandAcknowledgement> {
-        return self.command_executor.send(CommandType::Delete(key));
+        self.command_executor.send(CommandType::Delete(key))
     }
 
     pub fn get(&self, key: Key) -> Option<Value> {
@@ -58,11 +58,11 @@ impl<Key, Value> CacheD<Key, Value>
             self.mark_key_accessed(&key);
             return Some(value);
         }
-        return None;
+        None
     }
 
     fn mark_key_accessed(&self, key: &Key) {
-        self.pool.add((self.config.key_hash)(&key));
+        self.pool.add((self.config.key_hash)(key));
     }
 }
 
