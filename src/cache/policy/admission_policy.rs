@@ -23,7 +23,7 @@ impl AdmissionPolicy {
             keep_running: Arc::new(AtomicBool::new(true)),
         };
         policy.start(receiver);
-        return policy;
+        policy
     }
 
     fn start(&self, receiver: Receiver<Vec<u64>>) {
@@ -33,11 +33,11 @@ impl AdmissionPolicy {
         thread::spawn(move || {
             while let Ok(key_hashes) = receiver.recv() {
                 { access_frequency.write().add(key_hashes); }
+                if !keep_running.load(Ordering::Acquire) {
+                    return;
+                }
             }
         });
-        if !keep_running.load(Ordering::Acquire) {
-            return;
-        }
     }
 
     pub(crate) fn estimate(&self, key_hash: u64) -> u8 {
