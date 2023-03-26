@@ -30,11 +30,11 @@ pub(crate) trait BufferConsumer {
 impl<Consumer> Buffer<Consumer>
     where Consumer: BufferConsumer {
     pub(crate) fn new(capacity: BufferSize, consumer: Rc<Consumer>) -> Self {
-        return Buffer {
+        Buffer {
             key_hashes: Vec::with_capacity(capacity.0),
             capacity,
             consumer,
-        };
+        }
     }
 
     pub(crate) fn add(&mut self, key_hash: u64) {
@@ -55,7 +55,7 @@ impl<Consumer> Pool<Consumer>
                 .map(|_| RwLock::new(Buffer::new(buffer_size, buffer_consumer.clone())))
                 .collect::<Vec<RwLock<Buffer<Consumer>>>>();
 
-        return Pool { buffers, pool_size };
+        Pool { buffers, pool_size }
     }
 
     pub(crate) fn add(&self, key_hash: u64) {
