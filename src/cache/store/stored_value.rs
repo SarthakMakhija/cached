@@ -60,13 +60,13 @@ mod tests {
 
         impl Clock for FutureClock {
             fn now(&self) -> SystemTime {
-                return SystemTime::now().add(Duration::from_secs(10));
+                SystemTime::now().add(Duration::from_secs(10))
             }
         }
 
         impl Clock for UnixEpochClock {
             fn now(&self) -> SystemTime {
-                return SystemTime::UNIX_EPOCH;
+                SystemTime::UNIX_EPOCH
             }
         }
     }
@@ -92,6 +92,6 @@ mod tests {
         let stored_value = StoredValue::expiring("storage-engine", Duration::from_secs(5), &system_clock);
 
         let future_clock: ClockType = Box::new(FutureClock {});
-        assert_eq!(false, stored_value.is_alive(&future_clock));
+        assert!(!stored_value.is_alive(&future_clock));
     }
 }

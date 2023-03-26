@@ -6,7 +6,7 @@ use std::thread;
 use crossbeam_channel::Receiver;
 
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
-use crate::cache::command::command::CommandType;
+use crate::cache::command::command::{CommandStatus, CommandType};
 use crate::cache::store::store::Store;
 
 pub(crate) struct CommandExecutor<Key, Value>
@@ -49,7 +49,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
                     CommandType::Delete(key) =>
                         store.delete(&key)
                 }
-                pair.acknowledgement.done();
+                pair.acknowledgement.done(CommandStatus::Done);
                 if !keep_running.load(Ordering::Acquire) {
                     return;
                 }

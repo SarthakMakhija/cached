@@ -32,5 +32,5 @@ fn put<Key, Value>(cached: &CacheD<Key, Value>, key_value_pairs: HashMap<Key, Va
         let acknowledgement = cached.put(key_value.0, key_value.1);
         acknowledgements.push(acknowledgement);
     }
-    return acknowledgements;
+    acknowledgements
 }

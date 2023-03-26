@@ -65,7 +65,7 @@ mod tests {
 
         impl Clock for FutureClock {
             fn now(&self) -> SystemTime {
-                return SystemTime::now().add(Duration::from_secs(10));
+                SystemTime::now().add(Duration::from_secs(10))
             }
         }
     }

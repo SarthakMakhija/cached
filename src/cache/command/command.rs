@@ -5,3 +5,9 @@ pub(crate) enum CommandType<Key, Value> {
     PutWithTTL(Key, Value, Duration),
     Delete(Key)
 }
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum CommandStatus {
+    Pending,
+    Done
+}
