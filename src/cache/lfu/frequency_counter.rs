@@ -11,7 +11,7 @@ impl Row {
         let is_less_than15 = (self.0[index] >> shift) & 0x0f < 0x0f;
 
         if is_less_than15 {
-            self.0[index] = self.0[index] + (1 << shift);
+            self.0[index] += 1 << shift;
         }
     }
 
@@ -19,7 +19,7 @@ impl Row {
         let index = (position / 2) as usize;
         let shift = (position & 0x01) * 4;
 
-        return (self.0[index] >> shift) & 0x0f;
+        (self.0[index] >> shift) & 0x0f
     }
 
     fn half_counters(&mut self) {
@@ -41,11 +41,11 @@ pub(crate) struct FrequencyCounter {
 impl FrequencyCounter {
     pub(crate) fn new(counters: u64) -> FrequencyCounter {
         let total_counters = Self::next_power_2(counters);
-        return FrequencyCounter {
+        FrequencyCounter {
             matrix: Self::matrix(total_counters),
             seeds: Self::seeds(),
             total_counters,
-        };
+        }
     }
 
     pub(crate) fn increment(&mut self, key_hash: u64) {
@@ -67,7 +67,7 @@ impl FrequencyCounter {
                 min = current_min;
             }
         });
-        return min;
+        min
     }
 
     pub(crate) fn reset(&mut self) {
@@ -79,8 +79,8 @@ impl FrequencyCounter {
 
     fn next_power_2(counters: u64) -> u64 {
         let mut updated_counters = counters;
+        updated_counters -= 1;
 
-        updated_counters = updated_counters - 1;
         updated_counters |= updated_counters >> 1;
         updated_counters |= updated_counters >> 2;
         updated_counters |= updated_counters >> 4;
@@ -88,8 +88,8 @@ impl FrequencyCounter {
         updated_counters |= updated_counters >> 16;
         updated_counters |= updated_counters >> 32;
 
-        updated_counters = updated_counters + 1;
-        return updated_counters;
+        updated_counters += 1;
+        updated_counters
     }
 
     fn seeds() -> [u64; ROWS] {
@@ -99,7 +99,7 @@ impl FrequencyCounter {
                 .map(|_index| random_number_generator.gen::<u64>())
                 .collect::<Vec<u64>>();
 
-        return seeds.try_into().unwrap();
+        seeds.try_into().unwrap()
     }
 
     fn matrix(total_counters: u64) -> [Row; ROWS] {
@@ -109,7 +109,7 @@ impl FrequencyCounter {
                 .map(|_index| Row(vec![0; total_counters]))
                 .collect::<Vec<Row>>();
 
-        return rows.try_into().unwrap();
+        rows.try_into().unwrap()
     }
 }
 
