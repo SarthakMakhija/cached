@@ -12,28 +12,28 @@ pub(crate) struct StoredValue<Value>
 impl<Value> StoredValue<Value>
     where Value: Clone {
     pub(crate) fn never_expiring(value: Value) -> Self {
-        return StoredValue {
+        StoredValue {
             value,
             expire_after: None,
-        };
+        }
     }
 
     pub(crate) fn expiring(value: Value, time_to_live: Duration, clock: &ClockType) -> Self {
-        return StoredValue {
+        StoredValue {
             value,
             expire_after: Some(clock.now().add(time_to_live)),
-        };
+        }
     }
 
     pub(crate) fn is_alive(&self, clock: &ClockType) -> bool {
         if let Some(expire_after) = self.expire_after {
             return !clock.has_passed(&expire_after);
         }
-        return true;
+        true
     }
 
     pub(crate) fn value(&self) -> Value {
-        return self.value.clone();
+        self.value.clone()
     }
 }
 
