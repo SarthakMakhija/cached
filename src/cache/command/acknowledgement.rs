@@ -20,7 +20,7 @@ pub(crate) struct WakerState {
 
 impl CommandAcknowledgement {
     pub(crate) fn new() -> Arc<CommandAcknowledgement> {
-        return Arc::new(
+        Arc::new(
             CommandAcknowledgement {
                 handle: CommandAcknowledgementHandle {
                     done: AtomicBool::new(false),
@@ -29,7 +29,7 @@ impl CommandAcknowledgement {
                     })),
                 },
             }
-        );
+        )
     }
 
     pub(crate) fn done(&self) {
@@ -37,7 +37,7 @@ impl CommandAcknowledgement {
     }
 
     pub fn handle(&self) -> &CommandAcknowledgementHandle {
-        return &self.handle;
+        &self.handle
     }
 }
 
@@ -58,7 +58,7 @@ impl Future for &CommandAcknowledgementHandle {
         match guard.waker.as_ref() {
             Some(waker) => {
                 if !waker.will_wake(context.waker()) {
-                    (*guard).waker = Some(context.waker().clone());
+                    guard.waker = Some(context.waker().clone());
                 }
             }
             None => {
@@ -69,7 +69,7 @@ impl Future for &CommandAcknowledgementHandle {
         if self.done.load(Ordering::Acquire) {
             return Poll::Ready(());
         }
-        return Poll::Pending;
+        Poll::Pending
     }
 }
 
