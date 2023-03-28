@@ -3,9 +3,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
-use dashmap::mapref::one::Ref;
 
 use crate::cache::clock::ClockType;
+use crate::cache::store::key_value_ref::KeyValueRef;
 use crate::cache::store::stored_value::StoredValue;
 
 pub(crate) struct Store<Key, Value>
@@ -18,7 +18,7 @@ impl<Key, Value> Store<Key, Value>
     where Key: Hash + Eq, {
     pub(crate) fn new(clock: ClockType) -> Arc<Store<Key, Value>> {
         Arc::new(Store {
-            store: DashMap::new(),
+            store: DashMap::new(), //TODO: define capacity
             clock,
         })
     }
@@ -35,10 +35,11 @@ impl<Key, Value> Store<Key, Value>
         self.store.remove(key);
     }
 
-    pub(crate) fn get_ref(&self, key: &Key) -> Option<Ref<'_, Key, StoredValue<Value>>> {
+    pub(crate) fn get_ref(&self, key: &Key) -> Option<KeyValueRef<'_, Key, StoredValue<Value>>> {
         let maybe_value = self.store.get(key);
         maybe_value
             .filter(|stored_value| stored_value.is_alive(&self.clock))
+            .map(|key_value_ref| KeyValueRef::new(key_value_ref))
     }
 }
 
@@ -105,8 +106,8 @@ mod tests {
 
         store.put("name", Name{first: "John".to_string(), last: "Mcnamara".to_string() });
 
-        let value = store.get_ref(&"name");
-        assert_eq!(&Name{first: "John".to_string(), last: "Mcnamara".to_string() }, value.unwrap().value().value_ref());
+        let key_value_ref = store.get_ref(&"name");
+        assert_eq!(&Name{first: "John".to_string(), last: "Mcnamara".to_string() }, key_value_ref.unwrap().value().value_ref());
     }
 
     #[test]

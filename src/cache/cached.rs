@@ -3,17 +3,17 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
-use dashmap::mapref::one::Ref;
-
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
 use crate::cache::command::command::CommandType;
 use crate::cache::command::command_executor::CommandExecutor;
 use crate::cache::config::config::Config;
 use crate::cache::policy::admission_policy::AdmissionPolicy;
 use crate::cache::pool::Pool;
+use crate::cache::store::key_value_ref::KeyValueRef;
 use crate::cache::store::store::Store;
 use crate::cache::store::stored_value::StoredValue;
 
+//TODO: Lifetime 'static?
 pub struct CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + 'static,
           Value: Send + Sync + 'static {
@@ -57,7 +57,7 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     //TODO: Return our custom Ref instead of DashMap's ref
-    pub fn get_ref(&self, key: &Key) -> Option<Ref<'_, Key, StoredValue<Value>>> {
+    pub fn get_ref(&self, key: &Key) -> Option<KeyValueRef<'_, Key, StoredValue<Value>>> {
         if let Some(value_ref) = self.store.get_ref(key) {
             self.mark_key_accessed(key);
             return Some(value_ref);
