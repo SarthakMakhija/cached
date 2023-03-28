@@ -40,7 +40,7 @@ impl<Key, Value> Store<Key, Value>
         let maybe_value = self.store.get(key);
         maybe_value
             .filter(|stored_value| stored_value.is_alive(&self.clock))
-            .map(|stored_value| { stored_value.value().value() })
+            .map(|key_value_ref| { key_value_ref.value().value() })
     }
 }
 

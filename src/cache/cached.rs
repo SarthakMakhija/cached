@@ -11,6 +11,7 @@ use crate::cache::policy::admission_policy::AdmissionPolicy;
 use crate::cache::pool::Pool;
 use crate::cache::store::store::Store;
 
+//TODO: is there an option to remove Clone from Value
 pub struct CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + 'static,
           Value: Send + Sync + Clone + 'static {
@@ -53,9 +54,9 @@ impl<Key, Value> CacheD<Key, Value>
         self.command_executor.send(CommandType::Delete(key))
     }
 
-    pub fn get(&self, key: Key) -> Option<Value> {
-        if let Some(value) = self.store.get(&key) {
-            self.mark_key_accessed(&key);
+    pub fn get(&self, key: &Key) -> Option<Value> {
+        if let Some(value) = self.store.get(key) {
+            self.mark_key_accessed(key);
             return Some(value);
         }
         None
@@ -81,7 +82,7 @@ mod tests {
         let acknowledgement = cached.put("topic", "microservices");
         acknowledgement.handle().await;
 
-        let value = cached.get("topic");
+        let value = cached.get(&"topic");
         assert_eq!(Some("microservices"), value);
     }
 
@@ -89,7 +90,7 @@ mod tests {
     fn get_value_for_a_non_existing_key() {
         let cached: CacheD<&str, &str> = CacheD::new(ConfigBuilder::new().counters(10).build());
 
-        let value = cached.get("non-existing");
+        let value = cached.get(&"non-existing");
         assert_eq!(None, value);
     }
 
@@ -103,7 +104,7 @@ mod tests {
         let acknowledgement = cached.delete("topic");
         acknowledgement.handle().await;
 
-        let value = cached.get("topic");
+        let value = cached.get(&"topic");
         assert_eq!(None, value);
     }
 
@@ -117,9 +118,9 @@ mod tests {
         acknowledgement_topic.handle().await;
         acknowledgement_disk.handle().await;
 
-        cached.get("topic");
-        cached.get("disk");
-        cached.get("topic");
+        cached.get(&"topic");
+        cached.get(&"disk");
+        cached.get(&"topic");
         thread::sleep(Duration::from_secs(2));
 
         let hasher = &(cached.config.key_hash);
