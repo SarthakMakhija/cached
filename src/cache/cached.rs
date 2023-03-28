@@ -65,7 +65,7 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     fn mark_key_accessed(&self, key: &Key) {
-        self.pool.add((self.config.key_hash)(key));
+        self.pool.add((self.config.key_hash_fn)(key));
     }
 }
 
@@ -154,7 +154,7 @@ mod tests {
         cached.get(&"topic");
         thread::sleep(Duration::from_secs(2));
 
-        let hasher = &(cached.config.key_hash);
+        let hasher = &(cached.config.key_hash_fn);
         assert_eq!(2, cached.policy.estimate(hasher(&"topic")));
         assert_eq!(1, cached.policy.estimate(hasher(&"disk")));
     }

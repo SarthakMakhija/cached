@@ -3,19 +3,20 @@ use std::hash::{Hash, Hasher};
 
 use crate::cache::clock::{ClockType, SystemClock};
 use crate::cache::pool::{BufferSize, PoolSize};
+use crate::cache::types::{KeyHash, TotalCounters};
 
-type HashFn<Key> = dyn Fn(&Key) -> u64;
+type HashFn<Key> = dyn Fn(&Key) -> KeyHash;
 
 const COMMAND_BUFFER_SIZE: usize = 32 * 1024;
 const ACCESS_POOL_SIZE: PoolSize = PoolSize(30);
 const ACCESS_BUFFER_SIZE: BufferSize = BufferSize(64);
-const COUNTERS: u64 = 1_000_000;
+const COUNTERS: TotalCounters = 1_000_000;
 
 pub struct Config<Key>
     where Key: Hash {
-    pub key_hash: Box<HashFn<Key>>,
+    pub key_hash_fn: Box<HashFn<Key>>,
     pub clock: ClockType,
-    pub counters: u64,
+    pub counters: TotalCounters,
     pub command_buffer_size: usize,
     pub(crate) access_pool_size: PoolSize,
     pub(crate) access_buffer_size: BufferSize,
@@ -23,12 +24,12 @@ pub struct Config<Key>
 
 pub struct ConfigBuilder<Key>
     where Key: Hash {
-    key_hash: Box<HashFn<Key>>,
+    key_hash_fn: Box<HashFn<Key>>,
     clock: ClockType,
+    counters: TotalCounters,
+    command_buffer_size: usize,
     access_pool_size: PoolSize,
     access_buffer_size: BufferSize,
-    command_buffer_size: usize,
-    counters: u64,
 }
 
 impl<Key> Default for ConfigBuilder<Key>
@@ -41,14 +42,14 @@ impl<Key> Default for ConfigBuilder<Key>
 impl<Key> ConfigBuilder<Key>
     where Key: Hash {
     pub fn new() -> Self {
-        let key_hash = |key: &Key| -> u64 {
+        let key_hash_fn = |key: &Key| -> KeyHash {
             let mut hasher = DefaultHasher::new();
             key.hash(&mut hasher);
             hasher.finish()
         };
 
         return ConfigBuilder {
-            key_hash: Box::new(key_hash),
+            key_hash_fn: Box::new(key_hash_fn),
             clock: SystemClock::boxed(),
             access_pool_size: ACCESS_POOL_SIZE,
             access_buffer_size: ACCESS_BUFFER_SIZE,
@@ -57,8 +58,8 @@ impl<Key> ConfigBuilder<Key>
         };
     }
 
-    pub fn key_hash(mut self, key_hash: Box<HashFn<Key>>) -> ConfigBuilder<Key> {
-        self.key_hash = key_hash;
+    pub fn key_hash_fn(mut self, key_hash: Box<HashFn<Key>>) -> ConfigBuilder<Key> {
+        self.key_hash_fn = key_hash;
         self
     }
 
@@ -82,14 +83,14 @@ impl<Key> ConfigBuilder<Key>
         self
     }
 
-    pub fn counters(mut self, counters: u64) -> ConfigBuilder<Key> {
+    pub fn counters(mut self, counters: TotalCounters) -> ConfigBuilder<Key> {
         self.counters = counters;
         self
     }
 
     pub fn build(self) -> Config<Key> {
         Config {
-            key_hash: self.key_hash,
+            key_hash_fn: self.key_hash_fn,
             clock: self.clock,
             access_pool_size: self.access_pool_size,
             access_buffer_size: self.access_buffer_size,

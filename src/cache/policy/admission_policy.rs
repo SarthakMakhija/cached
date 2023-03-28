@@ -7,15 +7,16 @@ use parking_lot::RwLock;
 
 use crate::cache::lfu::tiny_lfu::TinyLFU;
 use crate::cache::pool::BufferConsumer;
+use crate::cache::types::{KeyHash, TotalCounters};
 
 pub(crate) struct AdmissionPolicy {
     access_frequency: Arc<RwLock<TinyLFU>>,
-    sender: crossbeam_channel::Sender<Vec<u64>>,
+    sender: crossbeam_channel::Sender<Vec<KeyHash>>,
     keep_running: Arc<AtomicBool>,
 }
 
 impl AdmissionPolicy {
-    pub(crate) fn new(counters: u64) -> Self {
+    pub(crate) fn new(counters: TotalCounters) -> Self {
         let (sender, receiver) = crossbeam_channel::bounded(10); //TODO: capacity as parameter
         let policy = AdmissionPolicy {
             access_frequency: Arc::new(RwLock::new(TinyLFU::new(counters))),
@@ -26,7 +27,7 @@ impl AdmissionPolicy {
         policy
     }
 
-    fn start(&self, receiver: Receiver<Vec<u64>>) {
+    fn start(&self, receiver: Receiver<Vec<KeyHash>>) {
         let keep_running = self.keep_running.clone();
         let access_frequency = self.access_frequency.clone();
 
@@ -40,7 +41,7 @@ impl AdmissionPolicy {
         });
     }
 
-    pub(crate) fn estimate(&self, key_hash: u64) -> u8 {
+    pub(crate) fn estimate(&self, key_hash: KeyHash) -> u8 {
         return self.access_frequency.read().estimate(key_hash);
     }
 
@@ -50,7 +51,7 @@ impl AdmissionPolicy {
 }
 
 impl BufferConsumer for AdmissionPolicy {
-    fn accept(&self, key_hashes: Vec<u64>) {
+    fn accept(&self, key_hashes: Vec<KeyHash>) {
         //TODO: Decide if we need to clone this
         //TODO: Remove unwrap
         self.sender.clone().send(key_hashes).unwrap();

@@ -1,4 +1,5 @@
 use crate::cache::lfu::frequency_counter::FrequencyCounter;
+use crate::cache::types::{KeyHash, TotalCounters};
 
 pub(crate) struct TinyLFU {
     key_access_frequency: FrequencyCounter,
@@ -7,7 +8,7 @@ pub(crate) struct TinyLFU {
 }
 
 impl TinyLFU {
-    pub(crate) fn new(counters: u64) -> TinyLFU {
+    pub(crate) fn new(counters: TotalCounters) -> TinyLFU {
         TinyLFU {
             key_access_frequency: FrequencyCounter::new(counters),
             total_increments: 0,
@@ -15,16 +16,16 @@ impl TinyLFU {
         }
     }
 
-    pub(crate) fn add(&mut self, key_hashes: Vec<u64>) {
+    pub(crate) fn add(&mut self, key_hashes: Vec<KeyHash>) {
         key_hashes.iter().for_each(|key_hash| self.increment_access_for(*key_hash));
     }
 
-    pub(crate) fn estimate(&self, key_hash: u64) -> u8 {
+    pub(crate) fn estimate(&self, key_hash: KeyHash) -> u8 {
         //TODO: Doorkeeper
         self.key_access_frequency.estimate(key_hash)
     }
 
-    fn increment_access_for(&mut self, key_hash: u64) {
+    fn increment_access_for(&mut self, key_hash: KeyHash) {
         //TODO: Doorkeeper
         self.key_access_frequency.increment(key_hash);
         self.total_increments += 1;

@@ -1,4 +1,5 @@
 use rand::Rng;
+use crate::cache::types::{KeyHash, TotalCounters};
 
 #[repr(transparent)]
 #[derive(Debug, PartialEq)]
@@ -35,11 +36,11 @@ const ROWS: usize = 4;
 pub(crate) struct FrequencyCounter {
     matrix: [Row; ROWS],
     seeds: [u64; ROWS],
-    total_counters: u64,
+    total_counters: TotalCounters,
 }
 
 impl FrequencyCounter {
-    pub(crate) fn new(counters: u64) -> FrequencyCounter {
+    pub(crate) fn new(counters: TotalCounters) -> FrequencyCounter {
         let total_counters = Self::next_power_2(counters);
         FrequencyCounter {
             matrix: Self::matrix(total_counters),
@@ -48,7 +49,7 @@ impl FrequencyCounter {
         }
     }
 
-    pub(crate) fn increment(&mut self, key_hash: u64) {
+    pub(crate) fn increment(&mut self, key_hash: KeyHash) {
         (0..ROWS).for_each(|index| {
             let hash = key_hash ^ self.seeds[index];
             let current_row = &mut self.matrix[index];
@@ -56,7 +57,7 @@ impl FrequencyCounter {
         });
     }
 
-    pub(crate) fn estimate(&self, key_hash: u64) -> u8 {
+    pub(crate) fn estimate(&self, key_hash: KeyHash) -> u8 {
         let mut min = u8::MAX;
         (0..ROWS).for_each(|index| {
             let hash = key_hash ^ self.seeds[index];
@@ -77,7 +78,7 @@ impl FrequencyCounter {
         });
     }
 
-    fn next_power_2(counters: u64) -> u64 {
+    fn next_power_2(counters: TotalCounters) -> u64 {
         let mut updated_counters = counters;
         updated_counters -= 1;
 
@@ -102,7 +103,7 @@ impl FrequencyCounter {
         seeds.try_into().unwrap()
     }
 
-    fn matrix(total_counters: u64) -> [Row; ROWS] {
+    fn matrix(total_counters: TotalCounters) -> [Row; ROWS] {
         let total_counters = (total_counters / 2) as usize;
         let rows =
             (0..ROWS)
