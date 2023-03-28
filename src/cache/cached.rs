@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
-use crate::cache::command::command::CommandType;
+use crate::cache::command::CommandType;
 use crate::cache::command::command_executor::CommandExecutor;
 use crate::cache::config::Config;
 use crate::cache::policy::admission_policy::AdmissionPolicy;

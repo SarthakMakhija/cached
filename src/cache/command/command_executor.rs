@@ -6,7 +6,7 @@ use std::thread;
 use crossbeam_channel::Receiver;
 
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
-use crate::cache::command::command::{CommandStatus, CommandType};
+use crate::cache::command::{CommandStatus, CommandType};
 use crate::cache::store::store::Store;
 
 pub(crate) struct CommandExecutor<Key, Value>
@@ -78,7 +78,7 @@ mod tests {
     use std::time::Duration;
 
     use crate::cache::clock::SystemClock;
-    use crate::cache::command::command::CommandType;
+    use crate::cache::command::CommandType;
     use crate::cache::command::command_executor::CommandExecutor;
     use crate::cache::store::store::Store;
 

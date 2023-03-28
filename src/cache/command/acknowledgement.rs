@@ -4,7 +4,7 @@ use std::sync::{Arc};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::task::{Context, Poll, Waker};
 use parking_lot::Mutex;
-use crate::cache::command::command::CommandStatus;
+use crate::cache::command::CommandStatus;
 
 pub struct CommandAcknowledgement {
     handle: CommandAcknowledgementHandle,
@@ -80,7 +80,7 @@ impl Future for &CommandAcknowledgementHandle {
 #[cfg(test)]
 mod tests {
     use crate::cache::command::acknowledgement::CommandAcknowledgement;
-    use crate::cache::command::command::CommandStatus;
+    use crate::cache::command::CommandStatus;
 
     #[tokio::test]
     async fn acknowledge() {
