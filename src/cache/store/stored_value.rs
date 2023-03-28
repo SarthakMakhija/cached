@@ -3,14 +3,12 @@ use std::time::{Duration, SystemTime};
 
 use crate::cache::clock::ClockType;
 
-pub(crate) struct StoredValue<Value>
-    where Value: Clone {
+pub(crate) struct StoredValue<Value> {
     value: Value,
     expire_after: Option<SystemTime>,
 }
 
-impl<Value> StoredValue<Value>
-    where Value: Clone {
+impl<Value> StoredValue<Value> {
     pub(crate) fn never_expiring(value: Value) -> Self {
         StoredValue {
             value,
@@ -31,6 +29,10 @@ impl<Value> StoredValue<Value>
         }
         true
     }
+}
+
+impl<Value> StoredValue<Value>
+    where Value: Clone {
 
     pub(crate) fn value(&self) -> Value {
         self.value.clone()
@@ -44,7 +46,7 @@ mod tests {
 
     use crate::cache::clock::{ClockType, SystemClock};
     use crate::cache::store::stored_value::StoredValue;
-    use crate::cache::store::stored_value::tests::setup::{UnixEpochClock, FutureClock};
+    use crate::cache::store::stored_value::tests::setup::{FutureClock, UnixEpochClock};
 
     mod setup {
         use std::ops::Add;

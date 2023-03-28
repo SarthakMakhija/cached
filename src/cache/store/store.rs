@@ -8,15 +8,13 @@ use crate::cache::clock::ClockType;
 use crate::cache::store::stored_value::StoredValue;
 
 pub(crate) struct Store<Key, Value>
-    where Key: Hash + Eq,
-          Value: Clone {
+    where Key: Hash + Eq, {
     store: DashMap<Key, StoredValue<Value>>,
     clock: ClockType,
 }
 
 impl<Key, Value> Store<Key, Value>
-    where Key: Hash + Eq,
-          Value: Clone {
+    where Key: Hash + Eq, {
     pub(crate) fn new(clock: ClockType) -> Arc<Store<Key, Value>> {
         Arc::new(Store {
             store: DashMap::new(),
@@ -35,6 +33,11 @@ impl<Key, Value> Store<Key, Value>
     pub(crate) fn delete(&self, key: &Key) {
         self.store.remove(key);
     }
+}
+
+impl<Key, Value> Store<Key, Value>
+    where Key: Hash + Eq,
+          Value: Clone, {
 
     pub(crate) fn get(&self, key: &Key) -> Option<Value> {
         let maybe_value = self.store.get(key);

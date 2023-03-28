@@ -11,7 +11,7 @@ use crate::cache::store::store::Store;
 
 pub(crate) struct CommandExecutor<Key, Value>
     where Key: Hash + Eq + Send + Sync + 'static,
-          Value: Send + Sync + Clone + 'static {
+          Value: Send + Sync + 'static {
     sender: crossbeam_channel::Sender<CommandAcknowledgementPair<Key, Value>>,
     keep_running: Arc<AtomicBool>,
 }
@@ -23,7 +23,7 @@ struct CommandAcknowledgementPair<Key, Value> {
 
 impl<Key, Value> CommandExecutor<Key, Value>
     where Key: Hash + Eq + Send + Sync + 'static,
-          Value: Send + Sync + Clone + 'static {
+          Value: Send + Sync + 'static {
 
     pub(crate) fn new(store: Arc<Store<Key, Value>>, buffer_size: usize) -> Self {
         let (sender, receiver)
