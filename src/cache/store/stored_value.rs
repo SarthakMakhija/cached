@@ -29,6 +29,10 @@ impl<Value> StoredValue<Value> {
         }
         true
     }
+
+    pub(crate) fn value_ref(&self) -> &Value {
+        &self.value
+    }
 }
 
 impl<Value> StoredValue<Value>

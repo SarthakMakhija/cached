@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
+use dashmap::mapref::one::Ref;
 
 use crate::cache::clock::ClockType;
 use crate::cache::store::stored_value::StoredValue;
@@ -33,6 +34,12 @@ impl<Key, Value> Store<Key, Value>
     pub(crate) fn delete(&self, key: &Key) {
         self.store.remove(key);
     }
+
+    pub(crate) fn get_ref(&self, key: &Key) -> Option<Ref<'_, Key, StoredValue<Value>>> {
+        let maybe_value = self.store.get(key);
+        maybe_value
+            .filter(|stored_value| stored_value.is_alive(&self.clock))
+    }
 }
 
 impl<Key, Value> Store<Key, Value>
@@ -55,6 +62,7 @@ mod tests {
 
     use crate::cache::clock::SystemClock;
     use crate::cache::store::store::Store;
+    use crate::cache::store::store::tests::setup::Name;
     use crate::cache::store::stored_value::StoredValue;
 
     mod setup {
@@ -62,6 +70,12 @@ mod tests {
         use std::time::{Duration, SystemTime};
 
         use crate::cache::clock::Clock;
+
+        #[derive(Eq, PartialEq, Debug)]
+        pub(crate) struct Name {
+            pub(crate) first: String,
+            pub(crate) last: String,
+        }
 
         #[derive(Clone)]
         pub(crate) struct FutureClock;
@@ -82,6 +96,17 @@ mod tests {
 
         let value = store.get(&"topic");
         assert_eq!(Some("microservices"), value);
+    }
+
+    #[test]
+    fn get_value_ref_for_an_existing_key_if_value_is_not_cloneable() {
+        let clock = SystemClock::boxed();
+        let store = Store::new(clock);
+
+        store.put("name", Name{first: "John".to_string(), last: "Mcnamara".to_string() });
+
+        let value = store.get_ref(&"name");
+        assert_eq!(&Name{first: "John".to_string(), last: "Mcnamara".to_string() }, value.unwrap().value().value_ref());
     }
 
     #[test]
