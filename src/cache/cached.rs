@@ -3,6 +3,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
+use dashmap::mapref::one::Ref;
+
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
 use crate::cache::command::command::CommandType;
 use crate::cache::command::command_executor::CommandExecutor;
@@ -10,8 +12,8 @@ use crate::cache::config::config::Config;
 use crate::cache::policy::admission_policy::AdmissionPolicy;
 use crate::cache::pool::Pool;
 use crate::cache::store::store::Store;
+use crate::cache::store::stored_value::StoredValue;
 
-//TODO: is there an option to remove Clone from Value
 pub struct CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + 'static,
           Value: Send + Sync + 'static {
@@ -54,6 +56,15 @@ impl<Key, Value> CacheD<Key, Value>
         self.command_executor.send(CommandType::Delete(key))
     }
 
+    //TODO: Return our custom Ref instead of DashMap's ref
+    pub fn get_ref(&self, key: &Key) -> Option<Ref<'_, Key, StoredValue<Value>>> {
+        if let Some(value_ref) = self.store.get_ref(key) {
+            self.mark_key_accessed(key);
+            return Some(value_ref);
+        }
+        None
+    }
+
     fn mark_key_accessed(&self, key: &Key) {
         self.pool.add((self.config.key_hash)(key));
     }
@@ -62,7 +73,6 @@ impl<Key, Value> CacheD<Key, Value>
 impl<Key, Value> CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + 'static,
           Value: Send + Sync + Clone + 'static {
-
     pub fn get(&self, key: &Key) -> Option<Value> {
         if let Some(value) = self.store.get(key) {
             self.mark_key_accessed(key);
@@ -79,6 +89,12 @@ mod tests {
 
     use crate::cache::cached::CacheD;
     use crate::cache::config::config::ConfigBuilder;
+
+    #[derive(Eq, PartialEq, Debug)]
+    struct Name {
+        first: String,
+        last: String,
+    }
 
     #[tokio::test]
     async fn get_value_for_an_existing_key() {
@@ -97,6 +113,17 @@ mod tests {
 
         let value = cached.get(&"non-existing");
         assert_eq!(None, value);
+    }
+
+    #[tokio::test]
+    async fn get_value_ref_for_an_existing_key_if_value_is_not_cloneable() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        let acknowledgement = cached.put("name", Name { first: "John".to_string(), last: "Mcnamara".to_string() });
+        acknowledgement.handle().await;
+
+        let value = cached.get_ref(&"name");
+        assert_eq!(&Name { first: "John".to_string(), last: "Mcnamara".to_string() }, value.unwrap().value().value_ref());
     }
 
     #[tokio::test]

@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime};
 
 use crate::cache::clock::ClockType;
 
-pub(crate) struct StoredValue<Value> {
+pub struct StoredValue<Value> {
     value: Value,
     expire_after: Option<SystemTime>,
 }
@@ -30,7 +30,7 @@ impl<Value> StoredValue<Value> {
         true
     }
 
-    pub(crate) fn value_ref(&self) -> &Value {
+    pub fn value_ref(&self) -> &Value {
         &self.value
     }
 }
@@ -38,7 +38,7 @@ impl<Value> StoredValue<Value> {
 impl<Value> StoredValue<Value>
     where Value: Clone {
 
-    pub(crate) fn value(&self) -> Value {
+    pub fn value(&self) -> Value {
         self.value.clone()
     }
 }
