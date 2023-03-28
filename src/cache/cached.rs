@@ -56,7 +56,6 @@ impl<Key, Value> CacheD<Key, Value>
         self.command_executor.send(CommandType::Delete(key))
     }
 
-    //TODO: Return our custom Ref instead of DashMap's ref
     pub fn get_ref(&self, key: &Key) -> Option<KeyValueRef<'_, Key, StoredValue<Value>>> {
         if let Some(value_ref) = self.store.get_ref(key) {
             self.mark_key_accessed(key);
