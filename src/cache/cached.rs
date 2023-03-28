@@ -6,7 +6,7 @@ use std::time::Duration;
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
 use crate::cache::command::command::CommandType;
 use crate::cache::command::command_executor::CommandExecutor;
-use crate::cache::config::config::Config;
+use crate::cache::config::Config;
 use crate::cache::policy::admission_policy::AdmissionPolicy;
 use crate::cache::pool::Pool;
 use crate::cache::store::key_value_ref::KeyValueRef;
@@ -87,7 +87,7 @@ mod tests {
     use std::time::Duration;
 
     use crate::cache::cached::CacheD;
-    use crate::cache::config::config::ConfigBuilder;
+    use crate::cache::config::ConfigBuilder;
 
     #[derive(Eq, PartialEq, Debug)]
     struct Name {

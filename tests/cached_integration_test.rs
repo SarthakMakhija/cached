@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use cached::cache::cached::CacheD;
 use cached::cache::command::acknowledgement::CommandAcknowledgement;
-use cached::cache::config::config::ConfigBuilder;
+use cached::cache::config::ConfigBuilder;
 
 #[tokio::test]
 async fn get_value_for_an_existing_keys() {
