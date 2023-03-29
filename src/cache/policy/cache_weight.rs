@@ -1,13 +1,27 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 
-use crate::cache::types::Weight;
+use crate::cache::types::{KeyHash, Weight};
+
+struct WeightByKeyHash {
+    weight: Weight,
+    key_hash: KeyHash,
+}
+
+impl WeightByKeyHash {
+    fn new(weight: Weight, key_hash: KeyHash) -> Self {
+        WeightByKeyHash {
+            weight,
+            key_hash,
+        }
+    }
+}
 
 pub(crate) struct CacheWeight<Key>
     where Key: Hash + Eq + Send + Sync + 'static, {
     max_weight: Weight,
     weight_used: Weight,
-    cost_by_key: HashMap<Key, Weight>,
+    cost_by_key: HashMap<Key, WeightByKeyHash>,
 }
 
 impl<Key> CacheWeight<Key>
@@ -24,21 +38,21 @@ impl<Key> CacheWeight<Key>
         self.max_weight
     }
 
-    pub(crate) fn add(&mut self, key: Key, weight: Weight) {
+    pub(crate) fn add(&mut self, key: Key, key_hash: KeyHash, weight: Weight) {
         self.weight_used += weight;
-        self.cost_by_key.insert(key, weight);
+        self.cost_by_key.insert(key, WeightByKeyHash::new(weight, key_hash));
     }
 
-    pub(crate) fn update(&mut self, key: Key, weight: Weight) {
-        self.cost_by_key.entry(key).and_modify(|existing_weight| {
-            self.weight_used += weight - *existing_weight;
-            *existing_weight = weight;
+    pub(crate) fn update(&mut self, key: Key, key_hash: KeyHash, weight: Weight) {
+        self.cost_by_key.entry(key).and_modify(|weight_by_key_hash| {
+            self.weight_used += weight - weight_by_key_hash.weight;
+            *weight_by_key_hash = WeightByKeyHash::new(weight, key_hash);
         });
     }
 
     pub(crate) fn delete(&mut self, key: &Key) {
-        if let Some(weight) = self.cost_by_key.remove(key) {
-            self.weight_used -= weight;
+        if let Some(weight_by_key_hash) = self.cost_by_key.remove(key) {
+            self.weight_used -= weight_by_key_hash.weight;
         }
     }
 }
@@ -56,7 +70,7 @@ mod tests {
     #[test]
     fn add_key_weight() {
         let mut cache_weight = CacheWeight::new(10);
-        cache_weight.add("disk", 3);
+        cache_weight.add("disk", 3040, 3);
 
         assert_eq!(3, cache_weight.weight_used);
     }
@@ -65,10 +79,10 @@ mod tests {
     fn update_key_weight_given_the_updated_weight_is_less() {
         let mut cache_weight = CacheWeight::new(10);
 
-        cache_weight.add("disk", 3);
+        cache_weight.add("disk", 3040,3);
         assert_eq!(3, cache_weight.weight_used);
 
-        cache_weight.update("disk", 2);
+        cache_weight.update("disk", 3040,2);
         assert_eq!(2, cache_weight.weight_used);
     }
 
@@ -76,10 +90,10 @@ mod tests {
     fn update_key_weight_given_the_updated_weight_is_more() {
         let mut cache_weight = CacheWeight::new(10);
 
-        cache_weight.add("disk", 4);
+        cache_weight.add("disk", 3040, 4);
         assert_eq!(4, cache_weight.weight_used);
 
-        cache_weight.update("disk", 8);
+        cache_weight.update("disk", 3040,8);
         assert_eq!(8, cache_weight.weight_used);
     }
 
@@ -87,10 +101,10 @@ mod tests {
     fn update_key_weight_given_the_updated_weight_is_same() {
         let mut cache_weight = CacheWeight::new(10);
 
-        cache_weight.add("disk", 4);
+        cache_weight.add("disk", 3040,4);
         assert_eq!(4, cache_weight.weight_used);
 
-        cache_weight.update("disk", 4);
+        cache_weight.update("disk", 3040,4);
         assert_eq!(4, cache_weight.weight_used);
     }
 
@@ -98,7 +112,7 @@ mod tests {
     fn delete_key_weight() {
         let mut cache_weight = CacheWeight::new(10);
 
-        cache_weight.add("disk", 3);
+        cache_weight.add("disk", 3040,3);
         assert_eq!(3, cache_weight.weight_used);
 
         cache_weight.delete(&"disk");
