@@ -1,6 +1,8 @@
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::BinaryHeap;
 use std::hash::Hash;
+use dashmap::DashMap;
+use dashmap::mapref::multiple::RefMulti;
 
 use crate::cache::types::{KeyHash, Weight};
 
@@ -22,49 +24,44 @@ pub(crate) struct CacheWeight<Key>
     where Key: Hash + Eq + Send + Sync + 'static, {
     max_weight: Weight,
     weight_used: Weight,
-    key_weights: HashMap<Key, WeightByKeyHash>,
+    key_weights: DashMap<Key, WeightByKeyHash>,
 }
-
 
 pub(crate) struct SampledKey<'a, Key>
     where Key: Eq {
-    key: &'a Key,
-    hash: KeyHash,
-    weight: Weight,
-    estimated_frequency: u8,
+    pair: RefMulti<'a, Key, WeightByKeyHash>,
+    estimated_frequency: u8, //TODO: type for frequency?
 }
 
 impl<'a, Key> Ord for SampledKey<'a, Key>
-    where Key: Eq {
+    where Key: Eq + Hash {
     fn cmp(&self, other: &Self) -> Ordering {
-        (other.estimated_frequency, self.weight).cmp(&(self.estimated_frequency, other.weight))
+        (other.estimated_frequency, self.pair.weight).cmp(&(self.estimated_frequency, other.pair.weight))
     }
 }
 
 impl<'a, Key> PartialOrd for SampledKey<'a, Key>
-    where Key: Eq {
+    where Key: Eq + Hash {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl<'a, Key> PartialEq for SampledKey<'a, Key>
-    where Key: Eq {
+    where Key: Eq + Hash {
     fn eq(&self, other: &Self) -> bool {
-        self.key == other.key
+        self.pair.key() == other.pair.key()
     }
 }
 
 impl<'a, Key> Eq for SampledKey<'a, Key>
-    where Key: Eq {}
+    where Key: Eq + Hash{}
 
 impl<'a, Key> SampledKey<'a, Key>
     where Key: Eq {
-    fn new(key: &'a Key, weight_by_key_hash: &WeightByKeyHash, frequency: u8) -> Self<> {
+    fn new(pair: RefMulti<'a, Key, WeightByKeyHash>, frequency: u8) -> Self<> {
         SampledKey {
-            key,
-            hash: weight_by_key_hash.key_hash,
-            weight: weight_by_key_hash.weight,
+            pair,
             estimated_frequency: frequency,
         }
     }
@@ -76,7 +73,7 @@ impl<Key> CacheWeight<Key>
         CacheWeight {
             max_weight,
             weight_used: 0,
-            key_weights: HashMap::new(),
+            key_weights: DashMap::new(),
         }
     }
 
@@ -100,7 +97,7 @@ impl<Key> CacheWeight<Key>
 
     pub(crate) fn delete(&mut self, key: &Key) {
         if let Some(weight_by_key_hash) = self.key_weights.remove(key) {
-            self.weight_used -= weight_by_key_hash.weight;
+            self.weight_used -= weight_by_key_hash.1.weight
         }
     }
 
@@ -108,8 +105,8 @@ impl<Key> CacheWeight<Key>
         where Freq: Fn(KeyHash) -> u8 {
         let mut sample = BinaryHeap::new();
         self.key_weights.iter().take(size).for_each(|pair| {
-            let frequency = frequency_counter(pair.1.key_hash);
-            sample.push(SampledKey::new(pair.0, pair.1, frequency));
+            let frequency = frequency_counter(pair.value().key_hash);
+            sample.push(SampledKey { pair, estimated_frequency: frequency });
         });
         sample
     }
@@ -217,17 +214,17 @@ mod tests {
 
         let sampled_key = sample.pop().unwrap();
         assert_eq!(1, sampled_key.estimated_frequency);
-        assert_eq!(5, sampled_key.weight);
-        assert_eq!(&"disk", sampled_key.key);
+        assert_eq!(5, sampled_key.pair.weight);
+        assert_eq!(&"disk", sampled_key.pair.key());
 
         let sampled_key = sample.pop().unwrap();
         assert_eq!(1, sampled_key.estimated_frequency);
-        assert_eq!(3, sampled_key.weight);
-        assert_eq!(&"SSD", sampled_key.key);
+        assert_eq!(3, sampled_key.pair.weight);
+        assert_eq!(&"SSD", sampled_key.pair.key());
 
         let sampled_key = sample.pop().unwrap();
         assert_eq!(2, sampled_key.estimated_frequency);
-        assert_eq!(2, sampled_key.weight);
-        assert_eq!(&"topic", sampled_key.key);
+        assert_eq!(2, sampled_key.pair.weight);
+        assert_eq!(&"topic", sampled_key.pair.key());
     }
 }
