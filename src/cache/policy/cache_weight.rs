@@ -95,14 +95,17 @@ impl<Key> CacheWeight<Key>
     }
 
     //TODO: Combine key and key_hash together?
-    pub(crate) fn update(&self, key: Key, key_hash: KeyHash, weight: Weight) {
+    pub(crate) fn update(&self, key: Key, key_hash: KeyHash, weight: Weight) -> bool {
+        let mut present: bool = false;
         self.key_weights.entry(key).and_modify(|weight_by_key_hash| {
             {
                 let mut guard = self.weight_used.write();
                 *guard += weight - weight_by_key_hash.weight;
             }
             *weight_by_key_hash = WeightByKeyHash::new(weight, key_hash);
+            present = true;
         });
+        present
     }
 
     pub(crate) fn delete(&self, key: &Key) {
@@ -139,6 +142,24 @@ mod tests {
         cache_weight.add("disk", 3040, 3);
 
         assert_eq!(3, cache_weight.get_weight_used());
+    }
+
+    #[test]
+    fn update_non_existing_key() {
+        let cache_weight = CacheWeight::new(10);
+
+        let result = cache_weight.update("disk", 3040, 2);
+        assert!(!result);
+    }
+
+    #[test]
+    fn update_an_existing_key() {
+        let cache_weight = CacheWeight::new(10);
+
+        cache_weight.add("disk", 3040, 3);
+        let result = cache_weight.update("disk", 3040, 2);
+
+        assert!(result);
     }
 
     #[test]
