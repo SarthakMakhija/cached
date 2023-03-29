@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
@@ -6,20 +7,25 @@ use crossbeam_channel::Receiver;
 use parking_lot::RwLock;
 
 use crate::cache::lfu::tiny_lfu::TinyLFU;
+use crate::cache::policy::cache_weight::CacheWeight;
 use crate::cache::pool::BufferConsumer;
 use crate::cache::types::{KeyHash, TotalCounters};
 
-pub(crate) struct AdmissionPolicy {
+pub(crate) struct AdmissionPolicy<Key>
+    where Key: Hash + Eq + Send + Sync + 'static, {
     access_frequency: Arc<RwLock<TinyLFU>>,
+    cache_weight: CacheWeight<Key>,
     sender: crossbeam_channel::Sender<Vec<KeyHash>>,
     keep_running: Arc<AtomicBool>,
 }
 
-impl AdmissionPolicy {
+impl<Key> AdmissionPolicy<Key>
+    where Key: Hash + Eq + Send + Sync + 'static, {
     pub(crate) fn new(counters: TotalCounters) -> Self {
         let (sender, receiver) = crossbeam_channel::bounded(10); //TODO: capacity as parameter
         let policy = AdmissionPolicy {
             access_frequency: Arc::new(RwLock::new(TinyLFU::new(counters))),
+            cache_weight: CacheWeight::new(100), //TODO: parameter?
             sender,
             keep_running: Arc::new(AtomicBool::new(true)),
         };
@@ -50,7 +56,8 @@ impl AdmissionPolicy {
     }
 }
 
-impl BufferConsumer for AdmissionPolicy {
+impl<Key> BufferConsumer for AdmissionPolicy<Key>
+    where Key: Hash + Eq + Send + Sync + 'static, {
     fn accept(&self, key_hashes: Vec<KeyHash>) {
         //TODO: Decide if we need to clone this
         //TODO: Remove unwrap
@@ -62,12 +69,13 @@ impl BufferConsumer for AdmissionPolicy {
 mod tests {
     use std::thread;
     use std::time::Duration;
+
     use crate::cache::policy::admission_policy::AdmissionPolicy;
     use crate::cache::pool::BufferConsumer;
 
     #[test]
     fn increase_access_frequency() {
-        let policy = AdmissionPolicy::new(10);
+        let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10);
         let key_hashes = vec![10, 14, 116, 19, 19, 10];
 
         policy.accept(key_hashes);

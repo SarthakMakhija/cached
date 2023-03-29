@@ -20,8 +20,8 @@ pub struct CacheD<Key, Value>
     config: Config<Key>,
     store: Arc<Store<Key, Value>>,
     command_executor: CommandExecutor<Key, Value>,
-    policy: Rc<AdmissionPolicy>,
-    pool: Pool<AdmissionPolicy>,
+    policy: Rc<AdmissionPolicy<Key>>,
+    pool: Pool<AdmissionPolicy<Key>>,
 }
 
 impl<Key, Value> CacheD<Key, Value>

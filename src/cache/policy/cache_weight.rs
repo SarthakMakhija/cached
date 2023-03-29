@@ -71,7 +71,7 @@ impl<'a, Key> SampledKey<'a, Key>
 
 impl<Key> CacheWeight<Key>
     where Key: Hash + Eq + Send + Sync + 'static, {
-    fn new(max_weight: Weight) -> Self <> {
+    pub(crate) fn new(max_weight: Weight) -> Self <> {
         CacheWeight {
             max_weight,
             weight_used: RwLock::new(0),
