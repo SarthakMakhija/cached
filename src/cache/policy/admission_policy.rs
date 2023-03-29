@@ -6,10 +6,11 @@ use std::thread;
 use crossbeam_channel::Receiver;
 use parking_lot::RwLock;
 
+use crate::cache::command::CommandStatus;
 use crate::cache::lfu::tiny_lfu::TinyLFU;
 use crate::cache::policy::cache_weight::CacheWeight;
 use crate::cache::pool::BufferConsumer;
-use crate::cache::types::{KeyHash, TotalCounters};
+use crate::cache::types::{KeyHash, TotalCounters, Weight};
 
 pub(crate) struct AdmissionPolicy<Key>
     where Key: Hash + Eq + Send + Sync + 'static, {
@@ -25,7 +26,7 @@ impl<Key> AdmissionPolicy<Key>
         let (sender, receiver) = crossbeam_channel::bounded(10); //TODO: capacity as parameter
         let policy = AdmissionPolicy {
             access_frequency: Arc::new(RwLock::new(TinyLFU::new(counters))),
-            cache_weight: CacheWeight::new(100), //TODO: parameter?
+            cache_weight: CacheWeight::new(10), //TODO: parameter?
             sender,
             keep_running: Arc::new(AtomicBool::new(true)),
         };
@@ -51,6 +52,20 @@ impl<Key> AdmissionPolicy<Key>
         return self.access_frequency.read().estimate(key_hash);
     }
 
+    pub(crate) fn add(&self, key: Key, key_hash: KeyHash, weight: Weight) -> CommandStatus {
+        if weight > self.cache_weight.get_max_weight() {
+            return CommandStatus::Rejected;
+        }
+        if self.cache_weight.update(&key, key_hash, weight) {
+            return CommandStatus::Done;
+        }
+        if self.cache_weight.is_space_available_for(weight) {
+            self.cache_weight.add(key, key_hash, weight);
+            return CommandStatus::Done;
+        }
+        CommandStatus::Pending
+    }
+
     pub(crate) fn shutdown(&self) {
         self.keep_running.store(false, Ordering::Release);
     }
@@ -70,6 +85,7 @@ mod tests {
     use std::thread;
     use std::time::Duration;
 
+    use crate::cache::command::CommandStatus;
     use crate::cache::policy::admission_policy::AdmissionPolicy;
     use crate::cache::pool::BufferConsumer;
 
@@ -90,5 +106,30 @@ mod tests {
         let expected_frequencies = vec![2, 1, 1, 2];
 
         assert_eq!(expected_frequencies, actual_frequencies);
+    }
+
+    #[test]
+    fn does_not_add_key_if_its_weight_is_more_than_the_total_cache_weight() {
+        let policy = AdmissionPolicy::new(10);
+        assert_eq!(CommandStatus::Rejected, policy.add("topic", 3018, 100));
+    }
+
+    #[test]
+    fn updates_the_weight_of_an_existing_key() {
+        let policy = AdmissionPolicy::new(10);
+
+        let addition_status = policy.add("topic", 3018, 5);
+        assert_eq!(CommandStatus::Done, addition_status);
+
+        let update_status = policy.add("topic", 3018, 6);
+        assert_eq!(CommandStatus::Done, update_status);
+    }
+
+    #[test]
+    fn adds_a_key_given_space_is_available() {
+        let policy = AdmissionPolicy::new(10);
+
+        let addition_status = policy.add("topic", 3018, 5);
+        assert_eq!(CommandStatus::Done, addition_status);
     }
 }

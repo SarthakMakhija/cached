@@ -13,4 +13,5 @@ pub(crate) enum CommandType<Key, Value> {
 pub enum CommandStatus {
     Pending,
     Done,
+    Rejected,
 }
