@@ -106,7 +106,7 @@ impl<Key> CacheWeight<Key>
         let mut sample = BinaryHeap::new();
         self.key_weights.iter().take(size).for_each(|pair| {
             let frequency = frequency_counter(pair.value().key_hash);
-            sample.push(SampledKey { pair, estimated_frequency: frequency });
+            sample.push(SampledKey::new(pair, frequency));
         });
         sample
     }
