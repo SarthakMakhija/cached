@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::cmp::Ordering;
+use std::collections::{BinaryHeap, HashMap};
 use std::hash::Hash;
 
 use crate::cache::types::{KeyHash, Weight};
@@ -21,7 +22,52 @@ pub(crate) struct CacheWeight<Key>
     where Key: Hash + Eq + Send + Sync + 'static, {
     max_weight: Weight,
     weight_used: Weight,
-    cost_by_key: HashMap<Key, WeightByKeyHash>,
+    key_weights: HashMap<Key, WeightByKeyHash>,
+}
+
+
+pub(crate) struct SampledKey<'a, Key>
+    where Key: Eq {
+    key: &'a Key,
+    hash: KeyHash,
+    weight: Weight,
+    estimated_frequency: u8,
+}
+
+impl<'a, Key> Ord for SampledKey<'a, Key>
+    where Key: Eq {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (other.estimated_frequency, self.weight).cmp(&(self.estimated_frequency, other.weight))
+    }
+}
+
+impl<'a, Key> PartialOrd for SampledKey<'a, Key>
+    where Key: Eq {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<'a, Key> PartialEq for SampledKey<'a, Key>
+    where Key: Eq {
+    fn eq(&self, other: &Self) -> bool {
+        self.key == other.key
+    }
+}
+
+impl<'a, Key> Eq for SampledKey<'a, Key>
+    where Key: Eq {}
+
+impl<'a, Key> SampledKey<'a, Key>
+    where Key: Eq {
+    fn new(key: &'a Key, weight_by_key_hash: &WeightByKeyHash, frequency: u8) -> Self<> {
+        SampledKey {
+            key,
+            hash: weight_by_key_hash.key_hash,
+            weight: weight_by_key_hash.weight,
+            estimated_frequency: frequency,
+        }
+    }
 }
 
 impl<Key> CacheWeight<Key>
@@ -30,7 +76,7 @@ impl<Key> CacheWeight<Key>
         CacheWeight {
             max_weight,
             weight_used: 0,
-            cost_by_key: HashMap::new(),
+            key_weights: HashMap::new(),
         }
     }
 
@@ -38,22 +84,34 @@ impl<Key> CacheWeight<Key>
         self.max_weight
     }
 
+    //TODO: Combine key and key_hash together?
     pub(crate) fn add(&mut self, key: Key, key_hash: KeyHash, weight: Weight) {
         self.weight_used += weight;
-        self.cost_by_key.insert(key, WeightByKeyHash::new(weight, key_hash));
+        self.key_weights.insert(key, WeightByKeyHash::new(weight, key_hash));
     }
 
+    //TODO: Combine key and key_hash together?
     pub(crate) fn update(&mut self, key: Key, key_hash: KeyHash, weight: Weight) {
-        self.cost_by_key.entry(key).and_modify(|weight_by_key_hash| {
+        self.key_weights.entry(key).and_modify(|weight_by_key_hash| {
             self.weight_used += weight - weight_by_key_hash.weight;
             *weight_by_key_hash = WeightByKeyHash::new(weight, key_hash);
         });
     }
 
     pub(crate) fn delete(&mut self, key: &Key) {
-        if let Some(weight_by_key_hash) = self.cost_by_key.remove(key) {
+        if let Some(weight_by_key_hash) = self.key_weights.remove(key) {
             self.weight_used -= weight_by_key_hash.weight;
         }
+    }
+
+    pub(crate) fn sample<Freq>(&self, size: usize, frequency_counter: Freq) -> BinaryHeap<SampledKey<'_, Key>>
+        where Freq: Fn(KeyHash) -> u8 {
+        let mut sample = BinaryHeap::new();
+        self.key_weights.iter().take(size).for_each(|pair| {
+            let frequency = frequency_counter(pair.1.key_hash);
+            sample.push(SampledKey::new(pair.0, pair.1, frequency));
+        });
+        sample
     }
 }
 
@@ -79,10 +137,10 @@ mod tests {
     fn update_key_weight_given_the_updated_weight_is_less() {
         let mut cache_weight = CacheWeight::new(10);
 
-        cache_weight.add("disk", 3040,3);
+        cache_weight.add("disk", 3040, 3);
         assert_eq!(3, cache_weight.weight_used);
 
-        cache_weight.update("disk", 3040,2);
+        cache_weight.update("disk", 3040, 2);
         assert_eq!(2, cache_weight.weight_used);
     }
 
@@ -93,7 +151,7 @@ mod tests {
         cache_weight.add("disk", 3040, 4);
         assert_eq!(4, cache_weight.weight_used);
 
-        cache_weight.update("disk", 3040,8);
+        cache_weight.update("disk", 3040, 8);
         assert_eq!(8, cache_weight.weight_used);
     }
 
@@ -101,10 +159,10 @@ mod tests {
     fn update_key_weight_given_the_updated_weight_is_same() {
         let mut cache_weight = CacheWeight::new(10);
 
-        cache_weight.add("disk", 3040,4);
+        cache_weight.add("disk", 3040, 4);
         assert_eq!(4, cache_weight.weight_used);
 
-        cache_weight.update("disk", 3040,4);
+        cache_weight.update("disk", 3040, 4);
         assert_eq!(4, cache_weight.weight_used);
     }
 
@@ -112,10 +170,64 @@ mod tests {
     fn delete_key_weight() {
         let mut cache_weight = CacheWeight::new(10);
 
-        cache_weight.add("disk", 3040,3);
+        cache_weight.add("disk", 3040, 3);
         assert_eq!(3, cache_weight.weight_used);
 
         cache_weight.delete(&"disk");
         assert_eq!(0, cache_weight.weight_used);
+    }
+
+    #[test]
+    fn sample_keys_with_distinct_frequencies() {
+        let mut cache_weight = CacheWeight::new(10);
+
+        cache_weight.add("disk", 3040, 3);
+        cache_weight.add("topic", 1090, 4);
+        cache_weight.add("SSD", 1290, 3);
+
+        let mut sample = cache_weight.sample(3, |hash| {
+            match hash {
+                3040 => 1,
+                1090 => 2,
+                1290 => 3,
+                _ => 0
+            }
+        });
+        assert_eq!(1, sample.pop().unwrap().estimated_frequency);
+        assert_eq!(2, sample.pop().unwrap().estimated_frequency);
+        assert_eq!(3, sample.pop().unwrap().estimated_frequency);
+    }
+
+    #[test]
+    fn sample_keys_with_same_frequencies() {
+        let mut cache_weight = CacheWeight::new(10);
+
+        cache_weight.add("disk", 3040, 5);
+        cache_weight.add("topic", 1090, 2);
+        cache_weight.add("SSD", 1290, 3);
+
+        let mut sample = cache_weight.sample(3, |hash| {
+            match hash {
+                3040 => 1,
+                1090 => 2,
+                1290 => 1,
+                _ => 0
+            }
+        });
+
+        let sampled_key = sample.pop().unwrap();
+        assert_eq!(1, sampled_key.estimated_frequency);
+        assert_eq!(5, sampled_key.weight);
+        assert_eq!(&"disk", sampled_key.key);
+
+        let sampled_key = sample.pop().unwrap();
+        assert_eq!(1, sampled_key.estimated_frequency);
+        assert_eq!(3, sampled_key.weight);
+        assert_eq!(&"SSD", sampled_key.key);
+
+        let sampled_key = sample.pop().unwrap();
+        assert_eq!(2, sampled_key.estimated_frequency);
+        assert_eq!(2, sampled_key.weight);
+        assert_eq!(&"topic", sampled_key.key);
     }
 }
