@@ -34,41 +34,48 @@ pub(crate) struct CacheWeight<Key>
     key_weights: DashMap<KeyId, WeightedKey<Key>>,
 }
 
-pub(crate) struct SampledKey<'a, Key>
-    where Key: Eq + Hash {
-    pair: RefMulti<'a, KeyId, WeightedKey<Key>>,
+pub(crate) struct SampledKey {
+    id: KeyId,
+    hash: KeyHash,
+    weight: Weight,
     estimated_frequency: u8, //TODO: type for frequency?
 }
 
-impl<'a, Key> Ord for SampledKey<'a, Key>
-    where Key: Eq + Hash {
+impl Ord for SampledKey {
     fn cmp(&self, other: &Self) -> Ordering {
-        (other.estimated_frequency, self.pair.weight).cmp(&(self.estimated_frequency, other.pair.weight))
+        (other.estimated_frequency, self.weight).cmp(&(self.estimated_frequency, other.weight))
     }
 }
 
-impl<'a, Key> PartialOrd for SampledKey<'a, Key>
-    where Key: Eq + Hash {
+impl PartialOrd for SampledKey {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<'a, Key> PartialEq for SampledKey<'a, Key>
-    where Key: Eq + Hash {
+impl PartialEq for SampledKey {
     fn eq(&self, other: &Self) -> bool {
-        self.pair.key() == other.pair.key()
+        self.id == other.id
     }
 }
 
-impl<'a, Key> Eq for SampledKey<'a, Key>
-    where Key: Eq + Hash {}
+impl Eq for SampledKey {}
 
-impl<'a, Key> SampledKey<'a, Key>
-    where Key: Eq + Hash {
-    fn new(pair: RefMulti<'a, KeyId, WeightedKey<Key>>, frequency: u8) -> Self <> {
+impl SampledKey {
+    fn new<Key>(pair: RefMulti<KeyId, WeightedKey<Key>>, frequency: u8) -> Self <> {
+        Self::using(
+            *pair.key(),
+            pair.key_hash,
+            pair.weight,
+            frequency,
+        )
+    }
+
+    fn using(id: KeyId, key_hash: KeyHash, key_weight: Weight, frequency: u8) -> Self <> {
         SampledKey {
-            pair,
+            id,
+            hash: key_hash,
+            weight: key_weight,
             estimated_frequency: frequency,
         }
     }
@@ -126,7 +133,7 @@ impl<Key> CacheWeight<Key>
     }
 
     pub(crate) fn sample<Freq>(&self, size: usize, frequency_counter: Freq)
-                               -> (Iter<'_, KeyId, WeightedKey<Key>, RandomState, DashMap<KeyId, WeightedKey<Key>>>, BinaryHeap<SampledKey<'_, Key>>)
+                               -> (Iter<'_, KeyId, WeightedKey<Key>, RandomState, DashMap<KeyId, WeightedKey<Key>>>, BinaryHeap<SampledKey>)
         where Freq: Fn(KeyHash) -> u8 {
         let mut counter = 0;
         let mut sample = BinaryHeap::new();
@@ -296,17 +303,17 @@ mod tests {
 
         let sampled_key = sample.pop().unwrap();
         assert_eq!(1, sampled_key.estimated_frequency);
-        assert_eq!(5, sampled_key.pair.weight);
-        assert_eq!(&10, sampled_key.pair.key());
+        assert_eq!(5, sampled_key.weight);
+        assert_eq!(10, sampled_key.id);
 
         let sampled_key = sample.pop().unwrap();
         assert_eq!(1, sampled_key.estimated_frequency);
-        assert_eq!(3, sampled_key.pair.weight);
-        assert_eq!(&30, sampled_key.pair.key());
+        assert_eq!(3, sampled_key.weight);
+        assert_eq!(30, sampled_key.id);
 
         let sampled_key = sample.pop().unwrap();
         assert_eq!(2, sampled_key.estimated_frequency);
-        assert_eq!(2, sampled_key.pair.weight);
-        assert_eq!(&20, sampled_key.pair.key());
+        assert_eq!(2, sampled_key.weight);
+        assert_eq!(20, sampled_key.id);
     }
 }
