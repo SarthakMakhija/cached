@@ -68,10 +68,11 @@ impl<Key> AdmissionPolicy<Key>
             return CommandStatus::Accepted;
         }
         let (status, victims) = self.create_space(space_left, key_description);
+        victims.iter().for_each(|sampled_key| {
+            println!("vicitm {}", sampled_key.id);
+            self.cache_weight.delete(&sampled_key.id);
+        });
         if let CommandStatus::Accepted = status {
-            victims.iter().for_each(|sampled_key| {
-                self.cache_weight.delete(&sampled_key.id);
-            });
             self.cache_weight.add(key_description);
         }
         status
@@ -179,12 +180,30 @@ mod tests {
         let key_hashes = vec![10, 14, 116];
         policy.access_frequency.write().add(key_hashes);
 
-        let status = policy.maybe_add(&KeyDescription::new(&"topic", 1, 10, 5)); //space_used = 5, available: (total-used) and avail >= incom, left = available
+        let status = policy.maybe_add(&KeyDescription::new(&"topic", 1, 10, 5));
         assert_eq!(CommandStatus::Accepted, status);
 
         let status = policy.maybe_add(&KeyDescription::new(&"SSD", 2, 14, 6));
         assert_eq!(CommandStatus::Accepted, status);
 
         assert_eq!(6, policy.cache_weight.get_weight_used());
+    }
+
+    #[test]
+    fn rejects_the_incoming_key_and_has_victims() {
+        let policy = AdmissionPolicy::new(10);
+        let key_hashes = vec![14];
+        policy.access_frequency.write().add(key_hashes);
+
+        let status = policy.maybe_add(&KeyDescription::new(&"topic", 1, 20, 5));
+        assert_eq!(CommandStatus::Accepted, status);
+
+        let status = policy.maybe_add(&KeyDescription::new(&"HDD", 2, 14, 3));
+        assert_eq!(CommandStatus::Accepted, status);
+
+        let status = policy.maybe_add(&KeyDescription::new(&"SSD", 3, 90, 9));
+        assert_eq!(CommandStatus::Rejected, status);
+
+        assert_eq!(3, policy.cache_weight.get_weight_used());
     }
 }
