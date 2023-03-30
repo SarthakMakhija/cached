@@ -25,7 +25,7 @@ async fn get_value_for_an_existing_keys() {
 }
 
 fn put<Key, Value>(cached: &CacheD<Key, Value>, key_value_pairs: HashMap<Key, Value>) -> Vec<Arc<CommandAcknowledgement>>
-    where Key: Hash + Eq + Send + Sync + 'static,
+    where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + Clone + 'static {
     let mut acknowledgements = Vec::new();
     for key_value in key_value_pairs {

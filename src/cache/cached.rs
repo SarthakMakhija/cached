@@ -15,7 +15,7 @@ use crate::cache::store::stored_value::StoredValue;
 
 //TODO: Lifetime 'static?
 pub struct CacheD<Key, Value>
-    where Key: Hash + Eq + Send + Sync + 'static,
+    where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + 'static {
     config: Config<Key>,
     store: Arc<Store<Key, Value>>,
@@ -25,7 +25,7 @@ pub struct CacheD<Key, Value>
 }
 
 impl<Key, Value> CacheD<Key, Value>
-    where Key: Hash + Eq + Send + Sync + 'static,
+    where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + 'static {
     pub fn new(config: Config<Key>) -> Self {
         assert!(config.counters > 0);
@@ -70,7 +70,7 @@ impl<Key, Value> CacheD<Key, Value>
 }
 
 impl<Key, Value> CacheD<Key, Value>
-    where Key: Hash + Eq + Send + Sync + 'static,
+    where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + Clone + 'static {
     pub fn get(&self, key: &Key) -> Option<Value> {
         if let Some(value) = self.store.get(key) {
