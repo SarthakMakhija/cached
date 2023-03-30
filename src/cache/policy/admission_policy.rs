@@ -7,13 +7,14 @@ use crossbeam_channel::Receiver;
 use parking_lot::RwLock;
 
 use crate::cache::command::CommandStatus;
+use crate::cache::key_description::KeyDescription;
 use crate::cache::lfu::tiny_lfu::TinyLFU;
 use crate::cache::policy::cache_weight::CacheWeight;
 use crate::cache::pool::BufferConsumer;
 use crate::cache::types::{KeyHash, TotalCounters, Weight};
 
 pub(crate) struct AdmissionPolicy<Key>
-    where Key: Hash + Eq + Send + Sync + 'static, {
+    where Key: Hash + Eq + Send + Sync + Clone + 'static, {
     access_frequency: Arc<RwLock<TinyLFU>>,
     cache_weight: CacheWeight<Key>,
     sender: crossbeam_channel::Sender<Vec<KeyHash>>,
@@ -21,7 +22,7 @@ pub(crate) struct AdmissionPolicy<Key>
 }
 
 impl<Key> AdmissionPolicy<Key>
-    where Key: Hash + Eq + Send + Sync + 'static, {
+    where Key: Hash + Eq + Send + Sync + Clone + 'static, {
     pub(crate) fn new(counters: TotalCounters) -> Self {
         let (sender, receiver) = crossbeam_channel::bounded(10); //TODO: capacity as parameter
         let policy = AdmissionPolicy {
@@ -56,12 +57,13 @@ impl<Key> AdmissionPolicy<Key>
         if weight > self.cache_weight.get_max_weight() {
             return CommandStatus::Rejected;
         }
-        if self.cache_weight.update(&key, key_hash, weight) {
+        let key_description = KeyDescription::new(&key, 0, key_hash, weight);
+        if self.cache_weight.update(&key_description) {
             return CommandStatus::Done;
         }
         let (_space_left, is_enough_space_available) = self.cache_weight.is_space_available_for(weight);
         if is_enough_space_available {
-            self.cache_weight.add(key, key_hash, weight);
+            self.cache_weight.add(&key_description);
             return CommandStatus::Done;
         }
         CommandStatus::Pending
@@ -73,7 +75,7 @@ impl<Key> AdmissionPolicy<Key>
 }
 
 impl<Key> BufferConsumer for AdmissionPolicy<Key>
-    where Key: Hash + Eq + Send + Sync + 'static, {
+    where Key: Hash + Eq + Send + Sync + Clone + 'static, {
     fn accept(&self, key_hashes: Vec<KeyHash>) {
         //TODO: Decide if we need to clone this
         //TODO: Remove unwrap

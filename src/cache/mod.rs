@@ -7,3 +7,4 @@ pub(crate) mod store;
 pub(crate) mod lfu;
 pub(crate) mod pool;
 pub(crate) mod policy;
+pub(crate) mod key_description;

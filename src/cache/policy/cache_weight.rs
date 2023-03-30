@@ -8,6 +8,7 @@ use dashmap::iter::Iter;
 use dashmap::mapref::multiple::RefMulti;
 use parking_lot::RwLock;
 
+use crate::cache::key_description::KeyDescription;
 use crate::cache::types::{KeyHash, Weight};
 
 pub(crate) struct WeightByKeyHash {
@@ -25,7 +26,7 @@ impl WeightByKeyHash {
 }
 
 pub(crate) struct CacheWeight<Key>
-    where Key: Hash + Eq + Send + Sync + 'static, {
+    where Key: Hash + Eq + Send + Sync + Clone + 'static, {
     max_weight: Weight,
     weight_used: RwLock<Weight>,
     key_weights: DashMap<Key, WeightByKeyHash>,
@@ -72,7 +73,7 @@ impl<'a, Key> SampledKey<'a, Key>
 }
 
 impl<Key> CacheWeight<Key>
-    where Key: Hash + Eq + Send + Sync + 'static, {
+    where Key: Hash + Eq + Send + Sync + Clone + 'static, {
     pub(crate) fn new(max_weight: Weight) -> Self <> {
         CacheWeight {
             max_weight,
@@ -94,21 +95,20 @@ impl<Key> CacheWeight<Key>
         (available, available >= weight)
     }
 
-    //TODO: Combine key and key_hash together?
-    pub(crate) fn add(&self, key: Key, key_hash: KeyHash, weight: Weight) {
-        self.key_weights.insert(key, WeightByKeyHash::new(weight, key_hash));
+    pub(crate) fn add(&self, key_description: &KeyDescription<Key>) {
+        self.key_weights.insert(key_description.key.clone(), WeightByKeyHash::new(key_description.weight, key_description.hash));
         let mut guard = self.weight_used.write();
-        *guard += weight;
+        *guard += key_description.weight;
     }
 
     //TODO: Combine key and key_hash together?
-    pub(crate) fn update(&self, key: &Key, key_hash: KeyHash, weight: Weight) -> bool {
-        if let Some(mut pair) = self.key_weights.get_mut(key) {
+    pub(crate) fn update(&self, key_description: &KeyDescription<Key>) -> bool {
+        if let Some(mut pair) = self.key_weights.get_mut(key_description.key) {
             {
                 let mut guard = self.weight_used.write();
-                *guard += weight - pair.weight;
+                *guard += key_description.weight - pair.weight;
             }
-            *(pair.value_mut()) = WeightByKeyHash::new(weight, key_hash);
+            *(pair.value_mut()) = WeightByKeyHash::new(key_description.weight, key_description.hash);
             return true;
         }
         false
@@ -124,7 +124,6 @@ impl<Key> CacheWeight<Key>
     pub(crate) fn sample<Freq>(&self, size: usize, frequency_counter: Freq)
                                -> (Iter<'_, Key, WeightByKeyHash, RandomState, DashMap<Key, WeightByKeyHash>>, BinaryHeap<SampledKey<'_, Key>>)
         where Freq: Fn(KeyHash) -> u8 {
-
         let mut counter = 0;
         let mut sample = BinaryHeap::new();
         let mut iterator = self.key_weights.iter();
@@ -144,6 +143,7 @@ impl<Key> CacheWeight<Key>
 
 #[cfg(test)]
 mod tests {
+    use crate::cache::key_description::KeyDescription;
     use crate::cache::policy::cache_weight::CacheWeight;
 
     #[test]
@@ -155,7 +155,7 @@ mod tests {
     #[test]
     fn space_is_available_for_new_key() {
         let cache_weight: CacheWeight<&str> = CacheWeight::new(10);
-        cache_weight.add("disk", 3040, 3);
+        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 3));
 
         assert!(cache_weight.is_space_available_for(7).1);
     }
@@ -163,7 +163,7 @@ mod tests {
     #[test]
     fn space_is_not_available_for_new_key() {
         let cache_weight: CacheWeight<&str> = CacheWeight::new(10);
-        cache_weight.add("disk", 3040, 3);
+        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 3));
 
         assert!(!cache_weight.is_space_available_for(8).1);
     }
@@ -171,7 +171,7 @@ mod tests {
     #[test]
     fn add_key_weight() {
         let cache_weight = CacheWeight::new(10);
-        cache_weight.add("disk", 3040, 3);
+        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 3));
 
         assert_eq!(3, cache_weight.get_weight_used());
     }
@@ -180,7 +180,7 @@ mod tests {
     fn update_non_existing_key() {
         let cache_weight = CacheWeight::new(10);
 
-        let result = cache_weight.update(&"disk", 3040, 2);
+        let result = cache_weight.update(&KeyDescription::new(&"disk", 1, 3040, 2));
         assert!(!result);
     }
 
@@ -188,8 +188,8 @@ mod tests {
     fn update_an_existing_key() {
         let cache_weight = CacheWeight::new(10);
 
-        cache_weight.add("disk", 3040, 3);
-        let result = cache_weight.update(&"disk", 3040, 2);
+        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 3));
+        let result = cache_weight.update(&KeyDescription::new(&"disk", 1, 3040, 2));
 
         assert!(result);
     }
@@ -198,10 +198,10 @@ mod tests {
     fn update_key_weight_given_the_updated_weight_is_less() {
         let cache_weight = CacheWeight::new(10);
 
-        cache_weight.add("disk", 3040, 3);
+        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 3));
         assert_eq!(3, cache_weight.get_weight_used());
 
-        cache_weight.update(&"disk", 3040, 2);
+        cache_weight.update(&KeyDescription::new(&"disk", 1, 3040, 2));
         assert_eq!(2, cache_weight.get_weight_used());
     }
 
@@ -209,10 +209,10 @@ mod tests {
     fn update_key_weight_given_the_updated_weight_is_more() {
         let cache_weight = CacheWeight::new(10);
 
-        cache_weight.add("disk", 3040, 4);
+        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 4));
         assert_eq!(4, cache_weight.get_weight_used());
 
-        cache_weight.update(&"disk", 3040, 8);
+        cache_weight.update(&KeyDescription::new(&"disk", 1, 3040, 8));
         assert_eq!(8, cache_weight.get_weight_used());
     }
 
@@ -220,10 +220,10 @@ mod tests {
     fn update_key_weight_given_the_updated_weight_is_same() {
         let cache_weight = CacheWeight::new(10);
 
-        cache_weight.add("disk", 3040, 4);
+        cache_weight.add(&KeyDescription::new(&"disk", 1,3040, 4));
         assert_eq!(4, cache_weight.get_weight_used());
 
-        cache_weight.update(&"disk", 3040, 4);
+        cache_weight.update(&KeyDescription::new(&"disk", 1, 3040, 4));
         assert_eq!(4, cache_weight.get_weight_used());
     }
 
@@ -231,7 +231,7 @@ mod tests {
     fn delete_key_weight() {
         let cache_weight = CacheWeight::new(10);
 
-        cache_weight.add("disk", 3040, 3);
+        cache_weight.add(&KeyDescription::new(&"disk", 1,3040, 3));
         assert_eq!(3, cache_weight.get_weight_used());
 
         cache_weight.delete(&"disk");
@@ -242,9 +242,9 @@ mod tests {
     fn sample_size() {
         let cache_weight = CacheWeight::new(10);
 
-        cache_weight.add("disk", 3040, 3);
-        cache_weight.add("topic", 1090, 4);
-        cache_weight.add("SSD", 1290, 3);
+        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 3));
+        cache_weight.add(&KeyDescription::new(&"topic", 2, 1090, 4));
+        cache_weight.add(&KeyDescription::new(&"SSD", 3, 1290, 3));
 
         let (mut iterator, sample) = cache_weight.sample(2, |_hash| 10);
 
@@ -256,9 +256,9 @@ mod tests {
     fn sample_keys_with_distinct_frequencies() {
         let cache_weight = CacheWeight::new(10);
 
-        cache_weight.add("disk", 3040, 3);
-        cache_weight.add("topic", 1090, 4);
-        cache_weight.add("SSD", 1290, 3);
+        cache_weight.add(&KeyDescription::new(&"disk", 1,3040, 3));
+        cache_weight.add(&KeyDescription::new(&"topic", 2,1090, 4));
+        cache_weight.add(&KeyDescription::new(&"SSD", 3,1290, 3));
 
         let (_, mut sample) = cache_weight.sample(3, |hash| {
             match hash {
@@ -277,9 +277,9 @@ mod tests {
     fn sample_keys_with_same_frequencies() {
         let cache_weight = CacheWeight::new(10);
 
-        cache_weight.add("disk", 3040, 5);
-        cache_weight.add("topic", 1090, 2);
-        cache_weight.add("SSD", 1290, 3);
+        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 5));
+        cache_weight.add(&KeyDescription::new(&"topic", 2, 1090, 2));
+        cache_weight.add(&KeyDescription::new(&"SSD", 3, 1290, 3));
 
         let (_, mut sample) = cache_weight.sample(3, |hash| {
             match hash {
