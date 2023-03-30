@@ -13,7 +13,7 @@ use crate::cache::types::{KeyHash, KeyId, Weight};
 
 pub(crate) struct WeightedKey<Key> {
     key: Key,
-    key_hash: KeyHash,
+    pub(crate) key_hash: KeyHash,
     weight: Weight,
 }
 
@@ -35,10 +35,10 @@ pub(crate) struct CacheWeight<Key>
 }
 
 pub(crate) struct SampledKey {
-    id: KeyId,
-    hash: KeyHash,
-    weight: Weight,
-    estimated_frequency: u8, //TODO: type for frequency?
+    pub(crate) id: KeyId,
+    pub(crate) hash: KeyHash,
+    pub(crate) weight: Weight,
+    pub(crate) estimated_frequency: u8, //TODO: type for frequency?
 }
 
 impl Ord for SampledKey {
@@ -62,7 +62,7 @@ impl PartialEq for SampledKey {
 impl Eq for SampledKey {}
 
 impl SampledKey {
-    fn new<Key>(pair: RefMulti<KeyId, WeightedKey<Key>>, frequency: u8) -> Self <> {
+    pub(crate) fn new<Key>(pair: RefMulti<KeyId, WeightedKey<Key>>, frequency: u8) -> Self <> {
         Self::using(
             *pair.key(),
             pair.key_hash,

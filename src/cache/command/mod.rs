@@ -12,6 +12,7 @@ pub(crate) enum CommandType<Key, Value> {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum CommandStatus {
     Pending,
+    Accepted,
     Done,
     Rejected,
 }
