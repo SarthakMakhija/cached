@@ -281,9 +281,9 @@ mod tests {
     fn sample_keys_with_same_frequencies() {
         let cache_weight = CacheWeight::new(10);
 
-        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 5));
-        cache_weight.add(&KeyDescription::new(&"topic", 2, 1090, 2));
-        cache_weight.add(&KeyDescription::new(&"SSD", 3, 1290, 3));
+        cache_weight.add(&KeyDescription::new(&"disk", 10, 3040, 5));
+        cache_weight.add(&KeyDescription::new(&"topic", 20, 1090, 2));
+        cache_weight.add(&KeyDescription::new(&"SSD", 30, 1290, 3));
 
         let (_, mut sample) = cache_weight.sample(3, |hash| {
             match hash {
@@ -297,16 +297,16 @@ mod tests {
         let sampled_key = sample.pop().unwrap();
         assert_eq!(1, sampled_key.estimated_frequency);
         assert_eq!(5, sampled_key.pair.weight);
-        assert_eq!(&1, sampled_key.pair.key());
+        assert_eq!(&10, sampled_key.pair.key());
 
         let sampled_key = sample.pop().unwrap();
         assert_eq!(1, sampled_key.estimated_frequency);
         assert_eq!(3, sampled_key.pair.weight);
-        assert_eq!(&3, sampled_key.pair.key());
+        assert_eq!(&30, sampled_key.pair.key());
 
         let sampled_key = sample.pop().unwrap();
         assert_eq!(2, sampled_key.estimated_frequency);
         assert_eq!(2, sampled_key.pair.weight);
-        assert_eq!(&2, sampled_key.pair.key());
+        assert_eq!(&20, sampled_key.pair.key());
     }
 }
