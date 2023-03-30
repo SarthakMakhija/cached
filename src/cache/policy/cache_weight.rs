@@ -1,14 +1,16 @@
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
+use std::collections::hash_map::RandomState;
 use std::hash::Hash;
 
 use dashmap::DashMap;
+use dashmap::iter::Iter;
 use dashmap::mapref::multiple::RefMulti;
 use parking_lot::RwLock;
 
 use crate::cache::types::{KeyHash, Weight};
 
-struct WeightByKeyHash {
+pub(crate) struct WeightByKeyHash {
     weight: Weight,
     key_hash: KeyHash,
 }
@@ -118,14 +120,24 @@ impl<Key> CacheWeight<Key>
         }
     }
 
-    pub(crate) fn sample<Freq>(&self, size: usize, frequency_counter: Freq) -> BinaryHeap<SampledKey<'_, Key>>
+    pub(crate) fn sample<Freq>(&self, size: usize, frequency_counter: Freq)
+                               -> (Iter<'_, Key, WeightByKeyHash, RandomState, DashMap<Key, WeightByKeyHash>>, BinaryHeap<SampledKey<'_, Key>>)
         where Freq: Fn(KeyHash) -> u8 {
+
+        let mut counter = 0;
         let mut sample = BinaryHeap::new();
-        self.key_weights.iter().take(size).for_each(|pair| {
+        let mut iterator = self.key_weights.iter();
+
+        for pair in iterator.by_ref() {
             let frequency = frequency_counter(pair.value().key_hash);
             sample.push(SampledKey::new(pair, frequency));
-        });
-        sample
+            counter += 1;
+
+            if counter >= size {
+                break;
+            }
+        }
+        (iterator, sample)
     }
 }
 
@@ -210,6 +222,20 @@ mod tests {
     }
 
     #[test]
+    fn sample_size() {
+        let cache_weight = CacheWeight::new(10);
+
+        cache_weight.add("disk", 3040, 3);
+        cache_weight.add("topic", 1090, 4);
+        cache_weight.add("SSD", 1290, 3);
+
+        let (mut iterator, sample) = cache_weight.sample(2, |_hash| 10);
+
+        assert_eq!(2, sample.len());
+        assert!(iterator.next().is_some())
+    }
+
+    #[test]
     fn sample_keys_with_distinct_frequencies() {
         let cache_weight = CacheWeight::new(10);
 
@@ -217,7 +243,7 @@ mod tests {
         cache_weight.add("topic", 1090, 4);
         cache_weight.add("SSD", 1290, 3);
 
-        let mut sample = cache_weight.sample(3, |hash| {
+        let (_, mut sample) = cache_weight.sample(3, |hash| {
             match hash {
                 3040 => 1,
                 1090 => 2,
@@ -238,7 +264,7 @@ mod tests {
         cache_weight.add("topic", 1090, 2);
         cache_weight.add("SSD", 1290, 3);
 
-        let mut sample = cache_weight.sample(3, |hash| {
+        let (_, mut sample) = cache_weight.sample(3, |hash| {
             match hash {
                 3040 => 1,
                 1090 => 2,
