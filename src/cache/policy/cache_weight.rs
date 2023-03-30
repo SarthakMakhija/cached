@@ -89,9 +89,9 @@ impl<Key> CacheWeight<Key>
         *self.weight_used.read()
     }
 
-    pub(crate) fn is_space_available_for(&self, weight: Weight) -> bool {
+    pub(crate) fn is_space_available_for(&self, weight: Weight) -> (Weight, bool) {
         let available = self.max_weight - (*self.weight_used.read());
-        available >= weight
+        (available, available >= weight)
     }
 
     //TODO: Combine key and key_hash together?
@@ -157,7 +157,7 @@ mod tests {
         let cache_weight: CacheWeight<&str> = CacheWeight::new(10);
         cache_weight.add("disk", 3040, 3);
 
-        assert!(cache_weight.is_space_available_for(7));
+        assert!(cache_weight.is_space_available_for(7).1);
     }
 
     #[test]
@@ -165,7 +165,7 @@ mod tests {
         let cache_weight: CacheWeight<&str> = CacheWeight::new(10);
         cache_weight.add("disk", 3040, 3);
 
-        assert!(!cache_weight.is_space_available_for(8));
+        assert!(!cache_weight.is_space_available_for(8).1);
     }
 
     #[test]

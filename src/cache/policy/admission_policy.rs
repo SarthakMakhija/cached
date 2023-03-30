@@ -59,7 +59,8 @@ impl<Key> AdmissionPolicy<Key>
         if self.cache_weight.update(&key, key_hash, weight) {
             return CommandStatus::Done;
         }
-        if self.cache_weight.is_space_available_for(weight) {
+        let (_space_left, is_enough_space_available) = self.cache_weight.is_space_available_for(weight);
+        if is_enough_space_available {
             self.cache_weight.add(key, key_hash, weight);
             return CommandStatus::Done;
         }
