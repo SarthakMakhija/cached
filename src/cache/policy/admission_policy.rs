@@ -82,22 +82,18 @@ impl<Key> AdmissionPolicy<Key>
         let mut victims = Vec::new();
         let mut space_available = space_left;
 
-        let (mut iterator, mut sample)
+        let mut sample
             = self.cache_weight.sample(EVICTION_SAMPLE_SIZE, frequency_counter);
 
         while space_available < key_description.weight {
-            let sampled_key = sample.pop().unwrap(); //TODO: Remove unwrap
+            let sampled_key = sample.min_frequency_key();
             if incoming_key_access_frequency < sampled_key.estimated_frequency {
                 return (CommandStatus::Rejected, victims);
             }
             space_available += sampled_key.weight;
             victims.push(sampled_key);
 
-            if sample.len() < EVICTION_SAMPLE_SIZE {
-                if let Some(pair) = iterator.next() {
-                    sample.push(SampledKey::new(frequency_counter(pair.key_hash), pair));
-                }
-            }
+            let _ = sample.maybe_fill_in();
         }
         (CommandStatus::Accepted, victims)
     }

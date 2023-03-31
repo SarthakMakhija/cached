@@ -34,6 +34,7 @@ pub(crate) struct CacheWeight<Key>
     key_weights: DashMap<KeyId, WeightedKey<Key>>,
 }
 
+#[derive(Copy, Clone)]
 pub(crate) struct SampledKey {
     pub(crate) id: KeyId,
     pub(crate) weight: Weight,
@@ -75,6 +76,60 @@ impl SampledKey {
             weight: key_weight,
             estimated_frequency: frequency,
         }
+    }
+}
+
+pub(crate) struct FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
+    where Freq: Fn(KeyHash) -> u8 {
+    iterator: Iter<'a, KeyId, WeightedKey<Key>, RandomState, DashMap<KeyId, WeightedKey<Key>>>,
+    sample: BinaryHeap<SampledKey>,
+    sample_size: usize,
+    frequency_counter: Freq,
+}
+
+impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
+    where Freq: Fn(KeyHash) -> u8 {
+    fn new(
+        mut iterator: Iter<'a, KeyId, WeightedKey<Key>, RandomState, DashMap<KeyId, WeightedKey<Key>>>,
+        sample_size: usize,
+        frequency_counter: Freq) -> Self <> {
+        let mut counter = 0;
+        let mut sample = BinaryHeap::new();
+        for pair in iterator.by_ref() {
+            sample.push(SampledKey::new(frequency_counter(pair.value().key_hash), pair));
+            counter += 1;
+
+            if counter >= sample_size {
+                break;
+            }
+        }
+
+        FrequencyCounterBasedMinHeapSamples {
+            iterator,
+            sample,
+            sample_size,
+            frequency_counter,
+        }
+    }
+
+    pub(crate) fn min_frequency_key(&mut self) -> SampledKey {
+        self.sample.pop().unwrap()
+    }
+
+    pub(crate) fn maybe_fill_in(&mut self) -> bool {
+        let mut filled_in: bool = false;
+        if self.sample.len() < self.sample_size {
+            if let Some(pair) = self.iterator.next() {
+                let frequency = (self.frequency_counter)(pair.key_hash);
+                self.sample.push(SampledKey::new(frequency, pair));
+                filled_in = true;
+            }
+        }
+        filled_in
+    }
+
+    pub(crate) fn size(&self) -> usize {
+        self.sample.len()
     }
 }
 
@@ -131,21 +186,13 @@ impl<Key> CacheWeight<Key>
 
     //TODO: can we avoid returning iterator? This would avoid holding the read-lock
     pub(crate) fn sample<Freq>(&self, size: usize, frequency_counter: Freq)
-                               -> (Iter<'_, KeyId, WeightedKey<Key>, RandomState, DashMap<KeyId, WeightedKey<Key>>>, BinaryHeap<SampledKey>)
+                               -> FrequencyCounterBasedMinHeapSamples<'_, Key, Freq>
         where Freq: Fn(KeyHash) -> u8 {
-        let mut counter = 0;
-        let mut sample = BinaryHeap::new();
-        let mut iterator = self.key_weights.iter();
-
-        for pair in iterator.by_ref() {
-            sample.push(SampledKey::new(frequency_counter(pair.value().key_hash), pair));
-            counter += 1;
-
-            if counter >= size {
-                break;
-            }
-        }
-        (iterator, sample)
+        FrequencyCounterBasedMinHeapSamples::new(
+            self.key_weights.iter(),
+            size,
+            frequency_counter,
+        )
     }
 }
 
@@ -254,10 +301,10 @@ mod tests {
         cache_weight.add(&KeyDescription::new(&"topic", 2, 1090, 4));
         cache_weight.add(&KeyDescription::new(&"SSD", 3, 1290, 3));
 
-        let (mut iterator, sample) = cache_weight.sample(2, |_hash| 10);
+        let mut sample = cache_weight.sample(2, |_hash| 10);
 
-        assert_eq!(2, sample.len());
-        assert!(iterator.next().is_some())
+        assert_eq!(2, sample.size());
+        assert!(sample.iterator.next().is_some())
     }
 
     #[test]
@@ -268,7 +315,7 @@ mod tests {
         cache_weight.add(&KeyDescription::new(&"topic", 2, 1090, 4));
         cache_weight.add(&KeyDescription::new(&"SSD", 3, 1290, 3));
 
-        let (_, mut sample) = cache_weight.sample(3, |hash| {
+        let mut sample = cache_weight.sample(3, |hash| {
             match hash {
                 3040 => 1,
                 1090 => 2,
@@ -276,9 +323,9 @@ mod tests {
                 _ => 0
             }
         });
-        assert_eq!(1, sample.pop().unwrap().estimated_frequency);
-        assert_eq!(2, sample.pop().unwrap().estimated_frequency);
-        assert_eq!(3, sample.pop().unwrap().estimated_frequency);
+        assert_eq!(1, sample.min_frequency_key().estimated_frequency);
+        assert_eq!(2, sample.min_frequency_key().estimated_frequency);
+        assert_eq!(3, sample.min_frequency_key().estimated_frequency);
     }
 
     #[test]
@@ -289,7 +336,7 @@ mod tests {
         cache_weight.add(&KeyDescription::new(&"topic", 20, 1090, 2));
         cache_weight.add(&KeyDescription::new(&"SSD", 30, 1290, 3));
 
-        let (_, mut sample) = cache_weight.sample(3, |hash| {
+        let mut sample = cache_weight.sample(3, |hash| {
             match hash {
                 3040 => 1,
                 1090 => 2,
@@ -298,17 +345,17 @@ mod tests {
             }
         });
 
-        let sampled_key = sample.pop().unwrap();
+        let sampled_key = sample.min_frequency_key();
         assert_eq!(1, sampled_key.estimated_frequency);
         assert_eq!(5, sampled_key.weight);
         assert_eq!(10, sampled_key.id);
 
-        let sampled_key = sample.pop().unwrap();
+        let sampled_key = sample.min_frequency_key();
         assert_eq!(1, sampled_key.estimated_frequency);
         assert_eq!(3, sampled_key.weight);
         assert_eq!(30, sampled_key.id);
 
-        let sampled_key = sample.pop().unwrap();
+        let sampled_key = sample.min_frequency_key();
         assert_eq!(2, sampled_key.estimated_frequency);
         assert_eq!(2, sampled_key.weight);
         assert_eq!(20, sampled_key.id);
