@@ -3,7 +3,7 @@ use std::hash::{Hash, Hasher};
 
 use crate::cache::clock::{ClockType, SystemClock};
 use crate::cache::pool::{BufferSize, PoolSize};
-use crate::cache::types::{KeyHash, TotalCounters};
+use crate::cache::types::{KeyHash, TotalCounters, Weight};
 
 type HashFn<Key> = dyn Fn(&Key) -> KeyHash;
 
@@ -11,6 +11,7 @@ const COMMAND_BUFFER_SIZE: usize = 32 * 1024;
 const ACCESS_POOL_SIZE: PoolSize = PoolSize(30);
 const ACCESS_BUFFER_SIZE: BufferSize = BufferSize(64);
 const COUNTERS: TotalCounters = 1_000_000;
+const TOTAL_CACHE_WEIGHT: Weight = 1_000_000_00;
 
 pub struct Config<Key>
     where Key: Hash {
@@ -20,6 +21,7 @@ pub struct Config<Key>
     pub command_buffer_size: usize,
     pub(crate) access_pool_size: PoolSize,
     pub(crate) access_buffer_size: BufferSize,
+    pub total_cache_weight: Weight,
 }
 
 pub struct ConfigBuilder<Key>
@@ -30,6 +32,7 @@ pub struct ConfigBuilder<Key>
     command_buffer_size: usize,
     access_pool_size: PoolSize,
     access_buffer_size: BufferSize,
+    total_cache_weight: Weight,
 }
 
 impl<Key> Default for ConfigBuilder<Key>
@@ -55,6 +58,7 @@ impl<Key> ConfigBuilder<Key>
             access_buffer_size: ACCESS_BUFFER_SIZE,
             command_buffer_size: COMMAND_BUFFER_SIZE,
             counters: COUNTERS,
+            total_cache_weight: TOTAL_CACHE_WEIGHT,
         };
     }
 
@@ -88,6 +92,11 @@ impl<Key> ConfigBuilder<Key>
         self
     }
 
+    pub fn total_cache_weight(mut self, weight: Weight) -> ConfigBuilder<Key> {
+        self.total_cache_weight = weight;
+        self
+    }
+
     pub fn build(self) -> Config<Key> {
         Config {
             key_hash_fn: self.key_hash_fn,
@@ -96,6 +105,7 @@ impl<Key> ConfigBuilder<Key>
             access_buffer_size: self.access_buffer_size,
             command_buffer_size: self.command_buffer_size,
             counters: self.counters,
+            total_cache_weight: self.total_cache_weight,
         }
     }
 }

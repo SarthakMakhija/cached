@@ -132,6 +132,7 @@ impl<Key> CacheWeight<Key>
         }
     }
 
+    //TODO: can we avoid returning iterator? This would avoid holding the read-lock
     pub(crate) fn sample<Freq>(&self, size: usize, frequency_counter: Freq)
                                -> (Iter<'_, KeyId, WeightedKey<Key>, RandomState, DashMap<KeyId, WeightedKey<Key>>>, BinaryHeap<SampledKey>)
         where Freq: Fn(KeyHash) -> u8 {

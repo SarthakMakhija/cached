@@ -25,11 +25,11 @@ pub(crate) struct AdmissionPolicy<Key>
 
 impl<Key> AdmissionPolicy<Key>
     where Key: Hash + Eq + Send + Sync + Clone + 'static, {
-    pub(crate) fn new(counters: TotalCounters) -> Self {
+    pub(crate) fn new(counters: TotalCounters, total_cache_weight: Weight) -> Self {
         let (sender, receiver) = crossbeam_channel::bounded(10); //TODO: capacity as parameter
         let policy = AdmissionPolicy {
             access_frequency: Arc::new(RwLock::new(TinyLFU::new(counters))),
-            cache_weight: CacheWeight::new(10), //TODO: parameter?
+            cache_weight: CacheWeight::new(total_cache_weight),
             sender,
             keep_running: Arc::new(AtomicBool::new(true)),
         };
@@ -69,7 +69,6 @@ impl<Key> AdmissionPolicy<Key>
         }
         let (status, victims) = self.create_space(space_left, key_description);
         victims.iter().for_each(|sampled_key| {
-            println!("vicitm {}", sampled_key.id);
             self.cache_weight.delete(&sampled_key.id);
         });
         if let CommandStatus::Accepted = status {
@@ -88,6 +87,7 @@ impl<Key> AdmissionPolicy<Key>
         let (mut iterator, mut sample)
             = self.cache_weight.sample(EVICTION_SAMPLE_SIZE, frequency_counter);
 
+        //TODO: should we directly delete here? and query the space_available from cache_weight?
         while space_available < key_description.weight {
             let sampled_key = sample.pop().unwrap(); //TODO: Remove unwrap
             if incoming_key_access_frequency < sampled_key.estimated_frequency {
@@ -132,7 +132,7 @@ mod tests {
 
     #[test]
     fn increase_access_frequency() {
-        let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10);
+        let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, 10);
         let key_hashes = vec![10, 14, 116, 19, 19, 10];
 
         policy.accept(key_hashes);
@@ -151,13 +151,13 @@ mod tests {
 
     #[test]
     fn does_not_add_key_if_its_weight_is_more_than_the_total_cache_weight() {
-        let policy = AdmissionPolicy::new(10);
+        let policy = AdmissionPolicy::new(10, 10);
         assert_eq!(CommandStatus::Rejected, policy.maybe_add(&KeyDescription::new(&"topic", 1, 3018, 100)));
     }
 
     #[test]
     fn updates_the_weight_of_an_existing_key() {
-        let policy = AdmissionPolicy::new(10);
+        let policy = AdmissionPolicy::new(10, 10);
 
         let addition_status = policy.maybe_add(&KeyDescription::new(&"topic", 1, 3018, 5));
         assert_eq!(CommandStatus::Accepted, addition_status);
@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn adds_a_key_given_space_is_available() {
-        let policy = AdmissionPolicy::new(10);
+        let policy = AdmissionPolicy::new(10, 10);
 
         let addition_status = policy.maybe_add(&KeyDescription::new(&"topic", 1, 3018, 5));
         assert_eq!(CommandStatus::Accepted, addition_status);
@@ -176,7 +176,7 @@ mod tests {
 
     #[test]
     fn adds_a_key_given_space_is_not_available() {
-        let policy = AdmissionPolicy::new(10);
+        let policy = AdmissionPolicy::new(10, 10);
         let key_hashes = vec![10, 14, 116];
         policy.access_frequency.write().add(key_hashes);
 
@@ -191,7 +191,7 @@ mod tests {
 
     #[test]
     fn rejects_the_incoming_key_and_has_victims() {
-        let policy = AdmissionPolicy::new(10);
+        let policy = AdmissionPolicy::new(10, 10);
         let key_hashes = vec![14];
         policy.access_frequency.write().add(key_hashes);
 

@@ -31,7 +31,7 @@ impl<Key, Value> CacheD<Key, Value>
         assert!(config.counters > 0);
 
         let store = Store::new((config.clock).clone_box());
-        let admission_policy = Rc::new(AdmissionPolicy::new(config.counters));
+        let admission_policy = Rc::new(AdmissionPolicy::new(config.counters, config.total_cache_weight));
         let pool = Pool::new(config.access_pool_size, config.access_buffer_size, admission_policy.clone());
         let command_buffer_size = config.command_buffer_size;
 
