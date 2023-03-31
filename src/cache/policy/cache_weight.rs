@@ -224,7 +224,7 @@ mod tests {
     #[test]
     fn space_is_available_for_new_key() {
         let cache_weight: CacheWeight<&str> = CacheWeight::new(10);
-        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 3));
+        cache_weight.add(&KeyDescription::new("disk", 1, 3040, 3));
 
         assert!(cache_weight.is_space_available_for(7).1);
     }
@@ -232,7 +232,7 @@ mod tests {
     #[test]
     fn space_is_not_available_for_new_key() {
         let cache_weight: CacheWeight<&str> = CacheWeight::new(10);
-        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 3));
+        cache_weight.add(&KeyDescription::new("disk", 1, 3040, 3));
 
         assert!(!cache_weight.is_space_available_for(8).1);
     }
@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn add_key_weight() {
         let cache_weight = CacheWeight::new(10);
-        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 3));
+        cache_weight.add(&KeyDescription::new("disk", 1, 3040, 3));
 
         assert_eq!(3, cache_weight.get_weight_used());
     }
@@ -249,7 +249,7 @@ mod tests {
     fn update_non_existing_key() {
         let cache_weight = CacheWeight::new(10);
 
-        let result = cache_weight.update(&KeyDescription::new(&"disk", 1, 3040, 2));
+        let result = cache_weight.update(&KeyDescription::new("disk", 1, 3040, 2));
         assert!(!result);
     }
 
@@ -257,8 +257,8 @@ mod tests {
     fn update_an_existing_key() {
         let cache_weight = CacheWeight::new(10);
 
-        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 3));
-        let result = cache_weight.update(&KeyDescription::new(&"disk", 1, 3040, 2));
+        cache_weight.add(&KeyDescription::new("disk", 1, 3040, 3));
+        let result = cache_weight.update(&KeyDescription::new("disk", 1, 3040, 2));
 
         assert!(result);
     }
@@ -267,10 +267,10 @@ mod tests {
     fn update_key_weight_given_the_updated_weight_is_less() {
         let cache_weight = CacheWeight::new(10);
 
-        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 3));
+        cache_weight.add(&KeyDescription::new("disk", 1, 3040, 3));
         assert_eq!(3, cache_weight.get_weight_used());
 
-        cache_weight.update(&KeyDescription::new(&"disk", 1, 3040, 2));
+        cache_weight.update(&KeyDescription::new("disk", 1, 3040, 2));
         assert_eq!(2, cache_weight.get_weight_used());
     }
 
@@ -278,10 +278,10 @@ mod tests {
     fn update_key_weight_given_the_updated_weight_is_more() {
         let cache_weight = CacheWeight::new(10);
 
-        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 4));
+        cache_weight.add(&KeyDescription::new("disk", 1, 3040, 4));
         assert_eq!(4, cache_weight.get_weight_used());
 
-        cache_weight.update(&KeyDescription::new(&"disk", 1, 3040, 8));
+        cache_weight.update(&KeyDescription::new("disk", 1, 3040, 8));
         assert_eq!(8, cache_weight.get_weight_used());
     }
 
@@ -289,10 +289,10 @@ mod tests {
     fn update_key_weight_given_the_updated_weight_is_same() {
         let cache_weight = CacheWeight::new(10);
 
-        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 4));
+        cache_weight.add(&KeyDescription::new("disk", 1, 3040, 4));
         assert_eq!(4, cache_weight.get_weight_used());
 
-        cache_weight.update(&KeyDescription::new(&"disk", 1, 3040, 4));
+        cache_weight.update(&KeyDescription::new("disk", 1, 3040, 4));
         assert_eq!(4, cache_weight.get_weight_used());
     }
 
@@ -300,7 +300,7 @@ mod tests {
     fn delete_key_weight() {
         let cache_weight = CacheWeight::new(10);
 
-        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 3));
+        cache_weight.add(&KeyDescription::new("disk", 1, 3040, 3));
         assert_eq!(3, cache_weight.get_weight_used());
 
         cache_weight.delete(&1);

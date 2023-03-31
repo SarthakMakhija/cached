@@ -161,14 +161,14 @@ mod tests {
     #[test]
     fn does_not_add_key_if_its_weight_is_more_than_the_total_cache_weight() {
         let policy = AdmissionPolicy::new(10, 10);
-        assert_eq!(CommandStatus::Rejected, policy.maybe_add(&KeyDescription::new(&"topic", 1, 3018, 100)));
+        assert_eq!(CommandStatus::Rejected, policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 100)));
     }
 
     #[test]
     fn adds_a_key_given_space_is_available() {
         let policy = AdmissionPolicy::new(10, 10);
 
-        let addition_status = policy.maybe_add(&KeyDescription::new(&"topic", 1, 3018, 5));
+        let addition_status = policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 5));
         assert_eq!(CommandStatus::Accepted, addition_status);
     }
 
@@ -178,10 +178,10 @@ mod tests {
         let key_hashes = vec![10, 14, 116];
         policy.access_frequency.write().add(key_hashes);
 
-        let status = policy.maybe_add(&KeyDescription::new(&"topic", 1, 10, 5));
+        let status = policy.maybe_add(&KeyDescription::new("topic", 1, 10, 5));
         assert_eq!(CommandStatus::Accepted, status);
 
-        let status = policy.maybe_add(&KeyDescription::new(&"SSD", 2, 14, 6));
+        let status = policy.maybe_add(&KeyDescription::new("SSD", 2, 14, 6));
         assert_eq!(CommandStatus::Accepted, status);
 
         assert!(policy.contains(&2));
@@ -195,13 +195,13 @@ mod tests {
         let key_hashes = vec![14];
         policy.access_frequency.write().add(key_hashes);
 
-        let status = policy.maybe_add(&KeyDescription::new(&"topic", 1, 20, 5));
+        let status = policy.maybe_add(&KeyDescription::new("topic", 1, 20, 5));
         assert_eq!(CommandStatus::Accepted, status);
 
-        let status = policy.maybe_add(&KeyDescription::new(&"HDD", 2, 14, 3));
+        let status = policy.maybe_add(&KeyDescription::new("HDD", 2, 14, 3));
         assert_eq!(CommandStatus::Accepted, status);
 
-        let status = policy.maybe_add(&KeyDescription::new(&"SSD", 3, 90, 9));
+        let status = policy.maybe_add(&KeyDescription::new("SSD", 3, 90, 9));
         assert_eq!(CommandStatus::Rejected, status);
 
         assert!(policy.contains(&2));
@@ -214,11 +214,11 @@ mod tests {
     fn updates_the_weight_of_a_key() {
         let policy = AdmissionPolicy::new(10, 10);
 
-        let addition_status = policy.maybe_add(&KeyDescription::new(&"topic", 1, 3018, 5));
+        let addition_status = policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 5));
         assert_eq!(CommandStatus::Accepted, addition_status);
         assert_eq!(5, policy.cache_weight.get_weight_used());
 
-        policy.update(&KeyDescription::new(&"topic", 1, 3018, 8));
+        policy.update(&KeyDescription::new("topic", 1, 3018, 8));
         assert_eq!(8, policy.cache_weight.get_weight_used());
     }
 
@@ -226,7 +226,7 @@ mod tests {
     fn deletes_a_key() {
         let policy = AdmissionPolicy::new(10, 10);
 
-        let addition_status = policy.maybe_add(&KeyDescription::new(&"topic", 1, 3018, 5));
+        let addition_status = policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 5));
         assert_eq!(CommandStatus::Accepted, addition_status);
 
         policy.delete(&1);
