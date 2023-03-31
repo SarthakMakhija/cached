@@ -59,9 +59,6 @@ impl<Key> AdmissionPolicy<Key>
         if key_description.weight > self.cache_weight.get_max_weight() {
             return CommandStatus::Rejected;
         }
-        if self.cache_weight.update(key_description) {
-            return CommandStatus::Done;
-        }
         let (space_left, is_enough_space_available) = self.cache_weight.is_space_available_for(key_description.weight);
         if is_enough_space_available {
             self.cache_weight.add(key_description);
@@ -153,17 +150,6 @@ mod tests {
     fn does_not_add_key_if_its_weight_is_more_than_the_total_cache_weight() {
         let policy = AdmissionPolicy::new(10, 10);
         assert_eq!(CommandStatus::Rejected, policy.maybe_add(&KeyDescription::new(&"topic", 1, 3018, 100)));
-    }
-
-    #[test]
-    fn updates_the_weight_of_an_existing_key() {
-        let policy = AdmissionPolicy::new(10, 10);
-
-        let addition_status = policy.maybe_add(&KeyDescription::new(&"topic", 1, 3018, 5));
-        assert_eq!(CommandStatus::Accepted, addition_status);
-
-        let update_status = policy.maybe_add(&KeyDescription::new(&"topic", 1, 3018, 6));
-        assert_eq!(CommandStatus::Done, update_status);
     }
 
     #[test]
