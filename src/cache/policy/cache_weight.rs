@@ -61,7 +61,7 @@ impl PartialEq for SampledKey {
 impl Eq for SampledKey {}
 
 impl SampledKey {
-    pub(crate) fn new<Key>(pair: RefMulti<KeyId, WeightedKey<Key>>, frequency: u8) -> Self <> {
+    pub(crate) fn new<Key>(frequency: u8, pair: RefMulti<KeyId, WeightedKey<Key>>) -> Self <> {
         Self::using(
             *pair.key(),
             pair.weight,
@@ -138,8 +138,7 @@ impl<Key> CacheWeight<Key>
         let mut iterator = self.key_weights.iter();
 
         for pair in iterator.by_ref() {
-            let frequency = frequency_counter(pair.value().key_hash);
-            sample.push(SampledKey::new(pair, frequency));
+            sample.push(SampledKey::new(frequency_counter(pair.value().key_hash), pair));
             counter += 1;
 
             if counter >= size {

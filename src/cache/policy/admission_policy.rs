@@ -74,6 +74,7 @@ impl<Key> AdmissionPolicy<Key>
         status
     }
 
+    //TODO: should we directly delete here? and query the space_available from cache_weight?
     fn create_space(&self, space_left: Weight, key_description: &KeyDescription<Key>) -> (CommandStatus, Vec<SampledKey>) {
         let frequency_counter = |key_hash| self.estimate(key_hash);
 
@@ -84,7 +85,6 @@ impl<Key> AdmissionPolicy<Key>
         let (mut iterator, mut sample)
             = self.cache_weight.sample(EVICTION_SAMPLE_SIZE, frequency_counter);
 
-        //TODO: should we directly delete here? and query the space_available from cache_weight?
         while space_available < key_description.weight {
             let sampled_key = sample.pop().unwrap(); //TODO: Remove unwrap
             if incoming_key_access_frequency < sampled_key.estimated_frequency {
@@ -95,8 +95,7 @@ impl<Key> AdmissionPolicy<Key>
 
             if sample.len() < EVICTION_SAMPLE_SIZE {
                 if let Some(pair) = iterator.next() {
-                    let frequency = frequency_counter(pair.key_hash);
-                    sample.push(SampledKey::new(pair, frequency));
+                    sample.push(SampledKey::new(frequency_counter(pair.key_hash), pair));
                 }
             }
         }
