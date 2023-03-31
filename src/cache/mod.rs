@@ -8,3 +8,4 @@ pub(crate) mod lfu;
 pub(crate) mod pool;
 pub(crate) mod policy;
 pub(crate) mod key_description;
+pub(crate) mod unique_id;
