@@ -94,6 +94,20 @@ impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
         sample_size: usize,
         frequency_counter: Freq) -> Self <> {
 
+        let sample = Self::initial_sample(&mut iterator, sample_size, &frequency_counter);
+        FrequencyCounterBasedMinHeapSamples {
+            iterator,
+            sample,
+            sample_size,
+            frequency_counter,
+        }
+    }
+
+    fn initial_sample(
+        iterator: &mut Iter<KeyId, WeightedKey<Key>, RandomState, DashMap<KeyId, WeightedKey<Key>>>,
+        sample_size: usize,
+        frequency_counter: &Freq) -> BinaryHeap<SampledKey> {
+
         let mut counter = 0;
         let mut sample = BinaryHeap::new();
 
@@ -105,12 +119,7 @@ impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
                 break;
             }
         }
-        FrequencyCounterBasedMinHeapSamples {
-            iterator,
-            sample,
-            sample_size,
-            frequency_counter,
-        }
+        sample
     }
 
     pub(crate) fn min_frequency_key(&mut self) -> SampledKey {
@@ -298,6 +307,7 @@ mod tests {
 #[cfg(test)]
 mod frequency_counter_based_min_heap_samples_tests {
     use dashmap::DashMap;
+
     use crate::cache::policy::cache_weight::{FrequencyCounterBasedMinHeapSamples, WeightedKey};
     use crate::cache::types::KeyId;
 
@@ -311,7 +321,7 @@ mod frequency_counter_based_min_heap_samples_tests {
         let mut sample = FrequencyCounterBasedMinHeapSamples::new(
             cache.iter(),
             2,
-            |_hash| {1}
+            |_hash| { 1 },
         );
 
         assert_eq!(2, sample.size());
@@ -335,7 +345,7 @@ mod frequency_counter_based_min_heap_samples_tests {
                     1290 => 3,
                     _ => 0
                 }
-            }
+            },
         );
 
         assert_eq!(1, sample.min_frequency_key().estimated_frequency);
@@ -360,7 +370,7 @@ mod frequency_counter_based_min_heap_samples_tests {
                     1290 => 1,
                     _ => 0
                 }
-            }
+            },
         );
 
         let sampled_key = sample.min_frequency_key();
