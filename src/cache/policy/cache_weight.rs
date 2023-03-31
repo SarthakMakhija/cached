@@ -93,8 +93,10 @@ impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
         mut iterator: Iter<'a, KeyId, WeightedKey<Key>, RandomState, DashMap<KeyId, WeightedKey<Key>>>,
         sample_size: usize,
         frequency_counter: Freq) -> Self <> {
+
         let mut counter = 0;
         let mut sample = BinaryHeap::new();
+
         for pair in iterator.by_ref() {
             sample.push(SampledKey::new(frequency_counter(pair.value().key_hash), pair));
             counter += 1;
@@ -103,7 +105,6 @@ impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
                 break;
             }
         }
-
         FrequencyCounterBasedMinHeapSamples {
             iterator,
             sample,
@@ -292,16 +293,26 @@ mod tests {
         cache_weight.delete(&1);
         assert_eq!(0, cache_weight.get_weight_used());
     }
+}
+
+#[cfg(test)]
+mod frequency_counter_based_min_heap_samples_tests {
+    use dashmap::DashMap;
+    use crate::cache::policy::cache_weight::{FrequencyCounterBasedMinHeapSamples, WeightedKey};
+    use crate::cache::types::KeyId;
 
     #[test]
     fn sample_size() {
-        let cache_weight = CacheWeight::new(10);
+        let cache: DashMap<KeyId, WeightedKey<&str>> = DashMap::new();
+        cache.insert(1, WeightedKey::new("disk", 3040, 3));
+        cache.insert(2, WeightedKey::new("topic", 1090, 4));
+        cache.insert(3, WeightedKey::new("SSD", 1290, 3));
 
-        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 3));
-        cache_weight.add(&KeyDescription::new(&"topic", 2, 1090, 4));
-        cache_weight.add(&KeyDescription::new(&"SSD", 3, 1290, 3));
-
-        let mut sample = cache_weight.sample(2, |_hash| 10);
+        let mut sample = FrequencyCounterBasedMinHeapSamples::new(
+            cache.iter(),
+            2,
+            |_hash| {1}
+        );
 
         assert_eq!(2, sample.size());
         assert!(sample.iterator.next().is_some())
@@ -309,20 +320,24 @@ mod tests {
 
     #[test]
     fn sample_keys_with_distinct_frequencies() {
-        let cache_weight = CacheWeight::new(10);
+        let cache: DashMap<KeyId, WeightedKey<&str>> = DashMap::new();
+        cache.insert(1, WeightedKey::new("disk", 3040, 3));
+        cache.insert(2, WeightedKey::new("topic", 1090, 4));
+        cache.insert(3, WeightedKey::new("SSD", 1290, 3));
 
-        cache_weight.add(&KeyDescription::new(&"disk", 1, 3040, 3));
-        cache_weight.add(&KeyDescription::new(&"topic", 2, 1090, 4));
-        cache_weight.add(&KeyDescription::new(&"SSD", 3, 1290, 3));
-
-        let mut sample = cache_weight.sample(3, |hash| {
-            match hash {
-                3040 => 1,
-                1090 => 2,
-                1290 => 3,
-                _ => 0
+        let mut sample = FrequencyCounterBasedMinHeapSamples::new(
+            cache.iter(),
+            3,
+            |hash| {
+                match hash {
+                    3040 => 1,
+                    1090 => 2,
+                    1290 => 3,
+                    _ => 0
+                }
             }
-        });
+        );
+
         assert_eq!(1, sample.min_frequency_key().estimated_frequency);
         assert_eq!(2, sample.min_frequency_key().estimated_frequency);
         assert_eq!(3, sample.min_frequency_key().estimated_frequency);
@@ -330,20 +345,23 @@ mod tests {
 
     #[test]
     fn sample_keys_with_same_frequencies() {
-        let cache_weight = CacheWeight::new(10);
+        let cache: DashMap<KeyId, WeightedKey<&str>> = DashMap::new();
+        cache.insert(10, WeightedKey::new("disk", 3040, 5));
+        cache.insert(20, WeightedKey::new("topic", 1090, 2));
+        cache.insert(30, WeightedKey::new("SSD", 1290, 3));
 
-        cache_weight.add(&KeyDescription::new(&"disk", 10, 3040, 5));
-        cache_weight.add(&KeyDescription::new(&"topic", 20, 1090, 2));
-        cache_weight.add(&KeyDescription::new(&"SSD", 30, 1290, 3));
-
-        let mut sample = cache_weight.sample(3, |hash| {
-            match hash {
-                3040 => 1,
-                1090 => 2,
-                1290 => 1,
-                _ => 0
+        let mut sample = FrequencyCounterBasedMinHeapSamples::new(
+            cache.iter(),
+            3,
+            |hash| {
+                match hash {
+                    3040 => 1,
+                    1090 => 2,
+                    1290 => 1,
+                    _ => 0
+                }
             }
-        });
+        );
 
         let sampled_key = sample.min_frequency_key();
         assert_eq!(1, sampled_key.estimated_frequency);
