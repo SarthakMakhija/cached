@@ -11,7 +11,7 @@ use crate::cache::key_description::KeyDescription;
 use crate::cache::lfu::tiny_lfu::TinyLFU;
 use crate::cache::policy::cache_weight::{CacheWeight, SampledKey};
 use crate::cache::pool::BufferConsumer;
-use crate::cache::types::{KeyHash, TotalCounters, Weight};
+use crate::cache::types::{KeyHash, KeyId, TotalCounters, Weight};
 
 const EVICTION_SAMPLE_SIZE: usize = 5;
 
@@ -74,6 +74,14 @@ impl<Key> AdmissionPolicy<Key>
         status
     }
 
+    pub(crate) fn contains(&self, key_id: &KeyId) -> bool {
+        self.cache_weight.contains(key_id)
+    }
+
+    pub(crate) fn shutdown(&self) {
+        self.keep_running.store(false, Ordering::Release);
+    }
+
     //TODO: should we directly delete here? and query the space_available from cache_weight?
     fn create_space(&self, space_left: Weight, key_description: &KeyDescription<Key>) -> (CommandStatus, Vec<SampledKey>) {
         let frequency_counter = |key_hash| self.estimate(key_hash);
@@ -96,10 +104,6 @@ impl<Key> AdmissionPolicy<Key>
             let _ = sample.maybe_fill_in();
         }
         (CommandStatus::Accepted, victims)
-    }
-
-    pub(crate) fn shutdown(&self) {
-        self.keep_running.store(false, Ordering::Release);
     }
 }
 
@@ -167,6 +171,8 @@ mod tests {
         let status = policy.maybe_add(&KeyDescription::new(&"SSD", 2, 14, 6));
         assert_eq!(CommandStatus::Accepted, status);
 
+        assert!(policy.contains(&2));
+        assert!(!policy.contains(&1));
         assert_eq!(6, policy.cache_weight.get_weight_used());
     }
 
@@ -185,6 +191,9 @@ mod tests {
         let status = policy.maybe_add(&KeyDescription::new(&"SSD", 3, 90, 9));
         assert_eq!(CommandStatus::Rejected, status);
 
+        assert!(policy.contains(&2));
+        assert!(!policy.contains(&3));
+        assert!(!policy.contains(&1));
         assert_eq!(3, policy.cache_weight.get_weight_used());
     }
 }

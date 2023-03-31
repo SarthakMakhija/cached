@@ -194,6 +194,10 @@ impl<Key> CacheWeight<Key>
         }
     }
 
+    pub(crate) fn contains(&self, key_id: &KeyId) -> bool {
+        self.key_weights.contains_key(key_id)
+    }
+
     //TODO: can we avoid returning iterator? This would avoid holding the read-lock
     pub(crate) fn sample<Freq>(&self, size: usize, frequency_counter: Freq)
                                -> FrequencyCounterBasedMinHeapSamples<'_, Key, Freq>
