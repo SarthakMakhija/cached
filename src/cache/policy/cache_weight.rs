@@ -36,7 +36,6 @@ pub(crate) struct CacheWeight<Key>
 
 pub(crate) struct SampledKey {
     pub(crate) id: KeyId,
-    pub(crate) hash: KeyHash,
     pub(crate) weight: Weight,
     pub(crate) estimated_frequency: u8, //TODO: type for frequency?
 }
@@ -65,16 +64,14 @@ impl SampledKey {
     pub(crate) fn new<Key>(pair: RefMulti<KeyId, WeightedKey<Key>>, frequency: u8) -> Self <> {
         Self::using(
             *pair.key(),
-            pair.key_hash,
             pair.weight,
             frequency,
         )
     }
 
-    fn using(id: KeyId, key_hash: KeyHash, key_weight: Weight, frequency: u8) -> Self <> {
+    fn using(id: KeyId, key_weight: Weight, frequency: u8) -> Self <> {
         SampledKey {
             id,
-            hash: key_hash,
             weight: key_weight,
             estimated_frequency: frequency,
         }
