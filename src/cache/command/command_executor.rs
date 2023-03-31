@@ -7,7 +7,7 @@ use crossbeam_channel::Receiver;
 
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
 use crate::cache::command::{CommandStatus, CommandType};
-use crate::cache::store::store::Store;
+use crate::cache::store::Store;
 
 pub(crate) struct CommandExecutor<Key, Value>
     where Key: Hash + Eq + Send + Sync + 'static,
@@ -80,7 +80,7 @@ mod tests {
     use crate::cache::clock::SystemClock;
     use crate::cache::command::CommandType;
     use crate::cache::command::command_executor::CommandExecutor;
-    use crate::cache::store::store::Store;
+    use crate::cache::store::Store;
 
     #[tokio::test]
     async fn puts_a_key_value() {

@@ -10,7 +10,7 @@ use crate::cache::config::Config;
 use crate::cache::policy::admission_policy::AdmissionPolicy;
 use crate::cache::pool::Pool;
 use crate::cache::store::key_value_ref::KeyValueRef;
-use crate::cache::store::store::Store;
+use crate::cache::store::Store;
 use crate::cache::store::stored_value::StoredValue;
 
 //TODO: Lifetime 'static?
