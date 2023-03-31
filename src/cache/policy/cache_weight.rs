@@ -167,7 +167,7 @@ impl<Key> CacheWeight<Key>
     }
 
     pub(crate) fn add(&self, key_description: &KeyDescription<Key>) {
-        self.key_weights.insert(key_description.id, WeightedKey::new(key_description.key.clone(), key_description.hash, key_description.weight));
+        self.key_weights.insert(key_description.id, WeightedKey::new(key_description.clone_key(), key_description.hash, key_description.weight));
         let mut guard = self.weight_used.write();
         *guard += key_description.weight;
     }
