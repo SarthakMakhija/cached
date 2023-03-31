@@ -74,6 +74,14 @@ impl<Key> AdmissionPolicy<Key>
         status
     }
 
+    pub(crate) fn update(&self, key_description: &KeyDescription<Key>) {
+        self.cache_weight.update(key_description);
+    }
+
+    pub(crate) fn delete(&self, key_id: &KeyId) {
+        self.cache_weight.delete(key_id);
+    }
+
     pub(crate) fn contains(&self, key_id: &KeyId) -> bool {
         self.cache_weight.contains(key_id)
     }
@@ -195,5 +203,28 @@ mod tests {
         assert!(!policy.contains(&3));
         assert!(!policy.contains(&1));
         assert_eq!(3, policy.cache_weight.get_weight_used());
+    }
+
+    #[test]
+    fn updates_the_weight_of_a_key() {
+        let policy = AdmissionPolicy::new(10, 10);
+
+        let addition_status = policy.maybe_add(&KeyDescription::new(&"topic", 1, 3018, 5));
+        assert_eq!(CommandStatus::Accepted, addition_status);
+        assert_eq!(5, policy.cache_weight.get_weight_used());
+
+        policy.update(&KeyDescription::new(&"topic", 1, 3018, 8));
+        assert_eq!(8, policy.cache_weight.get_weight_used());
+    }
+
+    #[test]
+    fn deletes_a_key() {
+        let policy = AdmissionPolicy::new(10, 10);
+
+        let addition_status = policy.maybe_add(&KeyDescription::new(&"topic", 1, 3018, 5));
+        assert_eq!(CommandStatus::Accepted, addition_status);
+
+        policy.delete(&1);
+        assert!(!policy.contains(&1));
     }
 }

@@ -305,6 +305,7 @@ mod tests {
 
         cache_weight.delete(&1);
         assert_eq!(0, cache_weight.get_weight_used());
+        assert!(!cache_weight.contains(&1));
     }
 }
 
