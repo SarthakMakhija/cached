@@ -1,10 +1,8 @@
 use std::cmp::Ordering;
-use std::collections::BinaryHeap;
-use std::collections::hash_map::RandomState;
+use std::collections::{BinaryHeap, HashSet};
 use std::hash::Hash;
 
 use dashmap::DashMap;
-use dashmap::iter::Iter;
 use dashmap::mapref::multiple::RefMulti;
 use parking_lot::RwLock;
 
@@ -34,7 +32,7 @@ pub(crate) struct CacheWeight<Key>
     key_weights: DashMap<KeyId, WeightedKey<Key>>,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct SampledKey {
     pub(crate) id: KeyId,
     pub(crate) weight: Weight,
@@ -81,8 +79,9 @@ impl SampledKey {
 
 pub(crate) struct FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
     where Freq: Fn(KeyHash) -> u8 {
-    iterator: Iter<'a, KeyId, WeightedKey<Key>, RandomState, DashMap<KeyId, WeightedKey<Key>>>,
+    source: &'a DashMap<KeyId, WeightedKey<Key>>,
     sample: BinaryHeap<SampledKey>,
+    current_sample_key_ids: HashSet<KeyId>,
     sample_size: usize,
     frequency_counter: Freq,
 }
@@ -90,51 +89,43 @@ pub(crate) struct FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
 impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
     where Freq: Fn(KeyHash) -> u8 {
     fn new(
-        mut iterator: Iter<'a, KeyId, WeightedKey<Key>, RandomState, DashMap<KeyId, WeightedKey<Key>>>,
+        source: &'a DashMap<KeyId, WeightedKey<Key>>,
         sample_size: usize,
         frequency_counter: Freq) -> Self <> {
-
-        let sample = Self::initial_sample(&mut iterator, sample_size, &frequency_counter);
+        let (sample, current_sample_key_ids)
+            = Self::initial_sample(source, sample_size, &frequency_counter);
         FrequencyCounterBasedMinHeapSamples {
-            iterator,
+            source,
             sample,
+            current_sample_key_ids,
             sample_size,
             frequency_counter,
         }
     }
 
-    fn initial_sample(
-        iterator: &mut Iter<KeyId, WeightedKey<Key>, RandomState, DashMap<KeyId, WeightedKey<Key>>>,
-        sample_size: usize,
-        frequency_counter: &Freq) -> BinaryHeap<SampledKey> {
-
-        let mut counter = 0;
-        let mut sample = BinaryHeap::new();
-
-        for pair in iterator.by_ref() {
-            sample.push(SampledKey::new(frequency_counter(pair.value().key_hash), pair));
-            counter += 1;
-
-            if counter >= sample_size {
-                break;
-            }
-        }
-        sample
-    }
-
     pub(crate) fn min_frequency_key(&mut self) -> SampledKey {
-        self.sample.pop().unwrap()
+        let sampled_key = self.sample.pop().unwrap();
+        self.current_sample_key_ids.remove(&sampled_key.id);
+
+        sampled_key
     }
 
     pub(crate) fn maybe_fill_in(&mut self) -> bool {
         let mut filled_in: bool = false;
+        let mut iterator = self.source.iter();
+
         while self.sample.len() < self.sample_size {
-            if let Some(pair) = self.iterator.next() {
-                let frequency = (self.frequency_counter)(pair.key_hash);
-                self.sample.push(SampledKey::new(frequency, pair));
-                filled_in = true;
-            } else {
-                break;
+            match iterator.next() {
+                Some(pair) => {
+                    if !self.current_sample_key_ids.contains(pair.key()) {
+                        let frequency = (self.frequency_counter)(pair.key_hash);
+                        self.sample.push(SampledKey::new(frequency, pair));
+                        filled_in = true;
+                    }
+                }
+                None => {
+                    break;
+                }
             }
         }
         filled_in
@@ -142,6 +133,26 @@ impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
 
     pub(crate) fn size(&self) -> usize {
         self.sample.len()
+    }
+
+    fn initial_sample(
+        source: &DashMap<KeyId, WeightedKey<Key>>,
+        sample_size: usize,
+        frequency_counter: &Freq) -> (BinaryHeap<SampledKey>, HashSet<KeyId>) {
+        let mut counter = 0;
+        let mut sample = BinaryHeap::new();
+        let mut current_sample_key_ids = HashSet::new();
+
+        for pair in source.iter().by_ref() {
+            current_sample_key_ids.insert(*pair.key());
+            sample.push(SampledKey::new(frequency_counter(pair.value().key_hash), pair));
+            counter += 1;
+
+            if counter >= sample_size {
+                break;
+            }
+        }
+        (sample, current_sample_key_ids)
     }
 }
 
@@ -200,12 +211,11 @@ impl<Key> CacheWeight<Key>
         self.key_weights.contains_key(key_id)
     }
 
-    //TODO: can we avoid returning iterator? This would avoid holding the read-lock
     pub(crate) fn sample<Freq>(&self, size: usize, frequency_counter: Freq)
                                -> FrequencyCounterBasedMinHeapSamples<'_, Key, Freq>
         where Freq: Fn(KeyHash) -> u8 {
         FrequencyCounterBasedMinHeapSamples::new(
-            self.key_weights.iter(),
+            &self.key_weights,
             size,
             frequency_counter,
         )
@@ -326,7 +336,7 @@ mod frequency_counter_based_min_heap_samples_tests {
         cache.insert(3, WeightedKey::new("SSD", 1290, 3));
 
         let sample = FrequencyCounterBasedMinHeapSamples::new(
-            cache.iter(),
+            &cache,
             2,
             |_hash| { 1 },
         );
@@ -342,7 +352,7 @@ mod frequency_counter_based_min_heap_samples_tests {
         cache.insert(3, WeightedKey::new("SSD", 1290, 3));
 
         let mut sample = FrequencyCounterBasedMinHeapSamples::new(
-            cache.iter(),
+            &cache,
             2,
             |_hash| { 1 },
         );
@@ -362,17 +372,36 @@ mod frequency_counter_based_min_heap_samples_tests {
         cache.insert(2, WeightedKey::new("topic", 1090, 4));
 
         let mut sample = FrequencyCounterBasedMinHeapSamples::new(
-            cache.iter(),
+            &cache,
             2,
             |_hash| { 1 },
         );
 
         assert_eq!(2, sample.size());
-
         let _ = sample.min_frequency_key();
+
+        cache.remove(&1);
+        cache.remove(&2);
         let _ = sample.maybe_fill_in();
 
         assert_eq!(1, sample.size());
+    }
+
+    #[test]
+    fn maybe_fill_in_with_the_sample_already_containing_the_source_keys() {
+        let cache: DashMap<KeyId, WeightedKey<&str>> = DashMap::new();
+        cache.insert(1, WeightedKey::new("disk", 3040, 3));
+        cache.insert(2, WeightedKey::new("topic", 1090, 4));
+
+        let mut sample = FrequencyCounterBasedMinHeapSamples::new(
+            &cache,
+            2,
+            |_hash| { 1 },
+        );
+
+        assert_eq!(2, sample.size());
+        let _ = sample.maybe_fill_in();
+        assert_eq!(2, sample.size());
     }
 
     #[test]
@@ -383,7 +412,7 @@ mod frequency_counter_based_min_heap_samples_tests {
         cache.insert(3, WeightedKey::new("SSD", 1290, 3));
 
         let mut sample = FrequencyCounterBasedMinHeapSamples::new(
-            cache.iter(),
+            &cache,
             3,
             |hash| {
                 match hash {
@@ -408,7 +437,7 @@ mod frequency_counter_based_min_heap_samples_tests {
         cache.insert(30, WeightedKey::new("SSD", 1290, 3));
 
         let mut sample = FrequencyCounterBasedMinHeapSamples::new(
-            cache.iter(),
+            &cache,
             3,
             |hash| {
                 match hash {

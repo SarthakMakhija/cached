@@ -64,9 +64,7 @@ impl<Key> AdmissionPolicy<Key>
             self.cache_weight.add(key_description);
             return CommandStatus::Accepted;
         }
-        let (status, victims) = self.create_space(space_left, key_description);
-        self.delete_victims(victims);
-
+        let (status, _victims) = self.create_space(space_left, key_description);
         if let CommandStatus::Accepted = status {
             self.cache_weight.add(key_description);
         }
@@ -105,18 +103,13 @@ impl<Key> AdmissionPolicy<Key>
             if incoming_key_access_frequency < sampled_key.estimated_frequency {
                 return (CommandStatus::Rejected, victims);
             }
+            self.cache_weight.delete(&sampled_key.id);
             space_available += sampled_key.weight;
             victims.push(sampled_key);
 
             let _ = sample.maybe_fill_in();
         }
         (CommandStatus::Accepted, victims)
-    }
-
-    fn delete_victims(&self, victims: Vec<SampledKey>) {
-        victims.iter().for_each(|sampled_key| {
-            self.cache_weight.delete(&sampled_key.id);
-        });
     }
 }
 
