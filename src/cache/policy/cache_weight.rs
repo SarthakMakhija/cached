@@ -128,11 +128,13 @@ impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
 
     pub(crate) fn maybe_fill_in(&mut self) -> bool {
         let mut filled_in: bool = false;
-        if self.sample.len() < self.sample_size {
+        while self.sample.len() < self.sample_size {
             if let Some(pair) = self.iterator.next() {
                 let frequency = (self.frequency_counter)(pair.key_hash);
                 self.sample.push(SampledKey::new(frequency, pair));
                 filled_in = true;
+            } else {
+                break;
             }
         }
         filled_in
@@ -323,6 +325,22 @@ mod frequency_counter_based_min_heap_samples_tests {
         cache.insert(2, WeightedKey::new("topic", 1090, 4));
         cache.insert(3, WeightedKey::new("SSD", 1290, 3));
 
+        let sample = FrequencyCounterBasedMinHeapSamples::new(
+            cache.iter(),
+            2,
+            |_hash| { 1 },
+        );
+
+        assert_eq!(2, sample.size());
+    }
+
+    #[test]
+    fn maybe_fill_in_with_source_having_keys_to_fill() {
+        let cache: DashMap<KeyId, WeightedKey<&str>> = DashMap::new();
+        cache.insert(1, WeightedKey::new("disk", 3040, 3));
+        cache.insert(2, WeightedKey::new("topic", 1090, 4));
+        cache.insert(3, WeightedKey::new("SSD", 1290, 3));
+
         let mut sample = FrequencyCounterBasedMinHeapSamples::new(
             cache.iter(),
             2,
@@ -330,7 +348,31 @@ mod frequency_counter_based_min_heap_samples_tests {
         );
 
         assert_eq!(2, sample.size());
-        assert!(sample.iterator.next().is_some())
+
+        let _ = sample.min_frequency_key();
+        let _ = sample.maybe_fill_in();
+
+        assert_eq!(2, sample.size());
+    }
+
+    #[test]
+    fn maybe_fill_in_with_source_not_having_keys_to_fill() {
+        let cache: DashMap<KeyId, WeightedKey<&str>> = DashMap::new();
+        cache.insert(1, WeightedKey::new("disk", 3040, 3));
+        cache.insert(2, WeightedKey::new("topic", 1090, 4));
+
+        let mut sample = FrequencyCounterBasedMinHeapSamples::new(
+            cache.iter(),
+            2,
+            |_hash| { 1 },
+        );
+
+        assert_eq!(2, sample.size());
+
+        let _ = sample.min_frequency_key();
+        let _ = sample.maybe_fill_in();
+
+        assert_eq!(1, sample.size());
     }
 
     #[test]
