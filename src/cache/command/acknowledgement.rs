@@ -88,11 +88,11 @@ mod tests {
         tokio::spawn({
             let acknowledgement = acknowledgement.clone();
             async move {
-                acknowledgement.done(CommandStatus::Done);
+                acknowledgement.done(CommandStatus::Accepted);
             }
         });
 
         let response = acknowledgement.handle().await;
-        assert_eq!(CommandStatus::Done, response);
+        assert_eq!(CommandStatus::Accepted, response);
     }
 }

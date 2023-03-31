@@ -49,7 +49,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
                     CommandType::Delete(key) =>
                         store.delete(&key)
                 }
-                pair.acknowledgement.done(CommandStatus::Done);
+                pair.acknowledgement.done(CommandStatus::Accepted);
                 if !keep_running.load(Ordering::Acquire) {
                     return;
                 }
