@@ -7,6 +7,7 @@ use dashmap::DashMap;
 use crate::cache::clock::ClockType;
 use crate::cache::store::key_value_ref::KeyValueRef;
 use crate::cache::store::stored_value::StoredValue;
+use crate::cache::types::KeyId;
 
 pub mod stored_value;
 pub mod key_value_ref;
@@ -26,16 +27,19 @@ impl<Key, Value> Store<Key, Value>
         })
     }
 
-    pub(crate) fn put(&self, key: Key, value: Value) {
-        self.store.insert(key, StoredValue::never_expiring(value, 0));
+    pub(crate) fn put(&self, key: Key, value: Value, key_id: KeyId) {
+        self.store.insert(key, StoredValue::never_expiring(value, key_id));
     }
 
-    pub(crate) fn put_with_ttl(&self, key: Key, value: Value, time_to_live: Duration) {
-        self.store.insert(key, StoredValue::expiring(value, 0, time_to_live, &self.clock));
+    pub(crate) fn put_with_ttl(&self, key: Key, value: Value, key_id: KeyId, time_to_live: Duration) {
+        self.store.insert(key, StoredValue::expiring(value, key_id, time_to_live, &self.clock));
     }
 
-    pub(crate) fn delete(&self, key: &Key) {
-        self.store.remove(key);
+    pub(crate) fn delete(&self, key: &Key) -> Option<KeyId> {
+        if let Some(pair) = self.store.remove(key) {
+            return Some(pair.1.key_id())
+        }
+        None
     }
 
     pub(crate) fn get_ref(&self, key: &Key) -> Option<KeyValueRef<'_, Key, StoredValue<Value>>> {
@@ -95,7 +99,7 @@ mod tests {
         let clock = SystemClock::boxed();
         let store = Store::new(clock);
 
-        store.put("topic", "microservices");
+        store.put("topic", "microservices", 1);
 
         let value = store.get(&"topic");
         assert_eq!(Some("microservices"), value);
@@ -106,7 +110,7 @@ mod tests {
         let clock = SystemClock::boxed();
         let store = Store::new(clock);
 
-        store.put("name", Name { first: "John".to_string(), last: "Mcnamara".to_string() });
+        store.put("name", Name { first: "John".to_string(), last: "Mcnamara".to_string() }, 1);
 
         let key_value_ref = store.get_ref(&"name");
         assert_eq!(&Name { first: "John".to_string(), last: "Mcnamara".to_string() }, key_value_ref.unwrap().value().value_ref());
@@ -150,11 +154,12 @@ mod tests {
         let clock = SystemClock::boxed();
         let store = Store::new(clock);
 
-        store.put("topic", "microservices");
-        store.delete(&"topic");
+        store.put("topic", "microservices", 10);
+        let key_id = store.delete(&"topic");
 
         let value = store.get(&"topic");
         assert_eq!(None, value);
+        assert_eq!(Some(10), key_id);
     }
 
     #[test]
@@ -162,9 +167,10 @@ mod tests {
         let clock = SystemClock::boxed();
         let store = Store::new(clock);
 
-        store.delete(&"non-existing");
+        let key_id = store.delete(&"non-existing");
 
         let value: Option<&str> = store.get(&"non-existing");
         assert_eq!(None, value);
+        assert_eq!(None, key_id);
     }
 }

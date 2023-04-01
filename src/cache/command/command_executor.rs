@@ -17,7 +17,7 @@ pub(crate) struct CommandExecutor<Key, Value>
 }
 
 struct CommandAcknowledgementPair<Key, Value>
-    where Key: Hash + Eq + Clone  {
+    where Key: Hash + Eq + Clone {
     command: CommandType<Key, Value>,
     acknowledgement: Arc<CommandAcknowledgement>,
 }
@@ -43,11 +43,12 @@ impl<Key, Value> CommandExecutor<Key, Value>
                 let command = pair.command;
                 match command {
                     CommandType::Put(key_description, value) =>
-                        store.put(key_description.clone_key(), value),
+                        store.put(key_description.clone_key(), value, key_description.id),
                     CommandType::PutWithTTL(key_description, value, ttl) =>
-                        store.put_with_ttl(key_description.clone_key(), value, ttl),
-                    CommandType::Delete(key) =>
-                        store.delete(&key),
+                        store.put_with_ttl(key_description.clone_key(), value, key_description.id, ttl),
+                    CommandType::Delete(key) => {
+                        store.delete(&key);
+                    }
                 }
                 pair.acknowledgement.done(CommandStatus::Accepted);
                 if !keep_running.load(Ordering::Acquire) {
