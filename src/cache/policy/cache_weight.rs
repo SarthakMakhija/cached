@@ -200,10 +200,12 @@ impl<Key> CacheWeight<Key>
         false
     }
 
-    pub(crate) fn delete(&self, key_id: &KeyId) {
+    pub(crate) fn delete<DeleteHook>(&self, key_id: &KeyId, delete_hook: &DeleteHook)
+        where DeleteHook: Fn(Key) -> () {
         if let Some(weight_by_key_hash) = self.key_weights.remove(key_id) {
             let mut guard = self.weight_used.write();
             *guard -= weight_by_key_hash.1.weight;
+            delete_hook(weight_by_key_hash.1.key);
         }
     }
 
@@ -224,8 +226,14 @@ impl<Key> CacheWeight<Key>
 
 #[cfg(test)]
 mod tests {
+    use parking_lot::RwLock;
+
     use crate::cache::key_description::KeyDescription;
     use crate::cache::policy::cache_weight::CacheWeight;
+
+    struct DeletedKeys<Key> {
+        keys: RwLock<Vec<Key>>,
+    }
 
     #[test]
     fn maximum_cache_weight() {
@@ -315,7 +323,11 @@ mod tests {
         cache_weight.add(&KeyDescription::new("disk", 1, 3040, 3));
         assert_eq!(3, cache_weight.get_weight_used());
 
-        cache_weight.delete(&1);
+        let deleted_keys = DeletedKeys { keys: RwLock::new(Vec::new()) };
+        let delete_hook = |key| { deleted_keys.keys.write().push(key) };
+        cache_weight.delete(&1, &delete_hook);
+
+        assert_eq!(vec!["disk"], *deleted_keys.keys.read());
         assert_eq!(0, cache_weight.get_weight_used());
         assert!(!cache_weight.contains(&1));
     }

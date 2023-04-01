@@ -55,7 +55,10 @@ impl<Key> AdmissionPolicy<Key>
         return self.access_frequency.read().estimate(key_hash);
     }
 
-    pub(crate) fn maybe_add(&self, key_description: &KeyDescription<Key>) -> CommandStatus {
+    pub(crate) fn maybe_add<DeleteHook>(&self,
+                                        key_description: &KeyDescription<Key>,
+                                        delete_hook: &DeleteHook) -> CommandStatus
+        where DeleteHook: Fn(Key) -> () {
         if key_description.weight > self.cache_weight.get_max_weight() {
             return CommandStatus::Rejected;
         }
@@ -64,7 +67,7 @@ impl<Key> AdmissionPolicy<Key>
             self.cache_weight.add(key_description);
             return CommandStatus::Accepted;
         }
-        let (status, _victims) = self.create_space(space_left, key_description);
+        let (status, _victims) = self.create_space(space_left, key_description, delete_hook);
         if let CommandStatus::Accepted = status {
             self.cache_weight.add(key_description);
         }
@@ -75,8 +78,9 @@ impl<Key> AdmissionPolicy<Key>
         self.cache_weight.update(key_description);
     }
 
-    pub(crate) fn delete(&self, key_id: &KeyId) {
-        self.cache_weight.delete(key_id);
+    pub(crate) fn delete<DeleteHook>(&self, key_id: &KeyId, delete_hook: &DeleteHook)
+        where DeleteHook: Fn(Key) -> () {
+        self.cache_weight.delete(key_id, &delete_hook);
     }
 
     pub(crate) fn contains(&self, key_id: &KeyId) -> bool {
@@ -88,7 +92,11 @@ impl<Key> AdmissionPolicy<Key>
     }
 
     //TODO: should we directly delete here? and query the space_available from cache_weight?
-    fn create_space(&self, space_left: Weight, key_description: &KeyDescription<Key>) -> (CommandStatus, Vec<SampledKey>) {
+    fn create_space<DeleteHook>(&self,
+                                space_left: Weight,
+                                key_description: &KeyDescription<Key>,
+                                delete_hook: &DeleteHook) -> (CommandStatus, Vec<SampledKey>)
+        where DeleteHook: Fn(Key) -> () {
         let frequency_counter = |key_hash| self.estimate(key_hash);
 
         let incoming_key_access_frequency = self.estimate(key_description.hash);
@@ -103,7 +111,7 @@ impl<Key> AdmissionPolicy<Key>
             if incoming_key_access_frequency < sampled_key.estimated_frequency {
                 return (CommandStatus::Rejected, victims);
             }
-            self.cache_weight.delete(&sampled_key.id);
+            self.cache_weight.delete(&sampled_key.id, delete_hook);
             space_available += sampled_key.weight;
             victims.push(sampled_key);
 
@@ -127,10 +135,16 @@ mod tests {
     use std::thread;
     use std::time::Duration;
 
+    use parking_lot::RwLock;
+
     use crate::cache::command::CommandStatus;
     use crate::cache::key_description::KeyDescription;
     use crate::cache::policy::admission_policy::AdmissionPolicy;
     use crate::cache::pool::BufferConsumer;
+
+    struct DeletedKeys<Key> {
+        keys: RwLock<Vec<Key>>,
+    }
 
     #[test]
     fn increase_access_frequency() {
@@ -154,14 +168,21 @@ mod tests {
     #[test]
     fn does_not_add_key_if_its_weight_is_more_than_the_total_cache_weight() {
         let policy = AdmissionPolicy::new(10, 10);
-        assert_eq!(CommandStatus::Rejected, policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 100)));
+        let no_operation_delete_hook = |_key| {};
+
+        assert_eq!(CommandStatus::Rejected,
+                   policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 100), &no_operation_delete_hook)
+        );
     }
 
     #[test]
     fn adds_a_key_given_space_is_available() {
         let policy = AdmissionPolicy::new(10, 10);
+        let no_operation_delete_hook = |_key| {};
 
-        let addition_status = policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 5));
+        let addition_status = policy.maybe_add(
+            &KeyDescription::new("topic", 1, 3018, 5), &no_operation_delete_hook,
+        );
         assert_eq!(CommandStatus::Accepted, addition_status);
     }
 
@@ -171,15 +192,19 @@ mod tests {
         let key_hashes = vec![10, 14, 116];
         policy.access_frequency.write().add(key_hashes);
 
-        let status = policy.maybe_add(&KeyDescription::new("topic", 1, 10, 5));
+        let deleted_keys = DeletedKeys { keys: RwLock::new(Vec::new()) };
+        let delete_hook = |key| { deleted_keys.keys.write().push(key) };
+
+        let status = policy.maybe_add(&KeyDescription::new("topic", 1, 10, 5), &delete_hook);
         assert_eq!(CommandStatus::Accepted, status);
 
-        let status = policy.maybe_add(&KeyDescription::new("SSD", 2, 14, 6));
+        let status = policy.maybe_add(&KeyDescription::new("SSD", 2, 14, 6), &delete_hook);
         assert_eq!(CommandStatus::Accepted, status);
 
         assert!(policy.contains(&2));
-        assert!(!policy.contains(&1));
         assert_eq!(6, policy.cache_weight.get_weight_used());
+        assert!(!policy.contains(&1));
+        assert_eq!(vec!["topic"], *deleted_keys.keys.read());
     }
 
     #[test]
@@ -188,26 +213,31 @@ mod tests {
         let key_hashes = vec![14];
         policy.access_frequency.write().add(key_hashes);
 
-        let status = policy.maybe_add(&KeyDescription::new("topic", 1, 20, 5));
+        let deleted_keys = DeletedKeys { keys: RwLock::new(Vec::new()) };
+        let delete_hook = |key| { deleted_keys.keys.write().push(key) };
+
+        let status = policy.maybe_add(&KeyDescription::new("topic", 1, 20, 5), &delete_hook);
         assert_eq!(CommandStatus::Accepted, status);
 
-        let status = policy.maybe_add(&KeyDescription::new("HDD", 2, 14, 3));
+        let status = policy.maybe_add(&KeyDescription::new("HDD", 2, 14, 3), &delete_hook);
         assert_eq!(CommandStatus::Accepted, status);
 
-        let status = policy.maybe_add(&KeyDescription::new("SSD", 3, 90, 9));
+        let status = policy.maybe_add(&KeyDescription::new("SSD", 3, 90, 9), &delete_hook);
         assert_eq!(CommandStatus::Rejected, status);
 
         assert!(policy.contains(&2));
+        assert_eq!(3, policy.cache_weight.get_weight_used());
         assert!(!policy.contains(&3));
         assert!(!policy.contains(&1));
-        assert_eq!(3, policy.cache_weight.get_weight_used());
+        assert_eq!(vec!["topic"], *deleted_keys.keys.read());
     }
 
     #[test]
     fn updates_the_weight_of_a_key() {
         let policy = AdmissionPolicy::new(10, 10);
+        let no_operation_delete_hook = |_key| {};
 
-        let addition_status = policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 5));
+        let addition_status = policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 5), &no_operation_delete_hook);
         assert_eq!(CommandStatus::Accepted, addition_status);
         assert_eq!(5, policy.cache_weight.get_weight_used());
 
@@ -218,11 +248,13 @@ mod tests {
     #[test]
     fn deletes_a_key() {
         let policy = AdmissionPolicy::new(10, 10);
+        let no_operation_delete_hook = |_key| {};
 
-        let addition_status = policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 5));
+        let addition_status = policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 5), &no_operation_delete_hook);
         assert_eq!(CommandStatus::Accepted, addition_status);
 
-        policy.delete(&1);
+        let no_operation_delete_hook = |_key| {};
+        policy.delete(&1, &no_operation_delete_hook);
         assert!(!policy.contains(&1));
     }
 }
