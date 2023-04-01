@@ -4,14 +4,17 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
-use crate::cache::command::CommandType;
 use crate::cache::command::command_executor::CommandExecutor;
+use crate::cache::command::CommandType;
 use crate::cache::config::Config;
+use crate::cache::key_description::KeyDescription;
 use crate::cache::policy::admission_policy::AdmissionPolicy;
 use crate::cache::pool::Pool;
 use crate::cache::store::key_value_ref::KeyValueRef;
 use crate::cache::store::Store;
 use crate::cache::store::stored_value::StoredValue;
+use crate::cache::types::Weight;
+use crate::cache::unique_id::increasing_id_generator::IncreasingIdGenerator;
 
 //TODO: Lifetime 'static?
 pub struct CacheD<Key, Value>
@@ -22,6 +25,7 @@ pub struct CacheD<Key, Value>
     command_executor: CommandExecutor<Key, Value>,
     policy: Rc<AdmissionPolicy<Key>>,
     pool: Pool<AdmissionPolicy<Key>>,
+    id_generator: IncreasingIdGenerator,
 }
 
 impl<Key, Value> CacheD<Key, Value>
@@ -41,15 +45,24 @@ impl<Key, Value> CacheD<Key, Value>
             command_executor: CommandExecutor::new(store, command_buffer_size),
             policy: admission_policy,
             pool,
+            id_generator: IncreasingIdGenerator::new(),
         }
     }
 
     pub fn put(&self, key: Key, value: Value) -> Arc<CommandAcknowledgement> {
-        self.command_executor.send(CommandType::Put(key, value))
+        self.put_with_weight(key, value, 0)
+    }
+
+    pub fn put_with_weight(&self, key: Key, value: Value, weight: Weight) -> Arc<CommandAcknowledgement> {
+        self.command_executor.send(CommandType::Put(self.key_description(key, weight), value))
     }
 
     pub fn put_with_ttl(&self, key: Key, value: Value, time_to_live: Duration) -> Arc<CommandAcknowledgement> {
-        self.command_executor.send(CommandType::PutWithTTL(key, value, time_to_live))
+        self.command_executor.send(CommandType::PutWithTTL(self.key_description(key, 0), value, time_to_live))
+    }
+
+    pub fn put_with_weight_and_ttl(&self, key: Key, value: Value, weight: Weight, time_to_live: Duration) -> Arc<CommandAcknowledgement> {
+        self.command_executor.send(CommandType::PutWithTTL(self.key_description(key, weight), value, time_to_live))
     }
 
     pub fn delete(&self, key: Key) -> Arc<CommandAcknowledgement> {
@@ -66,6 +79,16 @@ impl<Key, Value> CacheD<Key, Value>
 
     fn mark_key_accessed(&self, key: &Key) {
         self.pool.add((self.config.key_hash_fn)(key));
+    }
+
+    fn key_description(&self, key: Key, weight: Weight) -> KeyDescription<Key> {
+        let hash = (self.config.key_hash_fn)(&key);
+        KeyDescription::new(
+            key,
+            self.id_generator.next(),
+            hash,
+            weight,
+        )
     }
 }
 

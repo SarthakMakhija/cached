@@ -5,26 +5,26 @@ use std::thread;
 
 use crossbeam_channel::Receiver;
 
-use crate::cache::command::acknowledgement::CommandAcknowledgement;
 use crate::cache::command::{CommandStatus, CommandType};
+use crate::cache::command::acknowledgement::CommandAcknowledgement;
 use crate::cache::store::Store;
 
 pub(crate) struct CommandExecutor<Key, Value>
-    where Key: Hash + Eq + Send + Sync + 'static,
+    where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + 'static {
     sender: crossbeam_channel::Sender<CommandAcknowledgementPair<Key, Value>>,
     keep_running: Arc<AtomicBool>,
 }
 
-struct CommandAcknowledgementPair<Key, Value> {
+struct CommandAcknowledgementPair<Key, Value>
+    where Key: Hash + Eq + Clone  {
     command: CommandType<Key, Value>,
     acknowledgement: Arc<CommandAcknowledgement>,
 }
 
 impl<Key, Value> CommandExecutor<Key, Value>
-    where Key: Hash + Eq + Send + Sync + 'static,
+    where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + 'static {
-
     pub(crate) fn new(store: Arc<Store<Key, Value>>, buffer_size: usize) -> Self {
         let (sender, receiver)
             = crossbeam_channel::bounded(buffer_size);
@@ -42,12 +42,12 @@ impl<Key, Value> CommandExecutor<Key, Value>
             while let Ok(pair) = receiver.recv() {
                 let command = pair.command;
                 match command {
-                    CommandType::Put(key, value) =>
-                        store.put(key, value),
-                    CommandType::PutWithTTL(key, value, ttl) =>
-                        store.put_with_ttl(key, value, ttl),
+                    CommandType::Put(key_description, value) =>
+                        store.put(key_description.clone_key(), value),
+                    CommandType::PutWithTTL(key_description, value, ttl) =>
+                        store.put_with_ttl(key_description.clone_key(), value, ttl),
                     CommandType::Delete(key) =>
-                        store.delete(&key)
+                        store.delete(&key),
                 }
                 pair.acknowledgement.done(CommandStatus::Accepted);
                 if !keep_running.load(Ordering::Acquire) {
@@ -78,8 +78,9 @@ mod tests {
     use std::time::Duration;
 
     use crate::cache::clock::SystemClock;
-    use crate::cache::command::CommandType;
     use crate::cache::command::command_executor::CommandExecutor;
+    use crate::cache::command::CommandType;
+    use crate::cache::key_description::KeyDescription;
     use crate::cache::store::Store;
 
     #[tokio::test]
@@ -91,7 +92,7 @@ mod tests {
         );
 
         let command_acknowledgement = command_executor.send(CommandType::Put(
-            "topic",
+            KeyDescription::new("topic", 1, 1029, 10),
             "microservices",
         ));
         command_acknowledgement.handle().await;
@@ -105,15 +106,15 @@ mod tests {
         let store = Store::new(SystemClock::boxed());
         let command_executor = CommandExecutor::new(
             store.clone(),
-            10
+            10,
         );
 
         let acknowledgement = command_executor.send(CommandType::Put(
-            "topic",
+            KeyDescription::new("topic", 1, 1029, 10),
             "microservices",
         ));
         let other_acknowledgment = command_executor.send(CommandType::Put(
-            "disk",
+            KeyDescription::new("disk", 2, 2076, 3),
             "SSD",
         ));
         acknowledgement.handle().await;
@@ -129,11 +130,11 @@ mod tests {
         let store = Store::new(SystemClock::boxed());
         let command_executor = CommandExecutor::new(
             store.clone(),
-            10
+            10,
         );
 
         let acknowledgement = command_executor.send(CommandType::PutWithTTL(
-            "topic",
+            KeyDescription::new("topic", 1, 1029, 10),
             "microservices",
             Duration::from_secs(10),
         ));
@@ -148,11 +149,11 @@ mod tests {
         let store = Store::new(SystemClock::boxed());
         let command_executor = CommandExecutor::new(
             store.clone(),
-            10
+            10,
         );
 
         let acknowledgement = command_executor.send(CommandType::PutWithTTL(
-            "topic",
+            KeyDescription::new("topic", 1, 1029, 10),
             "microservices",
             Duration::from_secs(10),
         ));
