@@ -27,11 +27,11 @@ impl<Key, Value> Store<Key, Value>
     }
 
     pub(crate) fn put(&self, key: Key, value: Value) {
-        self.store.insert(key, StoredValue::never_expiring(value));
+        self.store.insert(key, StoredValue::never_expiring(value, 0));
     }
 
     pub(crate) fn put_with_ttl(&self, key: Key, value: Value, time_to_live: Duration) {
-        self.store.insert(key, StoredValue::expiring(value, time_to_live, &self.clock));
+        self.store.insert(key, StoredValue::expiring(value, 0, time_to_live, &self.clock));
     }
 
     pub(crate) fn delete(&self, key: &Key) {
@@ -126,7 +126,7 @@ mod tests {
         let store = Store::new(Box::new(FutureClock {}));
         {
             let clock = SystemClock::boxed();
-            store.store.insert("topic", StoredValue::expiring("microservices", Duration::from_secs(5), &clock));
+            store.store.insert("topic", StoredValue::expiring("microservices", 1, Duration::from_secs(5), &clock));
         }
 
         let value = store.get(&"topic");
@@ -138,7 +138,7 @@ mod tests {
         let store = Store::new(Box::new(FutureClock {}));
         {
             let clock = SystemClock::boxed();
-            store.store.insert("topic", StoredValue::expiring("microservices", Duration::from_secs(15), &clock));
+            store.store.insert("topic", StoredValue::expiring("microservices", 1, Duration::from_secs(15), &clock));
         }
 
         let value = store.get(&"topic");

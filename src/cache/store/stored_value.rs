@@ -2,23 +2,27 @@ use std::ops::Add;
 use std::time::{Duration, SystemTime};
 
 use crate::cache::clock::ClockType;
+use crate::cache::types::KeyId;
 
 pub struct StoredValue<Value> {
     value: Value,
+    key_id: KeyId,
     expire_after: Option<SystemTime>,
 }
 
 impl<Value> StoredValue<Value> {
-    pub(crate) fn never_expiring(value: Value) -> Self {
+    pub(crate) fn never_expiring(value: Value, key_id: KeyId) -> Self {
         StoredValue {
             value,
+            key_id,
             expire_after: None,
         }
     }
 
-    pub(crate) fn expiring(value: Value, time_to_live: Duration, clock: &ClockType) -> Self {
+    pub(crate) fn expiring(value: Value, key_id: KeyId, time_to_live: Duration, clock: &ClockType) -> Self {
         StoredValue {
             value,
+            key_id,
             expire_after: Some(clock.now().add(time_to_live)),
         }
     }
@@ -32,6 +36,10 @@ impl<Value> StoredValue<Value> {
 
     pub fn value_ref(&self) -> &Value {
         &self.value
+    }
+
+    pub fn key_id(&self) -> KeyId {
+        self.key_id
     }
 }
 
@@ -80,14 +88,14 @@ mod tests {
     #[test]
     fn expiration_time() {
         let clock: ClockType = Box::new(UnixEpochClock {});
-        let stored_value = StoredValue::expiring("SSD", Duration::from_secs(10), &clock);
+        let stored_value = StoredValue::expiring("SSD", 1, Duration::from_secs(10), &clock);
 
         assert!(stored_value.expire_after.unwrap().eq(&SystemTime::UNIX_EPOCH.add(Duration::from_secs(10))));
     }
 
     #[test]
     fn is_alive() {
-        let stored_value = StoredValue::never_expiring("storage-engine");
+        let stored_value = StoredValue::never_expiring("storage-engine", 1);
 
         assert!(stored_value.is_alive(&SystemClock::boxed()));
     }
@@ -95,7 +103,7 @@ mod tests {
     #[test]
     fn is_not_alive() {
         let system_clock = SystemClock::boxed();
-        let stored_value = StoredValue::expiring("storage-engine", Duration::from_secs(5), &system_clock);
+        let stored_value = StoredValue::expiring("storage-engine", 1, Duration::from_secs(5), &system_clock);
 
         let future_clock: ClockType = Box::new(FutureClock {});
         assert!(!stored_value.is_alive(&future_clock));
