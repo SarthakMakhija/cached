@@ -58,7 +58,7 @@ impl<Key> AdmissionPolicy<Key>
     pub(crate) fn maybe_add<DeleteHook>(&self,
                                         key_description: &KeyDescription<Key>,
                                         delete_hook: &DeleteHook) -> CommandStatus
-        where DeleteHook: Fn(Key) -> () {
+        where DeleteHook: Fn(Key) {
         if key_description.weight > self.cache_weight.get_max_weight() {
             return CommandStatus::Rejected;
         }
@@ -96,7 +96,7 @@ impl<Key> AdmissionPolicy<Key>
                                 space_left: Weight,
                                 key_description: &KeyDescription<Key>,
                                 delete_hook: &DeleteHook) -> (CommandStatus, Vec<SampledKey>)
-        where DeleteHook: Fn(Key) -> () {
+        where DeleteHook: Fn(Key) {
         let frequency_counter = |key_hash| self.estimate(key_hash);
 
         let incoming_key_access_frequency = self.estimate(key_description.hash);

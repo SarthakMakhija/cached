@@ -11,7 +11,7 @@ const COMMAND_BUFFER_SIZE: usize = 32 * 1024;
 const ACCESS_POOL_SIZE: PoolSize = PoolSize(30);
 const ACCESS_BUFFER_SIZE: BufferSize = BufferSize(64);
 const COUNTERS: TotalCounters = 1_000_000;
-const TOTAL_CACHE_WEIGHT: Weight = 1_000_000_00;
+const TOTAL_CACHE_WEIGHT: Weight = 100_000_000;
 
 pub struct Config<Key>
     where Key: Hash {

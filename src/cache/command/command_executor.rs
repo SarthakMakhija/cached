@@ -74,8 +74,8 @@ impl<Key, Value> CommandExecutor<Key, Value>
         key_description: &KeyDescription<Key>,
         delete_hook: &DeleteHook,
         value: Value) -> CommandStatus
-        where DeleteHook: Fn(Key) -> () {
-        let status = admission_policy.maybe_add(&key_description, &delete_hook);
+        where DeleteHook: Fn(Key) {
+        let status = admission_policy.maybe_add(key_description, delete_hook);
         if let CommandStatus::Accepted = status {
             store.put(key_description.clone_key(), value, key_description.id);
         }
@@ -89,8 +89,8 @@ impl<Key, Value> CommandExecutor<Key, Value>
         delete_hook: &DeleteHook,
         value: Value,
         ttl: Duration) -> CommandStatus
-        where DeleteHook: Fn(Key) -> () {
-        let status = admission_policy.maybe_add(&key_description, &delete_hook);
+        where DeleteHook: Fn(Key) {
+        let status = admission_policy.maybe_add(key_description, delete_hook);
         if let CommandStatus::Accepted = status {
             store.put_with_ttl(key_description.clone_key(), value, key_description.id, ttl);
         }
@@ -101,7 +101,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
         store: &Arc<Store<Key, Value>>,
         admission_policy: &Arc<AdmissionPolicy<Key>>,
         key: &Key) -> CommandStatus {
-        let key_id = store.delete(&key);
+        let key_id = store.delete(key);
         if let Some(key_id) = key_id {
             admission_policy.delete(&key_id); //TODO: Remove delete hook
             return CommandStatus::Accepted;

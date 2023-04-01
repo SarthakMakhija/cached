@@ -201,7 +201,7 @@ impl<Key> CacheWeight<Key>
     }
 
     pub(crate) fn delete<DeleteHook>(&self, key_id: &KeyId, delete_hook: &DeleteHook)
-        where DeleteHook: Fn(Key) -> () {
+        where DeleteHook: Fn(Key) {
         if let Some(weight_by_key_hash) = self.key_weights.remove(key_id) {
             let mut guard = self.weight_used.write();
             *guard -= weight_by_key_hash.1.weight;
