@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use parking_lot::RwLock;
 use rand::{Rng, thread_rng};
@@ -20,7 +20,7 @@ pub(crate) struct Pool<Consumer: BufferConsumer> {
 struct Buffer<Consumer: BufferConsumer> {
     key_hashes: Vec<u64>,
     capacity: BufferSize,
-    consumer: Rc<Consumer>,
+    consumer: Arc<Consumer>,
 }
 
 pub(crate) trait BufferConsumer {
@@ -29,7 +29,7 @@ pub(crate) trait BufferConsumer {
 
 impl<Consumer> Buffer<Consumer>
     where Consumer: BufferConsumer {
-    pub(crate) fn new(capacity: BufferSize, consumer: Rc<Consumer>) -> Self {
+    pub(crate) fn new(capacity: BufferSize, consumer: Arc<Consumer>) -> Self {
         Buffer {
             key_hashes: Vec::with_capacity(capacity.0),
             capacity,
@@ -49,7 +49,7 @@ impl<Consumer> Buffer<Consumer>
 
 impl<Consumer> Pool<Consumer>
     where Consumer: BufferConsumer {
-    pub(crate) fn new(pool_size: PoolSize, buffer_size: BufferSize, buffer_consumer: Rc<Consumer>) -> Self {
+    pub(crate) fn new(pool_size: PoolSize, buffer_size: BufferSize, buffer_consumer: Arc<Consumer>) -> Self {
         let buffers =
             (0..pool_size.0)
                 .map(|_| RwLock::new(Buffer::new(buffer_size, buffer_consumer.clone())))
@@ -67,7 +67,7 @@ impl<Consumer> Pool<Consumer>
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use crate::cache::pool::{BufferSize, Pool, PoolSize};
@@ -91,7 +91,7 @@ mod tests {
 
     #[test]
     fn push_keys_in_a_pool_with_1_buffer_of_size_2() {
-        let consumer = Rc::new(TestBufferConsumer { total_keys: AtomicUsize::new(0) });
+        let consumer = Arc::new(TestBufferConsumer { total_keys: AtomicUsize::new(0) });
         let pool = Pool::new(
             PoolSize(1),
             BufferSize(2),
@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn push_keys_in_a_pool_with_2_buffers_of_size_2() {
-        let consumer = Rc::new(TestBufferConsumer { total_keys: AtomicUsize::new(0) });
+        let consumer = Arc::new(TestBufferConsumer { total_keys: AtomicUsize::new(0) });
         let pool = Pool::new(
             PoolSize(2),
             BufferSize(2),

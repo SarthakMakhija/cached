@@ -1,5 +1,4 @@
 use std::hash::Hash;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -23,7 +22,7 @@ pub struct CacheD<Key, Value>
     config: Config<Key>,
     store: Arc<Store<Key, Value>>,
     command_executor: CommandExecutor<Key, Value>,
-    policy: Rc<AdmissionPolicy<Key>>,
+    policy: Arc<AdmissionPolicy<Key>>,
     pool: Pool<AdmissionPolicy<Key>>,
     id_generator: IncreasingIdGenerator,
 }
@@ -35,7 +34,7 @@ impl<Key, Value> CacheD<Key, Value>
         assert!(config.counters > 0);
 
         let store = Store::new((config.clock).clone_box());
-        let admission_policy = Rc::new(AdmissionPolicy::new(config.counters, config.total_cache_weight));
+        let admission_policy = Arc::new(AdmissionPolicy::new(config.counters, config.total_cache_weight));
         let pool = Pool::new(config.access_pool_size, config.access_buffer_size, admission_policy.clone());
         let command_buffer_size = config.command_buffer_size;
 
