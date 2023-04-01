@@ -78,9 +78,9 @@ impl<Key> AdmissionPolicy<Key>
         self.cache_weight.update(key_description);
     }
 
-    pub(crate) fn delete<DeleteHook>(&self, key_id: &KeyId, delete_hook: &DeleteHook)
-        where DeleteHook: Fn(Key) -> () {
-        self.cache_weight.delete(key_id, &delete_hook);
+    pub(crate) fn delete(&self, key_id: &KeyId) {
+        let no_operation_delete_hook = |_key| {};
+        self.cache_weight.delete(key_id, &no_operation_delete_hook);
     }
 
     pub(crate) fn contains(&self, key_id: &KeyId) -> bool {
@@ -253,8 +253,7 @@ mod tests {
         let addition_status = policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 5), &no_operation_delete_hook);
         assert_eq!(CommandStatus::Accepted, addition_status);
 
-        let no_operation_delete_hook = |_key| {};
-        policy.delete(&1, &no_operation_delete_hook);
+        policy.delete(&1);
         assert!(!policy.contains(&1));
     }
 }
