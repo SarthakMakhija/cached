@@ -1,5 +1,5 @@
 use crate::cache::lfu::frequency_counter::FrequencyCounter;
-use crate::cache::types::{KeyHash, TotalCounters};
+use crate::cache::types::{FrequencyEstimate, KeyHash, TotalCounters};
 
 pub(crate) struct TinyLFU {
     key_access_frequency: FrequencyCounter,
@@ -20,7 +20,7 @@ impl TinyLFU {
         key_hashes.iter().for_each(|key_hash| self.increment_access_for(*key_hash));
     }
 
-    pub(crate) fn estimate(&self, key_hash: KeyHash) -> u8 {
+    pub(crate) fn estimate(&self, key_hash: KeyHash) -> FrequencyEstimate {
         //TODO: Doorkeeper
         self.key_access_frequency.estimate(key_hash)
     }

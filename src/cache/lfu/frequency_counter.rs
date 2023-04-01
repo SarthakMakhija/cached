@@ -1,5 +1,5 @@
 use rand::Rng;
-use crate::cache::types::{KeyHash, TotalCounters};
+use crate::cache::types::{FrequencyEstimate, KeyHash, TotalCounters};
 
 #[repr(transparent)]
 #[derive(Debug, PartialEq)]
@@ -16,7 +16,7 @@ impl Row {
         }
     }
 
-    fn get_at(&self, position: u64) -> u8 {
+    fn get_at(&self, position: u64) -> FrequencyEstimate {
         let index = (position / 2) as usize;
         let shift = (position & 0x01) * 4;
 
@@ -57,7 +57,7 @@ impl FrequencyCounter {
         });
     }
 
-    pub(crate) fn estimate(&self, key_hash: KeyHash) -> u8 {
+    pub(crate) fn estimate(&self, key_hash: KeyHash) -> FrequencyEstimate {
         let mut min = u8::MAX;
         (0..ROWS).for_each(|index| {
             let hash = key_hash ^ self.seeds[index];

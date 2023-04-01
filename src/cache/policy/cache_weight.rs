@@ -7,7 +7,7 @@ use dashmap::mapref::multiple::RefMulti;
 use parking_lot::RwLock;
 
 use crate::cache::key_description::KeyDescription;
-use crate::cache::types::{KeyHash, KeyId, Weight};
+use crate::cache::types::{FrequencyEstimate, KeyHash, KeyId, Weight};
 
 pub(crate) struct WeightedKey<Key> {
     key: Key,
@@ -36,7 +36,7 @@ pub(crate) struct CacheWeight<Key>
 pub(crate) struct SampledKey {
     pub(crate) id: KeyId,
     pub(crate) weight: Weight,
-    pub(crate) estimated_frequency: u8, //TODO: type for frequency?
+    pub(crate) estimated_frequency: FrequencyEstimate,
 }
 
 impl Ord for SampledKey {
@@ -60,7 +60,7 @@ impl PartialEq for SampledKey {
 impl Eq for SampledKey {}
 
 impl SampledKey {
-    pub(crate) fn new<Key>(frequency: u8, pair: RefMulti<KeyId, WeightedKey<Key>>) -> Self <> {
+    pub(crate) fn new<Key>(frequency: FrequencyEstimate, pair: RefMulti<KeyId, WeightedKey<Key>>) -> Self <> {
         Self::using(
             *pair.key(),
             pair.weight,
@@ -68,7 +68,7 @@ impl SampledKey {
         )
     }
 
-    fn using(id: KeyId, key_weight: Weight, frequency: u8) -> Self <> {
+    fn using(id: KeyId, key_weight: Weight, frequency: FrequencyEstimate) -> Self <> {
         SampledKey {
             id,
             weight: key_weight,
@@ -78,7 +78,7 @@ impl SampledKey {
 }
 
 pub(crate) struct FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
-    where Freq: Fn(KeyHash) -> u8 {
+    where Freq: Fn(KeyHash) -> FrequencyEstimate {
     source: &'a DashMap<KeyId, WeightedKey<Key>>,
     sample: BinaryHeap<SampledKey>,
     current_sample_key_ids: HashSet<KeyId>,
@@ -87,7 +87,7 @@ pub(crate) struct FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
 }
 
 impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
-    where Freq: Fn(KeyHash) -> u8 {
+    where Freq: Fn(KeyHash) -> FrequencyEstimate {
     fn new(
         source: &'a DashMap<KeyId, WeightedKey<Key>>,
         sample_size: usize,
@@ -215,7 +215,7 @@ impl<Key> CacheWeight<Key>
 
     pub(crate) fn sample<Freq>(&self, size: usize, frequency_counter: Freq)
                                -> FrequencyCounterBasedMinHeapSamples<'_, Key, Freq>
-        where Freq: Fn(KeyHash) -> u8 {
+        where Freq: Fn(KeyHash) -> FrequencyEstimate {
         FrequencyCounterBasedMinHeapSamples::new(
             &self.key_weights,
             size,
