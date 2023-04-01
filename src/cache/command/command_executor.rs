@@ -103,7 +103,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
         key: &Key) -> CommandStatus {
         let key_id = store.delete(key);
         if let Some(key_id) = key_id {
-            admission_policy.delete(&key_id); //TODO: Remove delete hook
+            admission_policy.delete(&key_id);
             return CommandStatus::Accepted;
         }
         CommandStatus::Rejected
@@ -269,5 +269,102 @@ mod tests {
 
         command_executor.shutdown();
         assert_eq!(CommandStatus::Rejected, status);
+    }
+}
+
+#[cfg(test)]
+mod sociable_tests {
+    use std::sync::Arc;
+    use crate::cache::clock::SystemClock;
+    use crate::cache::command::command_executor::CommandExecutor;
+    use crate::cache::command::{CommandStatus, CommandType};
+    use crate::cache::key_description::KeyDescription;
+    use crate::cache::policy::admission_policy::AdmissionPolicy;
+    use crate::cache::pool::BufferConsumer;
+    use crate::cache::store::Store;
+
+    #[tokio::test]
+    async fn puts_a_key_value() {
+        let store = Store::new(SystemClock::boxed());
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100));
+
+        let command_executor = CommandExecutor::new(
+            store.clone(),
+            admission_policy.clone(),
+            10,
+        );
+
+        let key_description = KeyDescription::new("topic", 1, 1029, 10);
+        let key_id = key_description.id;
+        let command_acknowledgement = command_executor.send(CommandType::Put(
+            key_description,
+            "microservices",
+        ));
+        command_acknowledgement.handle().await;
+
+        command_executor.shutdown();
+        assert_eq!(Some("microservices"), store.get(&"topic"));
+        assert!(admission_policy.contains(&key_id));
+    }
+
+    #[tokio::test]
+    async fn puts_a_key_value_by_eliminting_victims() {
+        let store = Store::new(SystemClock::boxed());
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, 10));
+
+        let key_hashes = vec![10, 14, 116];
+        admission_policy.accept(key_hashes);
+
+        let command_executor = CommandExecutor::new(
+            store.clone(),
+            admission_policy.clone(),
+            10,
+        );
+
+        let command_acknowledgement = command_executor.send(CommandType::Put(
+            KeyDescription::new("topic", 1, 10, 5),
+            "microservices",
+        ));
+        let status = command_acknowledgement.handle().await;
+        assert_eq!(CommandStatus::Accepted, status);
+
+        let command_acknowledgement = command_executor.send(CommandType::Put(
+            KeyDescription::new("disk", 2, 14, 6),
+            "SSD",
+        ));
+        let status = command_acknowledgement.handle().await;
+        assert_eq!(CommandStatus::Accepted, status);
+
+        command_executor.shutdown();
+
+        assert!(admission_policy.contains(&2));
+        assert_eq!(Some("SSD"), store.get(&"disk"));
+
+        assert!(!admission_policy.contains(&1));
+        assert_eq!(None, store.get(&"topic"));
+    }
+
+    #[tokio::test]
+    async fn deletes_a_key() {
+        let store = Store::new(SystemClock::boxed());
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100));
+        let command_executor = CommandExecutor::new(
+            store.clone(),
+            admission_policy.clone(),
+            10,
+        );
+
+        let acknowledgement = command_executor.send(CommandType::Put(
+            KeyDescription::new("topic", 1, 1029, 10),
+            "microservices",
+        ));
+        acknowledgement.handle().await;
+
+        let acknowledgement = command_executor.send(CommandType::Delete("topic"));
+        acknowledgement.handle().await;
+
+        command_executor.shutdown();
+        assert_eq!(None, store.get(&"topic"));
+        assert!(!admission_policy.contains(&1));
     }
 }
