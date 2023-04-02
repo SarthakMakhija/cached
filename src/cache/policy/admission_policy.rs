@@ -189,7 +189,7 @@ mod tests {
     }
 
     #[test]
-    fn adds_a_key_given_space_is_not_available() {
+    fn adds_a_key_even_if_the_space_is_not_available() {
         let policy = AdmissionPolicy::new(10, 10);
         let key_hashes = vec![10, 14, 116];
         policy.access_frequency.write().add(key_hashes);
@@ -205,6 +205,7 @@ mod tests {
 
         assert!(policy.contains(&2));
         assert_eq!(6, policy.cache_weight.get_weight_used());
+
         assert!(!policy.contains(&1));
         assert_eq!(vec!["topic"], *deleted_keys.keys.read());
     }
@@ -229,8 +230,10 @@ mod tests {
 
         assert!(policy.contains(&2));
         assert_eq!(3, policy.cache_weight.get_weight_used());
+
         assert!(!policy.contains(&3));
         assert!(!policy.contains(&1));
+
         assert_eq!(vec!["topic"], *deleted_keys.keys.read());
     }
 
@@ -257,5 +260,41 @@ mod tests {
 
         policy.delete(&1);
         assert!(!policy.contains(&1));
+    }
+
+    #[test]
+    fn contains_a_key() {
+        let policy = AdmissionPolicy::new(10, 10);
+        let no_operation_delete_hook = |_key| {};
+
+        let addition_status = policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 5), &no_operation_delete_hook);
+        assert_eq!(CommandStatus::Accepted, addition_status);
+
+        assert!(policy.contains(&1));
+    }
+
+    #[test]
+    fn does_not_contain_a_key() {
+        let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, 10);
+
+        assert!(!policy.contains(&1));
+    }
+
+    #[test]
+    fn weight_of_an_existing_key() {
+        let policy = AdmissionPolicy::new(10, 10);
+        let no_operation_delete_hook = |_key| {};
+
+        let addition_status = policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 5), &no_operation_delete_hook);
+        assert_eq!(CommandStatus::Accepted, addition_status);
+
+        assert_eq!(Some(5), policy.weight_of(&1));
+    }
+
+    #[test]
+    fn weight_of_a_non_existing_key() {
+        let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, 10);
+
+        assert_eq!(None, policy.weight_of(&1));
     }
 }
