@@ -19,7 +19,7 @@ use crate::cache::unique_id::increasing_id_generator::IncreasingIdGenerator;
 pub struct CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + 'static {
-    config: Config<Key>,
+    config: Config<Key, Value>,
     store: Arc<Store<Key, Value>>,
     command_executor: CommandExecutor<Key, Value>,
     policy: Arc<AdmissionPolicy<Key>>,
@@ -30,7 +30,7 @@ pub struct CacheD<Key, Value>
 impl<Key, Value> CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + 'static {
-    pub fn new(config: Config<Key>) -> Self {
+    pub fn new(config: Config<Key, Value>) -> Self {
         assert!(config.counters > 0);
 
         let store = Store::new((config.clock).clone_box());
@@ -49,7 +49,8 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn put(&self, key: Key, value: Value) -> Arc<CommandAcknowledgement> {
-        self.put_with_weight(key, value, 0)
+        let weight = (self.config.weight_calculation_fn)(&key, &value);
+        self.put_with_weight(key, value, weight)
     }
 
     pub fn put_with_weight(&self, key: Key, value: Value, weight: Weight) -> Arc<CommandAcknowledgement> {
@@ -57,7 +58,12 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn put_with_ttl(&self, key: Key, value: Value, time_to_live: Duration) -> Arc<CommandAcknowledgement> {
-        self.command_executor.send(CommandType::PutWithTTL(self.key_description(key, 0), value, time_to_live))
+        let weight = (self.config.weight_calculation_fn)(&key, &value);
+        self.command_executor.send(CommandType::PutWithTTL(
+            self.key_description(key, weight),
+            value,
+            time_to_live)
+        )
     }
 
     pub fn put_with_weight_and_ttl(&self, key: Key, value: Value, weight: Weight, time_to_live: Duration) -> Arc<CommandAcknowledgement> {
