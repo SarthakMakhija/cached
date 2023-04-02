@@ -42,6 +42,13 @@ impl<Key, Value> Store<Key, Value>
         None
     }
 
+    pub(crate) fn mark_deleted(&self, key: &Key) {
+        if let Some(mut pair) = self.store.get_mut(key) {
+            let stored_value = pair.value_mut();
+            stored_value.is_soft_deleted = true;
+        }
+    }
+
     pub(crate) fn get_ref(&self, key: &Key) -> Option<KeyValueRef<'_, Key, StoredValue<Value>>> {
         let maybe_value = self.store.get(key);
         maybe_value
@@ -172,5 +179,17 @@ mod tests {
         let value: Option<&str> = store.get(&"non-existing");
         assert_eq!(None, value);
         assert_eq!(None, key_id);
+    }
+
+    #[test]
+    fn marks_a_key_deleted() {
+        let clock = SystemClock::boxed();
+        let store = Store::new(clock);
+
+        store.put("topic", "microservices", 10);
+        store.mark_deleted(&"topic");
+
+        let value = store.get(&"topic");
+        assert_eq!(None, value);
     }
 }

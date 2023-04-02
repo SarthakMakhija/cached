@@ -76,6 +76,7 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn delete(&self, key: Key) -> Arc<CommandAcknowledgement> {
+        self.store.mark_deleted(&key);
         self.command_executor.send(CommandType::Delete(key))
     }
 
@@ -181,11 +182,17 @@ mod tests {
         let acknowledgement = cached.put("topic", "microservices");
         acknowledgement.handle().await;
 
+        let key_id = {
+            let key_value_ref = cached.get_ref(&"topic").unwrap();
+            key_value_ref.value().key_id()
+        };
+
         let acknowledgement = cached.delete("topic");
         acknowledgement.handle().await;
 
         let value = cached.get(&"topic");
         assert_eq!(None, value);
+        assert!(!cached.pool.get_buffer_consumer().contains(&key_id));
     }
 
     #[tokio::test]
