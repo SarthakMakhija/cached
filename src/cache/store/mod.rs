@@ -113,6 +113,28 @@ mod tests {
     }
 
     #[test]
+    fn put_with_ttl() {
+        let clock = SystemClock::boxed();
+        let store = Store::new(clock);
+
+        store.put_with_ttl("topic", "microservices", 1, Duration::from_millis(5));
+
+        let value = store.get(&"topic");
+        assert_eq!(Some("microservices"), value);
+    }
+
+    #[test]
+    fn put_with_ttl_and_get_the_value_of_an_expired_key() {
+        let clock = SystemClock::boxed();
+        let store = Store::new(clock);
+
+        store.put_with_ttl("topic", "microservices", 1, Duration::from_nanos(1));
+
+        let value = store.get(&"topic");
+        assert_eq!(None, value);
+    }
+
+    #[test]
     fn get_value_ref_for_an_existing_key_if_value_is_not_cloneable() {
         let clock = SystemClock::boxed();
         let store = Store::new(clock);
