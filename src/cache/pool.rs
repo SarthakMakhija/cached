@@ -63,6 +63,11 @@ impl<Consumer> Pool<Consumer>
         let index = thread_rng().gen_range(0..pool_size);
         self.buffers[index].write().add(key_hash);
     }
+
+    #[cfg(test)]
+    pub(crate) fn get_buffer_consumer(&self) -> Arc<Consumer> {
+        self.buffers[0].read().consumer.clone()
+    }
 }
 
 #[cfg(test)]

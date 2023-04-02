@@ -22,7 +22,6 @@ pub struct CacheD<Key, Value>
     config: Config<Key, Value>,
     store: Arc<Store<Key, Value>>,
     command_executor: CommandExecutor<Key, Value>,
-    policy: Arc<AdmissionPolicy<Key>>,
     pool: Pool<AdmissionPolicy<Key>>,
     id_generator: IncreasingIdGenerator,
 }
@@ -41,8 +40,7 @@ impl<Key, Value> CacheD<Key, Value>
         CacheD {
             config,
             store: store.clone(),
-            command_executor: CommandExecutor::new(store, admission_policy.clone(), command_buffer_size),
-            policy: admission_policy,
+            command_executor: CommandExecutor::new(store, admission_policy, command_buffer_size),
             pool,
             id_generator: IncreasingIdGenerator::new(),
         }
@@ -54,7 +52,10 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn put_with_weight(&self, key: Key, value: Value, weight: Weight) -> Arc<CommandAcknowledgement> {
-        self.command_executor.send(CommandType::Put(self.key_description(key, weight), value))
+        self.command_executor.send(CommandType::Put(
+            self.key_description(key, weight),
+            value
+        ))
     }
 
     pub fn put_with_ttl(&self, key: Key, value: Value, time_to_live: Duration) -> Arc<CommandAcknowledgement> {
@@ -67,7 +68,11 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn put_with_weight_and_ttl(&self, key: Key, value: Value, weight: Weight, time_to_live: Duration) -> Arc<CommandAcknowledgement> {
-        self.command_executor.send(CommandType::PutWithTTL(self.key_description(key, weight), value, time_to_live))
+        self.command_executor.send(CommandType::PutWithTTL(
+            self.key_description(key, weight),
+            value,
+            time_to_live
+        ))
     }
 
     pub fn delete(&self, key: Key) -> Arc<CommandAcknowledgement> {
@@ -183,7 +188,9 @@ mod tests {
         thread::sleep(Duration::from_secs(2));
 
         let hasher = &(cached.config.key_hash_fn);
-        assert_eq!(2, cached.policy.estimate(hasher(&"topic")));
-        assert_eq!(1, cached.policy.estimate(hasher(&"disk")));
+        let policy = cached.pool.get_buffer_consumer();
+
+        assert_eq!(2, policy.estimate(hasher(&"topic")));
+        assert_eq!(1, policy.estimate(hasher(&"disk")));
     }
 }
