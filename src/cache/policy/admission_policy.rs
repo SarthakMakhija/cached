@@ -9,7 +9,7 @@ use parking_lot::RwLock;
 use crate::cache::command::CommandStatus;
 use crate::cache::key_description::KeyDescription;
 use crate::cache::lfu::tiny_lfu::TinyLFU;
-use crate::cache::policy::cache_weight::{CacheWeight, SampledKey};
+use crate::cache::policy::cache_weight::CacheWeight;
 use crate::cache::pool::BufferConsumer;
 use crate::cache::types::{FrequencyEstimate, KeyHash, KeyId, TotalCounters, Weight};
 

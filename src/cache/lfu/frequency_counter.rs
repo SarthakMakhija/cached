@@ -1,6 +1,11 @@
 use rand::Rng;
 use crate::cache::types::{FrequencyEstimate, KeyHash, TotalCounters};
 
+const BINARY_ONE: u64 = 0x01;
+const MAX_VALUE_LOWER_FOUR_BITS: u8 = 0x0f;
+const HALF_COUNTERS_BITS: u8 = 0x77;
+const SHIFT_OFFSET: u64 = 4;
+
 #[repr(transparent)]
 #[derive(Debug, PartialEq)]
 struct Row(Vec<u8>);
@@ -8,8 +13,8 @@ struct Row(Vec<u8>);
 impl Row {
     fn increment_at(&mut self, position: u64) {
         let index = (position / 2) as usize;
-        let shift = (position & 0x01) * 4;
-        let is_less_than15 = (self.0[index] >> shift) & 0x0f < 0x0f;
+        let shift = (position & BINARY_ONE) * SHIFT_OFFSET;
+        let is_less_than15 = (self.0[index] >> shift) & MAX_VALUE_LOWER_FOUR_BITS < MAX_VALUE_LOWER_FOUR_BITS;
 
         if is_less_than15 {
             self.0[index] += 1 << shift;
@@ -18,14 +23,14 @@ impl Row {
 
     fn get_at(&self, position: u64) -> FrequencyEstimate {
         let index = (position / 2) as usize;
-        let shift = (position & 0x01) * 4;
+        let shift = (position & BINARY_ONE) * SHIFT_OFFSET;
 
-        (self.0[index] >> shift) & 0x0f
+        (self.0[index] >> shift) & MAX_VALUE_LOWER_FOUR_BITS
     }
 
     fn half_counters(&mut self) {
         self.0.iter_mut().for_each(|slice| {
-            *slice = (*slice >> 1) & 0x77;
+            *slice = (*slice >> 1) & HALF_COUNTERS_BITS;
         });
     }
 }
@@ -116,7 +121,7 @@ impl FrequencyCounter {
 
 #[cfg(test)]
 mod tests {
-    use crate::cache::lfu::frequency_counter::{FrequencyCounter, Row};
+    use crate::cache::lfu::frequency_counter::{FrequencyCounter, MAX_VALUE_LOWER_FOUR_BITS, Row};
 
     #[test]
     fn total_counters() {
@@ -165,8 +170,8 @@ mod tests {
         assert_eq!(7, row.0[0]);
         assert_eq!(5, row.0[1]);
         assert_eq!(112, row.0[2]); // 240/2 is 120 but it can not be represented without using both the lower and the upper 4 bits of our counter
-        assert_eq!(7, row.0[3] & 0x0f); //lower 4 bits
-        assert_eq!(7, row.0[3] >> 4 & 0x0f); //upper 4 bits
+        assert_eq!(7, row.0[3] & MAX_VALUE_LOWER_FOUR_BITS); //lower 4 bits
+        assert_eq!(7, row.0[3] >> 4 & MAX_VALUE_LOWER_FOUR_BITS); //upper 4 bits
     }
 
     #[test]
