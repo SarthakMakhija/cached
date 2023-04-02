@@ -52,9 +52,10 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn put_with_weight(&self, key: Key, value: Value, weight: Weight) -> Arc<CommandAcknowledgement> {
+        assert!(weight > 0);
         self.command_executor.send(CommandType::Put(
             self.key_description(key, weight),
-            value
+            value,
         ))
     }
 
@@ -68,10 +69,11 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn put_with_weight_and_ttl(&self, key: Key, value: Value, weight: Weight, time_to_live: Duration) -> Arc<CommandAcknowledgement> {
+        assert!(weight > 0);
         self.command_executor.send(CommandType::PutWithTTL(
             self.key_description(key, weight),
             value,
-            time_to_live
+            time_to_live,
         ))
     }
 

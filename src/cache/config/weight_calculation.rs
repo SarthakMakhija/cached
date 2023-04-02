@@ -9,7 +9,7 @@ impl Calculation {
         let value_size = std::mem::size_of_val(value);
         let weighted_key_size = std::mem::size_of::<WeightedKey<Key>>();
 
-        (key_size + value_size + weighted_key_size) as i64
+        (key_size + value_size + weighted_key_size) as Weight
     }
 }
 
