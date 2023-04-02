@@ -146,6 +146,17 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn put_a_key_value_with_ttl() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        let acknowledgement = cached.put_with_ttl("topic", "microservices", Duration::from_secs(120));
+        acknowledgement.handle().await;
+
+        let value = cached.get(&"topic");
+        assert_eq!(Some("microservices"), value);
+    }
+
+    #[tokio::test]
     async fn get_value_for_an_existing_key() {
         let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
 
