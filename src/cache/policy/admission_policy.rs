@@ -74,8 +74,8 @@ impl<Key> AdmissionPolicy<Key>
         status
     }
 
-    pub(crate) fn update(&self, key_description: &KeyDescription<Key>) {
-        self.cache_weight.update(key_description);
+    pub(crate) fn update(&self, key_id: &KeyId, weight: Weight) {
+        self.cache_weight.update(key_id, weight);
     }
 
     pub(crate) fn delete(&self, key_id: &KeyId) {
@@ -246,7 +246,7 @@ mod tests {
         assert_eq!(CommandStatus::Accepted, addition_status);
         assert_eq!(5, policy.cache_weight.get_weight_used());
 
-        policy.update(&KeyDescription::new("topic", 1, 3018, 8));
+        policy.update(&1, 8);
         assert_eq!(8, policy.cache_weight.get_weight_used());
     }
 

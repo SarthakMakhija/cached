@@ -185,15 +185,14 @@ impl<Key> CacheWeight<Key>
         *guard += key_description.weight;
     }
 
-    pub(crate) fn update(&self, key_description: &KeyDescription<Key>) -> bool {
-        if let Some(mut pair) = self.key_weights.get_mut(&key_description.id) {
+    pub(crate) fn update(&self, key_id: &KeyId, weight: Weight) -> bool {
+        if let Some(mut pair) = self.key_weights.get_mut(key_id) {
             {
                 let mut guard = self.weight_used.write();
-                *guard += key_description.weight - pair.weight;
+                *guard += weight - pair.weight;
             }
             let weighted_key = pair.value_mut();
-            weighted_key.key_hash = key_description.hash;
-            weighted_key.weight = key_description.weight;
+            weighted_key.weight = weight;
 
             return true;
         }
@@ -271,9 +270,9 @@ mod tests {
 
     #[test]
     fn update_non_existing_key() {
-        let cache_weight = CacheWeight::new(10);
+        let cache_weight: CacheWeight<&str> = CacheWeight::new(10);
 
-        let result = cache_weight.update(&KeyDescription::new("disk", 1, 3040, 2));
+        let result = cache_weight.update(&1, 2);
         assert!(!result);
     }
 
@@ -282,7 +281,7 @@ mod tests {
         let cache_weight = CacheWeight::new(10);
 
         cache_weight.add(&KeyDescription::new("disk", 1, 3040, 3));
-        let result = cache_weight.update(&KeyDescription::new("disk", 1, 3040, 2));
+        let result = cache_weight.update(&1, 3);
 
         assert!(result);
     }
@@ -294,7 +293,7 @@ mod tests {
         cache_weight.add(&KeyDescription::new("disk", 1, 3040, 3));
         assert_eq!(3, cache_weight.get_weight_used());
 
-        cache_weight.update(&KeyDescription::new("disk", 1, 3040, 2));
+        cache_weight.update(&1, 2);
         assert_eq!(2, cache_weight.get_weight_used());
     }
 
@@ -305,7 +304,7 @@ mod tests {
         cache_weight.add(&KeyDescription::new("disk", 1, 3040, 4));
         assert_eq!(4, cache_weight.get_weight_used());
 
-        cache_weight.update(&KeyDescription::new("disk", 1, 3040, 8));
+        cache_weight.update(&1, 8);
         assert_eq!(8, cache_weight.get_weight_used());
     }
 
@@ -316,7 +315,7 @@ mod tests {
         cache_weight.add(&KeyDescription::new("disk", 1, 3040, 4));
         assert_eq!(4, cache_weight.get_weight_used());
 
-        cache_weight.update(&KeyDescription::new("disk", 1, 3040, 4));
+        cache_weight.update(&1, 4);
         assert_eq!(4, cache_weight.get_weight_used());
     }
 
