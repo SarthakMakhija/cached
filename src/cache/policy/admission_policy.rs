@@ -67,7 +67,7 @@ impl<Key> AdmissionPolicy<Key>
             self.cache_weight.add(key_description);
             return CommandStatus::Accepted;
         }
-        let (status, _victims) = self.create_space(space_left, key_description, delete_hook);
+        let status = self.create_space(space_left, key_description, delete_hook);
         if let CommandStatus::Accepted = status {
             self.cache_weight.add(key_description);
         }
@@ -95,16 +95,15 @@ impl<Key> AdmissionPolicy<Key>
         self.keep_running.store(false, Ordering::Release);
     }
 
-    //TODO: should we directly delete here? and query the space_available from cache_weight?
+    //TODO: should we query the space_available from cache_weight?
     fn create_space<DeleteHook>(&self,
                                 space_left: Weight,
                                 key_description: &KeyDescription<Key>,
-                                delete_hook: &DeleteHook) -> (CommandStatus, Vec<SampledKey>)
+                                delete_hook: &DeleteHook) -> CommandStatus
         where DeleteHook: Fn(Key) {
         let frequency_counter = |key_hash| self.estimate(key_hash);
 
         let incoming_key_access_frequency = self.estimate(key_description.hash);
-        let mut victims = Vec::new();
         let mut space_available = space_left;
 
         let mut sample
@@ -113,15 +112,14 @@ impl<Key> AdmissionPolicy<Key>
         while space_available < key_description.weight {
             let sampled_key = sample.min_frequency_key();
             if incoming_key_access_frequency < sampled_key.estimated_frequency {
-                return (CommandStatus::Rejected, victims);
+                return CommandStatus::Rejected;
             }
             self.cache_weight.delete(&sampled_key.id, delete_hook);
             space_available += sampled_key.weight;
-            victims.push(sampled_key);
 
             let _ = sample.maybe_fill_in();
         }
-        (CommandStatus::Accepted, victims)
+        CommandStatus::Accepted
     }
 }
 
