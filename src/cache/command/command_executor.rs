@@ -275,6 +275,8 @@ mod tests {
 #[cfg(test)]
 mod sociable_tests {
     use std::sync::Arc;
+    use std::thread;
+    use std::time::Duration;
     use crate::cache::clock::SystemClock;
     use crate::cache::command::command_executor::CommandExecutor;
     use crate::cache::command::{CommandStatus, CommandType};
@@ -308,12 +310,13 @@ mod sociable_tests {
     }
 
     #[tokio::test]
-    async fn puts_a_key_value_by_eliminting_victims() {
+    async fn puts_a_key_value_by_eliminating_victims() {
         let store = Store::new(SystemClock::boxed());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 10));
 
         let key_hashes = vec![10, 14, 116];
         admission_policy.accept(key_hashes);
+        thread::sleep(Duration::from_secs(1));
 
         let command_executor = CommandExecutor::new(
             store.clone(),
