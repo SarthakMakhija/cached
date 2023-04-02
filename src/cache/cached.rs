@@ -129,6 +129,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn put_a_key_value_with_weight() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        let acknowledgement = cached.put_with_weight("topic", "microservices", 50);
+        acknowledgement.handle().await;
+
+        let value = cached.get_ref(&"topic");
+        let value_ref = value.unwrap();
+        let stored_value = value_ref.value();
+        let key_id = stored_value.key_id();
+
+        assert_eq!("microservices", stored_value.value());
+        assert_eq!(Some(50), cached.pool.get_buffer_consumer().weight_of(&key_id));
+    }
+
+    #[tokio::test]
     async fn get_value_for_an_existing_key() {
         let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
 

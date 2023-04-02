@@ -87,6 +87,10 @@ impl<Key> AdmissionPolicy<Key>
         self.cache_weight.contains(key_id)
     }
 
+    pub(crate) fn weight_of(&self, key_id: &KeyId) -> Option<Weight> {
+        self.cache_weight.weight_of(key_id)
+    }
+
     pub(crate) fn shutdown(&self) {
         self.keep_running.store(false, Ordering::Release);
     }

@@ -213,6 +213,10 @@ impl<Key> CacheWeight<Key>
         self.key_weights.contains_key(key_id)
     }
 
+    pub(crate) fn weight_of(&self, key_id: &KeyId) -> Option<Weight> {
+        self.key_weights.get(key_id).map(|pair| pair.weight)
+    }
+
     pub(crate) fn sample<Freq>(&self, size: usize, frequency_counter: Freq)
                                -> FrequencyCounterBasedMinHeapSamples<'_, Key, Freq>
         where Freq: Fn(KeyHash) -> FrequencyEstimate {
