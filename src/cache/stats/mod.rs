@@ -63,6 +63,15 @@ impl ConcurrentStatsCounter {
     pub(crate) fn keys_rejected(&self) -> u64 {
         self.get(StatsType::KeysRejected)
     }
+
+    pub(crate) fn hit_ratio(&self) -> f64 {
+        let hits = self.hits();
+        let misses = self.misses();
+        if hits == 0 || misses == 0 {
+            return 0.0;
+        }
+        (hits as f64) / (hits + misses) as f64
+    }
 }
 
 #[cfg(test)]
@@ -121,5 +130,22 @@ mod tests {
         stats_counter.add(StatsType::KeysRejected, 1);
 
         assert_eq!(2, stats_counter.keys_rejected());
+    }
+
+    #[test]
+    fn hit_ratio_as_zero() {
+        let stats_counter = ConcurrentStatsCounter::new();
+        stats_counter.add(StatsType::CacheMisses, 1);
+
+        assert_eq!(0.0, stats_counter.hit_ratio());
+    }
+
+    #[test]
+    fn hit_ratio() {
+        let stats_counter = ConcurrentStatsCounter::new();
+        stats_counter.add(StatsType::CacheMisses, 3);
+        stats_counter.add(StatsType::CacheHits, 1);
+
+        assert_eq!(0.25, stats_counter.hit_ratio());
     }
 }
