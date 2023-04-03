@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crossbeam_utils::CachePadded;
 
-const TOTAL_STATS: usize = 6;
+const TOTAL_STATS: usize = 8;
 
 #[repr(usize)]
 pub(crate) enum StatsType {
@@ -12,6 +12,8 @@ pub(crate) enum StatsType {
     KeysDeleted = 3,
     KeysEvicted = 4,
     KeysRejected = 5,
+    CostAdded = 6,
+    CostEvicted = 7,
 }
 
 #[repr(transparent)]
@@ -62,6 +64,14 @@ impl ConcurrentStatsCounter {
 
     pub(crate) fn keys_rejected(&self) -> u64 {
         self.get(StatsType::KeysRejected)
+    }
+
+    pub(crate) fn cost_added(&self) -> u64 {
+        self.get(StatsType::CostAdded)
+    }
+
+    pub(crate) fn cost_evicted(&self) -> u64 {
+        self.get(StatsType::CostEvicted)
     }
 
     pub(crate) fn hit_ratio(&self) -> f64 {
@@ -147,5 +157,23 @@ mod tests {
         stats_counter.add(StatsType::CacheHits, 1);
 
         assert_eq!(0.25, stats_counter.hit_ratio());
+    }
+
+    #[test]
+    fn cost_added() {
+        let stats_counter = ConcurrentStatsCounter::new();
+        stats_counter.add(StatsType::CostAdded, 1);
+        stats_counter.add(StatsType::CostAdded, 1);
+
+        assert_eq!(2, stats_counter.cost_added());
+    }
+
+    #[test]
+    fn cost_evicted() {
+        let stats_counter = ConcurrentStatsCounter::new();
+        stats_counter.add(StatsType::CostEvicted, 1);
+        stats_counter.add(StatsType::CostEvicted, 1);
+
+        assert_eq!(2, stats_counter.cost_evicted());
     }
 }
