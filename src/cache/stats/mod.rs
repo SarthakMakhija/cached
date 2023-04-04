@@ -12,8 +12,8 @@ pub(crate) enum StatsType {
     KeysDeleted = 3,
     KeysEvicted = 4,
     KeysRejected = 5,
-    CostAdded = 6,
-    CostEvicted = 7,
+    WeightAdded = 6,
+    WeightEvicted = 7,
 }
 
 #[repr(transparent)]
@@ -34,10 +34,12 @@ impl ConcurrentStatsCounter {
         }
     }
 
+    //TODO: Confirm ordering
     pub(crate) fn add(&self, stats_type: StatsType, count: u64) {
         self.entries[stats_type as usize].0.fetch_add(count, Ordering::AcqRel);
     }
 
+    //TODO: Confirm ordering
     pub(crate) fn get(&self, stats_type: StatsType) -> u64 {
         self.entries[stats_type as usize].0.load(Ordering::Acquire)
     }
@@ -66,12 +68,12 @@ impl ConcurrentStatsCounter {
         self.get(StatsType::KeysRejected)
     }
 
-    pub(crate) fn cost_added(&self) -> u64 {
-        self.get(StatsType::CostAdded)
+    pub(crate) fn weight_added(&self) -> u64 {
+        self.get(StatsType::WeightAdded)
     }
 
-    pub(crate) fn cost_evicted(&self) -> u64 {
-        self.get(StatsType::CostEvicted)
+    pub(crate) fn weight_evicted(&self) -> u64 {
+        self.get(StatsType::WeightEvicted)
     }
 
     pub(crate) fn hit_ratio(&self) -> f64 {
@@ -160,20 +162,20 @@ mod tests {
     }
 
     #[test]
-    fn cost_added() {
+    fn weight_added() {
         let stats_counter = ConcurrentStatsCounter::new();
-        stats_counter.add(StatsType::CostAdded, 1);
-        stats_counter.add(StatsType::CostAdded, 1);
+        stats_counter.add(StatsType::WeightAdded, 1);
+        stats_counter.add(StatsType::WeightAdded, 1);
 
-        assert_eq!(2, stats_counter.cost_added());
+        assert_eq!(2, stats_counter.weight_added());
     }
 
     #[test]
-    fn cost_evicted() {
+    fn weight_evicted() {
         let stats_counter = ConcurrentStatsCounter::new();
-        stats_counter.add(StatsType::CostEvicted, 1);
-        stats_counter.add(StatsType::CostEvicted, 1);
+        stats_counter.add(StatsType::WeightEvicted, 1);
+        stats_counter.add(StatsType::WeightEvicted, 1);
 
-        assert_eq!(2, stats_counter.cost_evicted());
+        assert_eq!(2, stats_counter.weight_evicted());
     }
 }
