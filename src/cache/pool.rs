@@ -11,7 +11,6 @@ pub(crate) struct PoolSize(pub(crate) usize);
 #[derive(Copy, Clone)]
 pub(crate) struct BufferSize(pub(crate) usize);
 
-//TODO: Do we need to make it lossy?
 pub(crate) struct Pool<Consumer: BufferConsumer> {
     buffers: Vec<RwLock<Buffer<Consumer>>>,
     pool_size: PoolSize,

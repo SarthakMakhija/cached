@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 
-use crossbeam_channel::Receiver;
+use crossbeam_channel::{Receiver, select};
 use parking_lot::RwLock;
 
 use crate::cache::command::CommandStatus;
@@ -14,6 +14,7 @@ use crate::cache::pool::BufferConsumer;
 use crate::cache::types::{FrequencyEstimate, KeyHash, KeyId, TotalCounters, Weight};
 
 const EVICTION_SAMPLE_SIZE: usize = 5;
+const CHANNEL_CAPACITY: usize = 10;
 
 pub(crate) struct AdmissionPolicy<Key>
     where Key: Hash + Eq + Send + Sync + Clone + 'static, {
@@ -26,7 +27,11 @@ pub(crate) struct AdmissionPolicy<Key>
 impl<Key> AdmissionPolicy<Key>
     where Key: Hash + Eq + Send + Sync + Clone + 'static, {
     pub(crate) fn new(counters: TotalCounters, total_cache_weight: Weight) -> Self {
-        let (sender, receiver) = crossbeam_channel::bounded(10); //TODO: capacity as parameter
+        Self::with_channel_capacity(counters, total_cache_weight, CHANNEL_CAPACITY)
+    }
+
+    fn with_channel_capacity(counters: TotalCounters, total_cache_weight: Weight, capacity: usize) -> Self {
+        let (sender, receiver) = crossbeam_channel::bounded(capacity);
         let policy = AdmissionPolicy {
             access_frequency: Arc::new(RwLock::new(TinyLFU::new(counters))),
             cache_weight: CacheWeight::new(total_cache_weight),
@@ -126,9 +131,14 @@ impl<Key> AdmissionPolicy<Key>
 impl<Key> BufferConsumer for AdmissionPolicy<Key>
     where Key: Hash + Eq + Send + Sync + Clone + 'static, {
     fn accept(&self, key_hashes: Vec<KeyHash>) {
-        //TODO: Decide if we need to clone this
         //TODO: Remove unwrap
-        self.sender.clone().send(key_hashes).unwrap();
+        //TODO: Increase metrics
+        select! {
+            send(self.sender.clone(), key_hashes) -> _response => {},
+            default => {
+                println!("dropping sets that represent key access");
+            }
+        }
     }
 }
 
@@ -163,6 +173,28 @@ mod tests {
             policy.estimate(19),
         ];
         let expected_frequencies = vec![2, 1, 1, 2];
+
+        assert_eq!(expected_frequencies, actual_frequencies);
+    }
+
+    #[test]
+    fn increase_access_frequency_while_dropping_sets() {
+        let policy: AdmissionPolicy<&str> = AdmissionPolicy::with_channel_capacity(10, 10, 1);
+        let key_hashes = vec![10, 14];
+        policy.accept(key_hashes);
+
+        let key_hashes = vec![116, 19, 19, 10];
+        policy.accept(key_hashes);
+
+        thread::sleep(Duration::from_millis(5));
+
+        let actual_frequencies = vec![
+            policy.estimate(10),
+            policy.estimate(14),
+            policy.estimate(116),
+            policy.estimate(19),
+        ];
+        let expected_frequencies = vec![1, 1, 0, 0];
 
         assert_eq!(expected_frequencies, actual_frequencies);
     }
