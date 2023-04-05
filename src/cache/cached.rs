@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::hash::Hash;
 use std::sync::Arc;
 use std::time::Duration;
@@ -115,6 +116,10 @@ impl<Key, Value> CacheD<Key, Value>
         }
         None
     }
+
+    pub fn multi_get<'a>(&self, keys: Vec<&'a Key>) -> HashMap<&'a Key, Option<Value>> {
+        keys.into_iter().map(|key| (key, self.get(key))).collect::<HashMap<_, _>>()
+    }
 }
 
 #[cfg(test)]
@@ -228,5 +233,24 @@ mod tests {
 
         assert_eq!(2, policy.estimate(hasher(&"topic")));
         assert_eq!(1, policy.estimate(hasher(&"disk")));
+    }
+
+    #[tokio::test]
+    async fn get_multiple_keys() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        let acknowledgement = cached.put("topic", "microservices");
+        acknowledgement.handle().await;
+        let acknowledgement = cached.put("disk", "SSD");
+        acknowledgement.handle().await;
+        let acknowledgement = cached.put("cache", "in-memory");
+        acknowledgement.handle().await;
+
+        let values = cached.multi_get(vec![&"topic", &"non-existing", &"cache", &"disk"]);
+
+        assert_eq!(&Some("microservices"), values.get(&"topic").unwrap());
+        assert_eq!(&None, values.get(&"non-existing").unwrap());
+        assert_eq!(&Some("in-memory"), values.get(&"cache").unwrap());
+        assert_eq!(&Some("SSD"), values.get(&"disk").unwrap());
     }
 }
