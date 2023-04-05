@@ -302,5 +302,6 @@ mod tests {
         assert_eq!(None, iterator.next().unwrap());
         assert_eq!(Some("in-memory"), iterator.next().unwrap());
         assert_eq!(Some("SSD"), iterator.next().unwrap());
+        assert_eq!(None, iterator.next());
     }
 }
