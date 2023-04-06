@@ -47,9 +47,7 @@ impl<Value> StoredValue<Value> {
 
 impl<Value> StoredValue<Value>
     where Value: Clone {
-    pub fn value(&self) -> Value {
-        self.value.clone()
-    }
+    pub fn value(&self) -> Value { self.value.clone() }
 }
 
 #[cfg(test)]

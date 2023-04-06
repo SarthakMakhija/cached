@@ -101,7 +101,6 @@ impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
     pub(crate) fn min_frequency_key(&mut self) -> SampledKey {
         let sampled_key = self.sample.pop().unwrap();
         self.current_sample_key_ids.remove(&sampled_key.id);
-
         sampled_key
     }
 
@@ -214,11 +213,7 @@ impl<Key> CacheWeight<Key>
     pub(crate) fn sample<Freq>(&self, size: usize, frequency_counter: Freq)
                                -> FrequencyCounterBasedMinHeapSamples<'_, Key, Freq>
         where Freq: Fn(KeyHash) -> FrequencyEstimate {
-        FrequencyCounterBasedMinHeapSamples::new(
-            &self.key_weights,
-            size,
-            frequency_counter,
-        )
+        FrequencyCounterBasedMinHeapSamples::new(&self.key_weights, size, frequency_counter)
     }
 }
 

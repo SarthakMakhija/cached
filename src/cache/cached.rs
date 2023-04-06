@@ -96,12 +96,7 @@ impl<Key, Value> CacheD<Key, Value>
 
     fn key_description(&self, key: Key, weight: Weight) -> KeyDescription<Key> {
         let hash = (self.config.key_hash_fn)(&key);
-        KeyDescription::new(
-            key,
-            self.id_generator.next(),
-            hash,
-            weight,
-        )
+        KeyDescription::new(key, self.id_generator.next(), hash, weight)
     }
 }
 

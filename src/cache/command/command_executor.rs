@@ -120,7 +120,10 @@ impl<Key, Value> CommandExecutor<Key, Value>
 
         match send_result {
             Ok(_) => Ok(acknowledgement),
-            Err(err) => Err(CommandSendError::new(err.0.command.description()))
+            Err(err) => {
+                println!("received a SendError while sending command type {}", command.description());
+                Err(CommandSendError::new(err.0.command.description()))
+            }
         }
     }
 
