@@ -8,8 +8,8 @@ use crate::cache::types::{KeyHash, TotalCounters, Weight};
 
 pub(crate) mod weight_calculation;
 
-type HashFn<Key> = dyn Fn(&Key) -> KeyHash;
-type WeightCalculationFn<Key, Value> = dyn Fn(&Key, &Value) -> Weight;
+pub type HashFn<Key> = dyn Fn(&Key) -> KeyHash;
+pub type WeightCalculationFn<Key, Value> = dyn Fn(&Key, &Value) -> Weight;
 
 const COMMAND_BUFFER_SIZE: usize = 32 * 1024;
 const ACCESS_POOL_SIZE: PoolSize = PoolSize(30);
@@ -124,5 +124,106 @@ impl<Key, Value> ConfigBuilder<Key, Value>
             counters: self.counters,
             total_cache_weight: self.total_cache_weight,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::SystemTime;
+    use crate::cache::clock::ClockType;
+    use crate::cache::config::ConfigBuilder;
+    use crate::cache::config::tests::setup::UnixEpochClock;
+    use crate::cache::pool::{BufferSize, PoolSize};
+    use crate::cache::types::{KeyHash, Weight};
+
+    mod setup {
+        use std::time::SystemTime;
+
+        use crate::cache::clock::Clock;
+
+        #[derive(Clone)]
+        pub(crate) struct UnixEpochClock;
+
+        impl Clock for UnixEpochClock {
+            fn now(&self) -> SystemTime {
+                SystemTime::UNIX_EPOCH
+            }
+        }
+    }
+
+    #[test]
+    fn key_hash_function() {
+        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+
+        let key_hash_fn: Box<dyn Fn(&&str) -> KeyHash> = Box::new(|_key| 1);
+        let config = builder.key_hash_fn(key_hash_fn).build();
+
+        let key = "topic";
+        let hash = (config.key_hash_fn)(&key);
+
+        assert_eq!(1, hash);
+    }
+
+    #[test]
+    fn weight_calculation_function() {
+        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+
+        let weight_calculation_fn: Box<dyn Fn(&&str, &&str) -> Weight> = Box::new(|_key, _value| 10);
+        let config = builder.weight_calculation_fn(weight_calculation_fn).build();
+
+        let key = "topic";
+        let value = "microservices";
+        let weight = (config.weight_calculation_fn)(&key, &value);
+
+        assert_eq!(10, weight);
+    }
+
+    #[test]
+    fn clock() {
+        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+        let clock: ClockType = Box::new(UnixEpochClock{});
+
+        let config = builder.clock(clock).build();
+        assert_eq!(SystemTime::UNIX_EPOCH, config.clock.now());
+    }
+
+    #[test]
+    fn access_pool_size() {
+        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+        let config = builder.access_pool_size(32).build();
+
+        assert_eq!(PoolSize(32), config.access_pool_size);
+    }
+
+    #[test]
+    fn access_buffer_size() {
+        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+        let config = builder.access_buffer_size(64).build();
+
+        assert_eq!(BufferSize(64), config.access_buffer_size);
+    }
+
+    #[test]
+    fn command_buffer_size() {
+        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+        let config = builder.command_buffer_size(1024).build();
+
+        assert_eq!(1024, config.command_buffer_size);
+    }
+
+    #[test]
+    fn counters() {
+        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+        let config = builder.counters(4096).build();
+
+        assert_eq!(4096, config.counters);
+    }
+
+    #[test]
+    fn total_cache_weight() {
+        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+        let config = builder.total_cache_weight(1048576).build();
+
+        assert_eq!(1048576, config.total_cache_weight);
     }
 }

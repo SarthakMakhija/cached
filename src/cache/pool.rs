@@ -4,11 +4,11 @@ use parking_lot::RwLock;
 use rand::{Rng, thread_rng};
 
 #[repr(transparent)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub(crate) struct PoolSize(pub(crate) usize);
 
 #[repr(transparent)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub(crate) struct BufferSize(pub(crate) usize);
 
 pub(crate) struct Pool<Consumer: BufferConsumer> {
