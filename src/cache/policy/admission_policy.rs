@@ -112,8 +112,7 @@ impl<Key> AdmissionPolicy<Key>
         let incoming_key_access_frequency = self.estimate(key_description.hash);
         let mut space_available = space_left;
 
-        let mut sample
-            = self.cache_weight.sample(EVICTION_SAMPLE_SIZE, frequency_counter);
+        let mut sample = self.cache_weight.sample(EVICTION_SAMPLE_SIZE, frequency_counter);
 
         while space_available < key_description.weight {
             let sampled_key = sample.min_frequency_key();

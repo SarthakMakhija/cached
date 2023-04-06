@@ -35,10 +35,8 @@ impl<Key, Value> CommandExecutor<Key, Value>
         store: Arc<Store<Key, Value>>,
         admission_policy: Arc<AdmissionPolicy<Key>>,
         command_channel_size: usize) -> Self {
-        let (sender, receiver)
-            = crossbeam_channel::bounded(command_channel_size);
-        let command_executor
-            = CommandExecutor { sender, keep_running: Arc::new(AtomicBool::new(true)) };
+        let (sender, receiver) = crossbeam_channel::bounded(command_channel_size);
+        let command_executor = CommandExecutor { sender, keep_running: Arc::new(AtomicBool::new(true)) };
 
         command_executor.spin(receiver, store, admission_policy);
         command_executor

@@ -61,11 +61,7 @@ impl Eq for SampledKey {}
 
 impl SampledKey {
     pub(crate) fn new<Key>(frequency: FrequencyEstimate, pair: RefMulti<KeyId, WeightedKey<Key>>) -> Self <> {
-        Self::using(
-            *pair.key(),
-            pair.weight,
-            frequency,
-        )
+        Self::using(*pair.key(), pair.weight, frequency)
     }
 
     fn using(id: KeyId, key_weight: Weight, frequency: FrequencyEstimate) -> Self <> {
@@ -92,8 +88,7 @@ impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
         source: &'a DashMap<KeyId, WeightedKey<Key>>,
         sample_size: usize,
         frequency_counter: Freq) -> Self <> {
-        let (sample, current_sample_key_ids)
-            = Self::initial_sample(source, sample_size, &frequency_counter);
+        let (sample, current_sample_key_ids) = Self::initial_sample(source, sample_size, &frequency_counter);
         FrequencyCounterBasedMinHeapSamples {
             source,
             sample,
@@ -123,7 +118,9 @@ impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
                         filled_in = true;
                     }
                 }
-                None => { break; }
+                None => {
+                    break;
+                }
             }
         }
         filled_in
