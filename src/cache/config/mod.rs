@@ -134,7 +134,6 @@ mod tests {
     use crate::cache::config::ConfigBuilder;
     use crate::cache::config::tests::setup::UnixEpochClock;
     use crate::cache::pool::{BufferSize, PoolSize};
-    use crate::cache::types::{KeyHash, Weight};
 
     mod setup {
         use std::time::SystemTime;
@@ -155,7 +154,7 @@ mod tests {
     fn key_hash_function() {
         let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
 
-        let key_hash_fn: Box<dyn Fn(&&str) -> KeyHash> = Box::new(|_key| 1);
+        let key_hash_fn = Box::new(|_key: &&str| 1);
         let config = builder.key_hash_fn(key_hash_fn).build();
 
         let key = "topic";
@@ -168,7 +167,7 @@ mod tests {
     fn weight_calculation_function() {
         let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
 
-        let weight_calculation_fn: Box<dyn Fn(&&str, &&str) -> Weight> = Box::new(|_key, _value| 10);
+        let weight_calculation_fn = Box::new(|_key: &&str, _value: &&str| 10);
         let config = builder.weight_calculation_fn(weight_calculation_fn).build();
 
         let key = "topic";
