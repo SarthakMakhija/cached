@@ -20,3 +20,16 @@ impl<Key> KeyDescription<Key>
         self.key.clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::cache::key_description::KeyDescription;
+
+    #[test]
+    fn clone() {
+        let key_description = KeyDescription::new("topic", 1, 1090, 10);
+        let cloned = key_description.clone_key();
+
+        assert_eq!(cloned, key_description.key);
+    }
+}

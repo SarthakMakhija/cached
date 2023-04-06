@@ -61,7 +61,7 @@ impl<Key, Value> ConfigBuilder<Key, Value>
             hasher.finish()
         };
 
-        return ConfigBuilder {
+        ConfigBuilder {
             key_hash_fn: Box::new(key_hash_fn),
             weight_calculation_fn: Box::new(Calculation::perform),
             clock: SystemClock::boxed(),
@@ -70,7 +70,7 @@ impl<Key, Value> ConfigBuilder<Key, Value>
             command_buffer_size: COMMAND_BUFFER_SIZE,
             counters: COUNTERS,
             total_cache_weight: TOTAL_CACHE_WEIGHT,
-        };
+        }
     }
 
     pub fn key_hash_fn(mut self, key_hash: Box<HashFn<Key>>) -> ConfigBuilder<Key, Value> {
@@ -130,6 +130,7 @@ impl<Key, Value> ConfigBuilder<Key, Value>
 #[cfg(test)]
 mod tests {
     use std::time::SystemTime;
+
     use crate::cache::clock::ClockType;
     use crate::cache::config::ConfigBuilder;
     use crate::cache::config::tests::setup::UnixEpochClock;
@@ -165,7 +166,7 @@ mod tests {
 
     #[test]
     fn weight_calculation_function() {
-        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::new();
 
         let weight_calculation_fn = Box::new(|_key: &&str, _value: &&str| 10);
         let config = builder.weight_calculation_fn(weight_calculation_fn).build();
@@ -180,7 +181,7 @@ mod tests {
     #[test]
     fn clock() {
         let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
-        let clock: ClockType = Box::new(UnixEpochClock{});
+        let clock: ClockType = Box::new(UnixEpochClock {});
 
         let config = builder.clock(clock).build();
         assert_eq!(SystemTime::UNIX_EPOCH, config.clock.now());

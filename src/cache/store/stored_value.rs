@@ -91,6 +91,20 @@ mod tests {
     }
 
     #[test]
+    fn value_ref() {
+        let stored_value = StoredValue::never_expiring("microservices", 1);
+        let value = stored_value.value_ref();
+        assert_eq!(&"microservices", value);
+    }
+
+    #[test]
+    fn value() {
+        let stored_value = StoredValue::never_expiring("microservices", 1);
+        let value = stored_value.value();
+        assert_eq!("microservices", value);
+    }
+
+    #[test]
     fn expiration_time() {
         let clock: ClockType = Box::new(UnixEpochClock {});
         let stored_value = StoredValue::expiring("SSD", 1, Duration::from_secs(10), &clock);

@@ -49,10 +49,9 @@ impl<Consumer> Buffer<Consumer>
 impl<Consumer> Pool<Consumer>
     where Consumer: BufferConsumer {
     pub(crate) fn new(pool_size: PoolSize, buffer_size: BufferSize, buffer_consumer: Arc<Consumer>) -> Self {
-        let buffers =
-            (0..pool_size.0)
-                .map(|_| RwLock::new(Buffer::new(buffer_size, buffer_consumer.clone())))
-                .collect::<Vec<RwLock<Buffer<Consumer>>>>();
+        let buffers = (0..pool_size.0)
+            .map(|_| RwLock::new(Buffer::new(buffer_size, buffer_consumer.clone())))
+            .collect::<Vec<RwLock<Buffer<Consumer>>>>();
 
         Pool { buffers, pool_size }
     }
