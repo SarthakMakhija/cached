@@ -196,6 +196,14 @@ mod tests {
         assert_eq!(Some("microservices"), value);
     }
 
+    #[test]
+    fn get_value_ref_for_a_non_existing_key() {
+        let cached: CacheD<&str, &str> = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        let value = cached.get_ref(&"non-existing");
+        assert!(value.is_none());
+    }
+
     #[tokio::test]
     async fn get_value_for_an_existing_key() {
         let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
