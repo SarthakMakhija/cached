@@ -340,8 +340,21 @@ mod tests {
 mod frequency_counter_based_min_heap_samples_tests {
     use dashmap::DashMap;
 
-    use crate::cache::policy::cache_weight::{FrequencyCounterBasedMinHeapSamples, WeightedKey};
-    use crate::cache::types::KeyId;
+    use crate::cache::policy::cache_weight::{FrequencyCounterBasedMinHeapSamples, SampledKey, WeightedKey};
+    use crate::cache::types::{KeyHash, KeyId};
+
+    #[test]
+    fn equality_of_sampled_keys() {
+        let cache: DashMap<KeyId, WeightedKey<&str>> = DashMap::new();
+        cache.insert(1, WeightedKey::new("disk", 3040, 3));
+
+        let mut sampled_keys = Vec::new();
+        for pair in cache.iter().by_ref() {
+            sampled_keys.push(SampledKey::new(10, pair));
+        }
+
+        assert_eq!(sampled_keys[0], sampled_keys[0]);
+    }
 
     #[test]
     fn sample_size() {
@@ -397,6 +410,31 @@ mod frequency_counter_based_min_heap_samples_tests {
 
         cache.remove(&1);
         cache.remove(&2);
+        let _ = sample.maybe_fill_in();
+
+        assert_eq!(1, sample.size());
+    }
+
+    #[test]
+    fn maybe_fill_in_with_source_having_an_existing_sample_key_to_fill() {
+        let cache: DashMap<KeyId, WeightedKey<&str>> = DashMap::new();
+        cache.insert(1, WeightedKey::new("disk", 3040, 3));
+        cache.insert(2, WeightedKey::new("topic", 1090, 4));
+
+        let mut sample = FrequencyCounterBasedMinHeapSamples::new(
+            &cache,
+            2,
+            |hash| match hash {
+                3040 => 1,
+                1090 => 2,
+                _ => 0
+            },
+        );
+
+        assert_eq!(2, sample.size());
+        let _ = sample.min_frequency_key();
+
+        cache.remove(&1);
         let _ = sample.maybe_fill_in();
 
         assert_eq!(1, sample.size());
