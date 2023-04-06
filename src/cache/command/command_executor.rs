@@ -62,7 +62,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
                         Self::delete(&store, &admission_policy, &key),
                 };
                 pair.acknowledgement.done(status);
-                if !keep_running.load(Ordering::Acquire) {
+                if !keep_running.load(Ordering::SeqCst) {
                     drop(receiver);
                     break;
                 }
@@ -128,7 +128,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
     }
 
     pub(crate) fn shutdown(&self) {
-        self.keep_running.store(false, Ordering::Release);
+        self.keep_running.store(false, Ordering::SeqCst);
     }
 }
 
