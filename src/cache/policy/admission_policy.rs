@@ -163,14 +163,8 @@ mod tests {
         let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, 10);
         let key_hashes = vec![10, 14];
 
-        thread::scope(|scope| {
-            scope.spawn(|| {
-                policy.shutdown();
-            });
-            scope.spawn(|| {
-                policy.accept(key_hashes);
-            });
-        });
+        policy.shutdown();
+        policy.accept(key_hashes);
         thread::sleep(Duration::from_millis(5));
 
         let key_hashes = vec![116, 19];

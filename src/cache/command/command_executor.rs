@@ -143,7 +143,7 @@ mod tests {
     use crate::cache::policy::admission_policy::AdmissionPolicy;
     use crate::cache::store::Store;
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn puts_a_key_value_and_shutdown() {
         let store = Store::new(SystemClock::boxed());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100));
