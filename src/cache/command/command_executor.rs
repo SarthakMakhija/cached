@@ -143,43 +143,31 @@ mod tests {
     use crate::cache::policy::admission_policy::AdmissionPolicy;
     use crate::cache::store::Store;
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn puts_a_key_value_and_shutdown() {
         let store = Store::new(SystemClock::boxed());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100));
 
-        let command_executor = Arc::new(CommandExecutor::new(
+        let command_executor = CommandExecutor::new(
             store.clone(),
             admission_policy,
             10,
+        );
+        command_executor.shutdown();
+
+        command_executor.send(CommandType::Put(
+            KeyDescription::new("topic", 1, 1029, 10),
+            "microservices",
+        )).unwrap().handle().await;
+
+        let send_result = command_executor.send(CommandType::Put(
+            KeyDescription::new("disk", 2, 2090, 10),
+            "SSD",
         ));
-        let command_executor1 = command_executor.clone();
-        let command_executor2 = command_executor.clone();
-
-        let shutdown_handle = tokio::spawn(async move {
-            command_executor2.shutdown();
-        });
-        shutdown_handle.await.unwrap();
-
-        let put_handle = tokio::spawn(async move {
-            command_executor1.send(CommandType::Put(
-                KeyDescription::new("topic", 1, 1029, 10),
-                "microservices",
-            )).unwrap().handle().await;
-        });
-        put_handle.await.unwrap();
-
-        let put_handle = tokio::spawn(async move {
-            command_executor.send(CommandType::Put(
-                KeyDescription::new("disk", 2, 2090, 10),
-                "SSD",
-            ))
-        });
-        let send_result_post_shutdown = put_handle.await.unwrap();
 
         assert_eq!(Some("microservices"), store.get(&"topic"));
         assert_eq!(None, store.get(&"disk"));
-        assert!(send_result_post_shutdown.is_err());
+        assert!(send_result.is_err());
     }
 
     #[tokio::test]
