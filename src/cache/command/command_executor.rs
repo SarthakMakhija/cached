@@ -65,6 +65,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
                 };
                 pair.acknowledgement.done(status);
                 if !keep_running.load(Ordering::Acquire) {
+                    println!("dropping the receiver ..");
                     drop(receiver);
                     break;
                 }
