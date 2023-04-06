@@ -3,8 +3,7 @@ use std::hash::Hash;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::cache::command::acknowledgement::CommandAcknowledgement;
-use crate::cache::command::command_executor::CommandExecutor;
+use crate::cache::command::command_executor::{CommandExecutor, CommandSendResult};
 use crate::cache::command::CommandType;
 use crate::cache::config::Config;
 use crate::cache::key_description::KeyDescription;
@@ -47,12 +46,12 @@ impl<Key, Value> CacheD<Key, Value>
         }
     }
 
-    pub fn put(&self, key: Key, value: Value) -> Arc<CommandAcknowledgement> {
+    pub fn put(&self, key: Key, value: Value) -> CommandSendResult {
         let weight = (self.config.weight_calculation_fn)(&key, &value);
         self.put_with_weight(key, value, weight)
     }
 
-    pub fn put_with_weight(&self, key: Key, value: Value, weight: Weight) -> Arc<CommandAcknowledgement> {
+    pub fn put_with_weight(&self, key: Key, value: Value, weight: Weight) -> CommandSendResult {
         assert!(weight > 0);
         self.command_executor.send(CommandType::Put(
             self.key_description(key, weight),
@@ -60,7 +59,7 @@ impl<Key, Value> CacheD<Key, Value>
         ))
     }
 
-    pub fn put_with_ttl(&self, key: Key, value: Value, time_to_live: Duration) -> Arc<CommandAcknowledgement> {
+    pub fn put_with_ttl(&self, key: Key, value: Value, time_to_live: Duration) -> CommandSendResult {
         let weight = (self.config.weight_calculation_fn)(&key, &value);
         self.command_executor.send(CommandType::PutWithTTL(
             self.key_description(key, weight),
@@ -69,7 +68,7 @@ impl<Key, Value> CacheD<Key, Value>
         )
     }
 
-    pub fn put_with_weight_and_ttl(&self, key: Key, value: Value, weight: Weight, time_to_live: Duration) -> Arc<CommandAcknowledgement> {
+    pub fn put_with_weight_and_ttl(&self, key: Key, value: Value, weight: Weight, time_to_live: Duration) -> CommandSendResult {
         assert!(weight > 0);
         self.command_executor.send(CommandType::PutWithTTL(
             self.key_description(key, weight),
@@ -78,7 +77,7 @@ impl<Key, Value> CacheD<Key, Value>
         ))
     }
 
-    pub fn delete(&self, key: Key) -> Arc<CommandAcknowledgement> {
+    pub fn delete(&self, key: Key) -> CommandSendResult {
         self.store.mark_deleted(&key);
         self.command_executor.send(CommandType::Delete(key))
     }
@@ -124,7 +123,7 @@ impl<Key, Value> CacheD<Key, Value>
     pub fn multi_get_iterator<'a>(&'a self, keys: Vec<&'a Key>) -> MultiGetIterator<'a, Key, Value> {
         MultiGetIterator {
             cache: self,
-            keys
+            keys,
         }
     }
 }
@@ -172,7 +171,8 @@ mod tests {
     async fn put_a_key_value_with_weight() {
         let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
 
-        let acknowledgement = cached.put_with_weight("topic", "microservices", 50);
+        let acknowledgement =
+            cached.put_with_weight("topic", "microservices", 50).unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get_ref(&"topic");
@@ -188,7 +188,8 @@ mod tests {
     async fn put_a_key_value_with_ttl() {
         let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
 
-        let acknowledgement = cached.put_with_ttl("topic", "microservices", Duration::from_secs(120));
+        let acknowledgement =
+            cached.put_with_ttl("topic", "microservices", Duration::from_secs(120)).unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get(&"topic");
@@ -199,7 +200,8 @@ mod tests {
     async fn get_value_for_an_existing_key() {
         let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
 
-        let acknowledgement = cached.put("topic", "microservices");
+        let acknowledgement =
+            cached.put("topic", "microservices").unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get(&"topic");
@@ -218,7 +220,8 @@ mod tests {
     async fn get_value_ref_for_an_existing_key_if_value_is_not_cloneable() {
         let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
 
-        let acknowledgement = cached.put("name", Name { first: "John".to_string(), last: "Mcnamara".to_string() });
+        let acknowledgement =
+            cached.put("name", Name { first: "John".to_string(), last: "Mcnamara".to_string() }).unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get_ref(&"name");
@@ -229,7 +232,8 @@ mod tests {
     async fn delete_a_key() {
         let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
 
-        let acknowledgement = cached.put("topic", "microservices");
+        let acknowledgement =
+            cached.put("topic", "microservices").unwrap();
         acknowledgement.handle().await;
 
         let key_id = {
@@ -237,7 +241,8 @@ mod tests {
             key_value_ref.value().key_id()
         };
 
-        let acknowledgement = cached.delete("topic");
+        let acknowledgement =
+            cached.delete("topic").unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get(&"topic");
@@ -249,8 +254,10 @@ mod tests {
     async fn get_access_frequency() {
         let cached = CacheD::new(ConfigBuilder::new().access_pool_size(1).access_buffer_size(3).counters(10).build());
 
-        let acknowledgement_topic = cached.put("topic", "microservices");
-        let acknowledgement_disk = cached.put("disk", "SSD");
+        let acknowledgement_topic =
+            cached.put("topic", "microservices").unwrap();
+        let acknowledgement_disk =
+            cached.put("disk", "SSD").unwrap();
 
         acknowledgement_topic.handle().await;
         acknowledgement_disk.handle().await;
@@ -271,11 +278,16 @@ mod tests {
     async fn get_multiple_keys() {
         let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
 
-        let acknowledgement = cached.put("topic", "microservices");
+        let acknowledgement =
+            cached.put("topic", "microservices").unwrap();
         acknowledgement.handle().await;
-        let acknowledgement = cached.put("disk", "SSD");
+
+        let acknowledgement =
+            cached.put("disk", "SSD").unwrap();
         acknowledgement.handle().await;
-        let acknowledgement = cached.put("cache", "in-memory");
+
+        let acknowledgement =
+            cached.put("cache", "in-memory").unwrap();
         acknowledgement.handle().await;
 
         let values = cached.multi_get(vec![&"topic", &"non-existing", &"cache", &"disk"]);
@@ -290,11 +302,16 @@ mod tests {
     async fn get_multiple_keys_via_an_iterator() {
         let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
 
-        let acknowledgement = cached.put("topic", "microservices");
+        let acknowledgement =
+            cached.put("topic", "microservices").unwrap();
         acknowledgement.handle().await;
-        let acknowledgement = cached.put("disk", "SSD");
+
+        let acknowledgement =
+            cached.put("disk", "SSD").unwrap();
         acknowledgement.handle().await;
-        let acknowledgement = cached.put("cache", "in-memory");
+
+        let acknowledgement =
+            cached.put("cache", "in-memory").unwrap();
         acknowledgement.handle().await;
 
         let mut iterator = cached.multi_get_iterator(vec![&"topic", &"non-existing", &"cache", &"disk"]);

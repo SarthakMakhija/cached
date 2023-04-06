@@ -123,9 +123,7 @@ impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
                         filled_in = true;
                     }
                 }
-                None => {
-                    break;
-                }
+                None => { break; }
             }
         }
         filled_in

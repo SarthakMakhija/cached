@@ -8,9 +8,12 @@ use crossbeam_channel::Receiver;
 
 use crate::cache::command::{CommandStatus, CommandType};
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
+use crate::cache::command::error::CommandSendError;
 use crate::cache::key_description::KeyDescription;
 use crate::cache::policy::admission_policy::AdmissionPolicy;
 use crate::cache::store::Store;
+
+pub type CommandSendResult = Result<Arc<CommandAcknowledgement>, CommandSendError>;
 
 pub(crate) struct CommandExecutor<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
@@ -110,8 +113,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
         CommandStatus::Rejected
     }
 
-    //TODO: Change the return type to be a result
-    pub(crate) fn send(&self, command: CommandType<Key, Value>) -> Arc<CommandAcknowledgement> {
+    pub(crate) fn send(&self, command: CommandType<Key, Value>) -> CommandSendResult {
         let acknowledgement = CommandAcknowledgement::new();
         let send_result = self.sender.send(CommandAcknowledgementPair {
             command,
@@ -119,8 +121,8 @@ impl<Key, Value> CommandExecutor<Key, Value>
         });
 
         match send_result {
-            Ok(_) => acknowledgement,
-            Err(_) => acknowledgement
+            Ok(_) => Ok(acknowledgement),
+            Err(err) => Err(CommandSendError::new(err.0.command.description()))
         }
     }
 
@@ -158,7 +160,7 @@ mod tests {
             command_executor1.send(CommandType::Put(
                 KeyDescription::new("topic", 1, 1029, 10),
                 "microservices",
-            )).handle().await;
+            )).unwrap().handle().await;
         });
 
         let shutdown_handle = tokio::spawn(async move {
@@ -172,12 +174,13 @@ mod tests {
             command_executor.send(CommandType::Put(
                 KeyDescription::new("disk", 2, 2090, 10),
                 "SSD",
-            ));
+            ))
         });
-        put_handle.await.unwrap();
+        let send_result_post_shutdown = put_handle.await.unwrap();
 
         assert_eq!(Some("microservices"), store.get(&"topic"));
         assert_eq!(None, store.get(&"disk"));
+        assert!(send_result_post_shutdown.is_err());
     }
 
     #[tokio::test]
@@ -194,7 +197,7 @@ mod tests {
         let command_acknowledgement = command_executor.send(CommandType::Put(
             KeyDescription::new("topic", 1, 1029, 10),
             "microservices",
-        ));
+        )).unwrap();
         command_acknowledgement.handle().await;
 
         command_executor.shutdown();
@@ -215,7 +218,7 @@ mod tests {
         let command_acknowledgement = command_executor.send(CommandType::Put(
             KeyDescription::new("topic", 1, 1029, 200),
             "microservices",
-        ));
+        )).unwrap();
         let status = command_acknowledgement.handle().await;
 
         command_executor.shutdown();
@@ -237,11 +240,11 @@ mod tests {
         let acknowledgement = command_executor.send(CommandType::Put(
             KeyDescription::new("topic", 1, 1029, 10),
             "microservices",
-        ));
+        )).unwrap();
         let other_acknowledgment = command_executor.send(CommandType::Put(
             KeyDescription::new("disk", 2, 2076, 3),
             "SSD",
-        ));
+        )).unwrap();
         acknowledgement.handle().await;
         other_acknowledgment.handle().await;
 
@@ -265,7 +268,7 @@ mod tests {
             KeyDescription::new("topic", 1, 1029, 10),
             "microservices",
             Duration::from_secs(10),
-        ));
+        )).unwrap();
         acknowledgement.handle().await;
 
         command_executor.shutdown();
@@ -286,10 +289,11 @@ mod tests {
             KeyDescription::new("topic", 1, 1029, 10),
             "microservices",
             Duration::from_secs(10),
-        ));
+        )).unwrap();
         acknowledgement.handle().await;
 
-        let acknowledgement = command_executor.send(CommandType::Delete("topic"));
+        let acknowledgement =
+            command_executor.send(CommandType::Delete("topic")).unwrap();
         acknowledgement.handle().await;
 
         command_executor.shutdown();
@@ -307,7 +311,8 @@ mod tests {
             10,
         );
 
-        let acknowledgement = command_executor.send(CommandType::Delete("non-existing"));
+        let acknowledgement =
+            command_executor.send(CommandType::Delete("non-existing")).unwrap();
         let status = acknowledgement.handle().await;
 
         command_executor.shutdown();
@@ -345,7 +350,7 @@ mod sociable_tests {
         let command_acknowledgement = command_executor.send(CommandType::Put(
             key_description,
             "microservices",
-        ));
+        )).unwrap();
         command_acknowledgement.handle().await;
 
         command_executor.shutdown();
@@ -371,14 +376,14 @@ mod sociable_tests {
         let command_acknowledgement = command_executor.send(CommandType::Put(
             KeyDescription::new("topic", 1, 10, 5),
             "microservices",
-        ));
+        )).unwrap();
         let status = command_acknowledgement.handle().await;
         assert_eq!(CommandStatus::Accepted, status);
 
         let command_acknowledgement = command_executor.send(CommandType::Put(
             KeyDescription::new("disk", 2, 14, 6),
             "SSD",
-        ));
+        )).unwrap();
         let status = command_acknowledgement.handle().await;
         assert_eq!(CommandStatus::Accepted, status);
 
@@ -404,10 +409,11 @@ mod sociable_tests {
         let acknowledgement = command_executor.send(CommandType::Put(
             KeyDescription::new("topic", 1, 1029, 10),
             "microservices",
-        ));
+        )).unwrap();
         acknowledgement.handle().await;
 
-        let acknowledgement = command_executor.send(CommandType::Delete("topic"));
+        let acknowledgement =
+            command_executor.send(CommandType::Delete("topic")).unwrap();
         acknowledgement.handle().await;
 
         command_executor.shutdown();

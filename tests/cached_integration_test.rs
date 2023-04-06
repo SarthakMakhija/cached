@@ -29,7 +29,8 @@ fn put<Key, Value>(cached: &CacheD<Key, Value>, key_value_pairs: HashMap<Key, Va
           Value: Send + Sync + Clone + 'static {
     let mut acknowledgements = Vec::new();
     for key_value in key_value_pairs {
-        let acknowledgement = cached.put(key_value.0, key_value.1);
+        let acknowledgement =
+            cached.put(key_value.0, key_value.1).unwrap();
         acknowledgements.push(acknowledgement);
     }
     acknowledgements
