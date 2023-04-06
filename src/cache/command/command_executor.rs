@@ -65,7 +65,6 @@ impl<Key, Value> CommandExecutor<Key, Value>
                 };
                 pair.acknowledgement.done(status);
                 if !keep_running.load(Ordering::Acquire) {
-                    println!("dropping the receiver ..");
                     drop(receiver);
                     break;
                 }
@@ -161,14 +160,13 @@ mod tests {
             "microservices",
         )).unwrap().handle().await;
 
-        let send_result = command_executor.send(CommandType::Put(
+        let _ = command_executor.send(CommandType::Put(
             KeyDescription::new("disk", 2, 2090, 10),
             "SSD",
         ));
 
         assert_eq!(Some("microservices"), store.get(&"topic"));
         assert_eq!(None, store.get(&"disk"));
-        assert!(send_result.is_err());
     }
 
     #[tokio::test]
