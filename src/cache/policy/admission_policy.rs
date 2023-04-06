@@ -165,12 +165,12 @@ mod tests {
 
         policy.shutdown();
         policy.accept(key_hashes);
-        thread::sleep(Duration::from_millis(5));
+        thread::sleep(Duration::from_secs(1));
 
         let key_hashes = vec![116, 19];
         policy.accept(key_hashes);
 
-        thread::sleep(Duration::from_millis(5));
+        thread::sleep(Duration::from_secs(1));
 
         let actual_frequencies = vec![
             policy.estimate(10),
