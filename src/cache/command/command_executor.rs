@@ -62,7 +62,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
                         Self::delete(&store, &admission_policy, &key),
                 };
                 pair.acknowledgement.done(status);
-                if !keep_running.load(Ordering::SeqCst) {
+                if !keep_running.load(Ordering::Acquire) {
                     drop(receiver);
                     break;
                 }
@@ -128,7 +128,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
     }
 
     pub(crate) fn shutdown(&self) {
-        self.keep_running.store(false, Ordering::SeqCst);
+        self.keep_running.store(false, Ordering::Release);
     }
 }
 
@@ -162,6 +162,8 @@ mod tests {
             "microservices",
         )).unwrap().handle().await;
 
+        //introduce a delay to ensure that the thread in the spin method
+        //loads the shutdown flag before the next command is sent
         thread::sleep(Duration::from_secs(1));
 
         let send_result = command_executor.send(CommandType::Put(
