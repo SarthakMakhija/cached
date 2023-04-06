@@ -156,19 +156,18 @@ mod tests {
         let command_executor1 = command_executor.clone();
         let command_executor2 = command_executor.clone();
 
+        let shutdown_handle = tokio::spawn(async move {
+            command_executor2.shutdown();
+        });
+        shutdown_handle.await.unwrap();
+
         let put_handle = tokio::spawn(async move {
             command_executor1.send(CommandType::Put(
                 KeyDescription::new("topic", 1, 1029, 10),
                 "microservices",
             )).unwrap().handle().await;
         });
-
-        let shutdown_handle = tokio::spawn(async move {
-            command_executor2.shutdown();
-        });
-
         put_handle.await.unwrap();
-        shutdown_handle.await.unwrap();
 
         let put_handle = tokio::spawn(async move {
             command_executor.send(CommandType::Put(
