@@ -196,6 +196,18 @@ mod tests {
         assert_eq!(Some("microservices"), value);
     }
 
+    #[tokio::test]
+    async fn put_a_key_value_with_weight_and_ttl() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        let acknowledgement =
+            cached.put_with_weight_and_ttl("topic", "microservices", 10,Duration::from_secs(120)).unwrap();
+        acknowledgement.handle().await;
+
+        let value = cached.get(&"topic");
+        assert_eq!(Some("microservices"), value);
+    }
+
     #[test]
     fn get_value_ref_for_a_non_existing_key() {
         let cached: CacheD<&str, &str> = CacheD::new(ConfigBuilder::new().counters(10).build());

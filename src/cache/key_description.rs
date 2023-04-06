@@ -16,9 +16,7 @@ impl<Key> KeyDescription<Key>
         KeyDescription { key, id, hash, weight }
     }
 
-    pub(crate) fn clone_key(&self) -> Key {
-        self.key.clone()
-    }
+    pub(crate) fn clone_key(&self) -> Key { self.key.clone() }
 }
 
 #[cfg(test)]

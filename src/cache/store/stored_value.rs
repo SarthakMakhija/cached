@@ -40,13 +40,9 @@ impl<Value> StoredValue<Value> {
         true
     }
 
-    pub fn value_ref(&self) -> &Value {
-        &self.value
-    }
+    pub fn value_ref(&self) -> &Value { &self.value }
 
-    pub fn key_id(&self) -> KeyId {
-        self.key_id
-    }
+    pub fn key_id(&self) -> KeyId { self.key_id }
 }
 
 impl<Value> StoredValue<Value>
