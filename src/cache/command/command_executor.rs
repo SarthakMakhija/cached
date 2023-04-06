@@ -135,6 +135,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
+    use std::thread;
     use std::time::Duration;
 
     use crate::cache::clock::SystemClock;
@@ -161,13 +162,16 @@ mod tests {
             "microservices",
         )).unwrap().handle().await;
 
-        let _ = command_executor.send(CommandType::Put(
+        thread::sleep(Duration::from_secs(1));
+
+        let send_result = command_executor.send(CommandType::Put(
             KeyDescription::new("disk", 2, 2090, 10),
             "SSD",
         ));
 
         assert_eq!(Some("microservices"), store.get(&"topic"));
         assert_eq!(None, store.get(&"disk"));
+        assert!(send_result.is_err())
     }
 
     #[tokio::test]
