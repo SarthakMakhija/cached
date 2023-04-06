@@ -51,7 +51,7 @@ impl<Key> AdmissionPolicy<Key>
                 { access_frequency.write().add(key_hashes); }
                 if !keep_running.load(Ordering::Acquire) {
                     drop(receiver);
-                    return;
+                    break;
                 }
             }
         });
@@ -188,7 +188,7 @@ mod tests {
         let key_hashes = vec![10, 14, 116, 19, 19, 10];
 
         policy.accept(key_hashes);
-        thread::sleep(Duration::from_millis(5));
+        thread::sleep(Duration::from_millis(10));
 
         let actual_frequencies = vec![
             policy.estimate(10),
@@ -210,7 +210,7 @@ mod tests {
         let key_hashes = vec![116, 19, 19, 10];
         policy.accept(key_hashes);
 
-        thread::sleep(Duration::from_millis(5));
+        thread::sleep(Duration::from_millis(10));
 
         let actual_frequencies = vec![
             policy.estimate(10),
