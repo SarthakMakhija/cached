@@ -50,6 +50,7 @@ impl<Key> AdmissionPolicy<Key>
             while let Ok(key_hashes) = receiver.recv() {
                 { access_frequency.write().add(key_hashes); }
                 if !keep_running.load(Ordering::Acquire) {
+                    drop(receiver);
                     return;
                 }
             }
@@ -131,7 +132,6 @@ impl<Key> AdmissionPolicy<Key>
 impl<Key> BufferConsumer for AdmissionPolicy<Key>
     where Key: Hash + Eq + Send + Sync + Clone + 'static, {
     fn accept(&self, key_hashes: Vec<KeyHash>) {
-        //TODO: Remove unwrap
         //TODO: Increase metrics
         select! {
             send(self.sender.clone(), key_hashes) -> _response => {},
@@ -156,6 +156,36 @@ mod tests {
 
     struct DeletedKeys<Key> {
         keys: RwLock<Vec<Key>>,
+    }
+
+    #[test]
+    fn increase_access_and_shutdown() {
+        let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, 10);
+        let key_hashes = vec![10, 14];
+
+        thread::scope(|scope| {
+            scope.spawn(|| {
+                policy.shutdown();
+            });
+            scope.spawn(|| {
+                policy.accept(key_hashes);
+            });
+        });
+        thread::sleep(Duration::from_millis(5));
+
+        let key_hashes = vec![116, 19];
+        policy.accept(key_hashes);
+
+        thread::sleep(Duration::from_millis(5));
+
+        let actual_frequencies = vec![
+            policy.estimate(10),
+            policy.estimate(14),
+            policy.estimate(116),
+            policy.estimate(19),
+        ];
+        let expected_frequencies = vec![1, 1, 0, 0];
+        assert_eq!(expected_frequencies, actual_frequencies);
     }
 
     #[test]

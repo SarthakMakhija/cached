@@ -341,7 +341,7 @@ mod frequency_counter_based_min_heap_samples_tests {
     use dashmap::DashMap;
 
     use crate::cache::policy::cache_weight::{FrequencyCounterBasedMinHeapSamples, SampledKey, WeightedKey};
-    use crate::cache::types::{KeyHash, KeyId};
+    use crate::cache::types::KeyId;
 
     #[test]
     fn equality_of_sampled_keys() {

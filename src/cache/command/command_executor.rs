@@ -62,6 +62,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
                 };
                 pair.acknowledgement.done(status);
                 if !keep_running.load(Ordering::Acquire) {
+                    drop(receiver);
                     return;
                 }
             }
@@ -109,15 +110,18 @@ impl<Key, Value> CommandExecutor<Key, Value>
         CommandStatus::Rejected
     }
 
-    //TODO: Remove unwrap
+    //TODO: Change the return type to be a result
     pub(crate) fn send(&self, command: CommandType<Key, Value>) -> Arc<CommandAcknowledgement> {
         let acknowledgement = CommandAcknowledgement::new();
-        self.sender.send(CommandAcknowledgementPair {
+        let send_result = self.sender.send(CommandAcknowledgementPair {
             command,
             acknowledgement: acknowledgement.clone(),
-        }).unwrap();
+        });
 
-        acknowledgement
+        match send_result {
+            Ok(_) => acknowledgement,
+            Err(_) => acknowledgement
+        }
     }
 
     pub(crate) fn shutdown(&self) {
@@ -131,11 +135,50 @@ mod tests {
     use std::time::Duration;
 
     use crate::cache::clock::SystemClock;
-    use crate::cache::command::command_executor::CommandExecutor;
     use crate::cache::command::{CommandStatus, CommandType};
+    use crate::cache::command::command_executor::CommandExecutor;
     use crate::cache::key_description::KeyDescription;
     use crate::cache::policy::admission_policy::AdmissionPolicy;
     use crate::cache::store::Store;
+
+    #[tokio::test]
+    async fn puts_a_key_value_and_shutdown() {
+        let store = Store::new(SystemClock::boxed());
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100));
+
+        let command_executor = Arc::new(CommandExecutor::new(
+            store.clone(),
+            admission_policy,
+            10,
+        ));
+        let command_executor1 = command_executor.clone();
+        let command_executor2 = command_executor.clone();
+
+        let put_handle = tokio::spawn(async move {
+            command_executor1.send(CommandType::Put(
+                KeyDescription::new("topic", 1, 1029, 10),
+                "microservices",
+            )).handle().await;
+        });
+
+        let shutdown_handle = tokio::spawn(async move {
+            command_executor2.shutdown();
+        });
+
+        put_handle.await.unwrap();
+        shutdown_handle.await.unwrap();
+
+        let put_handle = tokio::spawn(async move {
+            command_executor.send(CommandType::Put(
+                KeyDescription::new("disk", 2, 2090, 10),
+                "SSD",
+            ));
+        });
+        put_handle.await.unwrap();
+
+        assert_eq!(Some("microservices"), store.get(&"topic"));
+        assert_eq!(None, store.get(&"disk"));
+    }
 
     #[tokio::test]
     async fn puts_a_key_value() {
@@ -277,9 +320,10 @@ mod sociable_tests {
     use std::sync::Arc;
     use std::thread;
     use std::time::Duration;
+
     use crate::cache::clock::SystemClock;
-    use crate::cache::command::command_executor::CommandExecutor;
     use crate::cache::command::{CommandStatus, CommandType};
+    use crate::cache::command::command_executor::CommandExecutor;
     use crate::cache::key_description::KeyDescription;
     use crate::cache::policy::admission_policy::AdmissionPolicy;
     use crate::cache::pool::BufferConsumer;
