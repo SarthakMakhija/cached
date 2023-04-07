@@ -63,7 +63,7 @@ impl TTLTicker {
 
     fn shard_index(self: &Arc<TTLTicker>, time: &SystemTime) -> usize {
         let since_the_epoch = time.duration_since(UNIX_EPOCH).expect("Time went backwards");
-        (since_the_epoch.as_secs() as usize % self.shards.len()) as usize
+        since_the_epoch.as_secs() as usize % self.shards.len()
     }
 
     fn spin<EvictHook>(self: Arc<TTLTicker>, tick_duration: Duration, clock: ClockType, evict_hook: EvictHook)
@@ -174,7 +174,7 @@ mod tests {
 
         let key_id = 10;
         let expire_after = clock.now().add(Duration::from_secs(5));
-        ticker.add(key_id, expire_after.clone());
+        ticker.add(key_id, expire_after);
 
         let updated_expiry = clock.now().add(Duration::from_secs(30));
         ticker.update(key_id, &expire_after, updated_expiry);
