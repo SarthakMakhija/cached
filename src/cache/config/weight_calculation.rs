@@ -17,13 +17,9 @@ impl Calculation {
         (std::mem::size_of_val(key), std::mem::size_of_val(value))
     }
 
-    fn weighted_key_size<Key>() -> usize {
-        std::mem::size_of::<WeightedKey<Key>>()
-    }
+    fn weighted_key_size<Key>() -> usize { std::mem::size_of::<WeightedKey<Key>>() }
 
-    fn ttl_ticker_entry_size() -> usize {
-        KEY_ID_SIZE + SYSTEM_SIZE_SIZE
-    }
+    fn ttl_ticker_entry_size() -> usize { KEY_ID_SIZE + SYSTEM_SIZE_SIZE }
 }
 
 #[cfg(test)]
