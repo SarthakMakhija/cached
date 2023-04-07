@@ -36,6 +36,17 @@ impl TTLTicker {
         self.shards[shard_index].write().insert(key_id, expire_after);
     }
 
+    pub(crate) fn update(self: &Arc<TTLTicker>, key_id: KeyId, old_expiry: &ExpireAfter, new_expiry: ExpireAfter) {
+        {
+            let shard_index = self.shard_index(old_expiry);
+            self.shards[shard_index].write().remove(&key_id);
+        }
+        {
+            let shard_index = self.shard_index(&new_expiry);
+            self.shards[shard_index].write().insert(key_id, new_expiry);
+        }
+    }
+
     pub(crate) fn get(self: &Arc<TTLTicker>, key_id: &KeyId, expire_after: &ExpireAfter) -> Option<ExpireAfter> {
         let shard_index = self.shard_index(expire_after);
         self.shards[shard_index].read().get(key_id).copied()
@@ -64,7 +75,6 @@ impl TTLTicker {
             while let Ok(_instant) = receiver.recv() {
                 let now = clock.now();
                 let shard_index = self.shard_index(&now);
-
 
                 self.shards[shard_index].write().retain(|key, expire_after| {
                     let has_not_expired = now.le(expire_after);
@@ -154,6 +164,23 @@ mod tests {
 
         let stored_value = ticker.get(&key_id, &expire_after).unwrap();
         assert_eq!(expire_after, stored_value);
+    }
+
+    #[test]
+    fn update() {
+        let clock = Box::new(UnixEpochClock {});
+        let no_operation_evict_hook = |_key: &KeyId| {};
+        let ticker = TTLTicker::new(4, Duration::from_secs(300), clock.clone(), no_operation_evict_hook);
+
+        let key_id = 10;
+        let expire_after = clock.now().add(Duration::from_secs(5));
+        ticker.add(key_id, expire_after.clone());
+
+        let updated_expiry = clock.now().add(Duration::from_secs(30));
+        ticker.update(key_id, &expire_after, updated_expiry);
+
+        let stored_value = ticker.get(&key_id, &updated_expiry).unwrap();
+        assert_eq!(updated_expiry, stored_value);
     }
 
     #[test]
