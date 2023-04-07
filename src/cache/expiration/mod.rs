@@ -47,11 +47,6 @@ impl TTLTicker {
         }
     }
 
-    pub(crate) fn get(self: &Arc<TTLTicker>, key_id: &KeyId, expire_after: &ExpireAfter) -> Option<ExpireAfter> {
-        let shard_index = self.shard_index(expire_after);
-        self.shards[shard_index].read().get(key_id).copied()
-    }
-
     pub(crate) fn delete(self: &Arc<TTLTicker>, key_id: &KeyId, expire_after: &ExpireAfter) {
         let shard_index = self.shard_index(expire_after);
         self.shards[shard_index].write().remove(key_id);
@@ -59,6 +54,11 @@ impl TTLTicker {
 
     pub(crate) fn shutdown(&self) {
         self.keep_running.store(false, Ordering::Release);
+    }
+
+    fn get(self: &Arc<TTLTicker>, key_id: &KeyId, expire_after: &ExpireAfter) -> Option<ExpireAfter> {
+        let shard_index = self.shard_index(expire_after);
+        self.shards[shard_index].read().get(key_id).copied()
     }
 
     fn shard_index(self: &Arc<TTLTicker>, time: &SystemTime) -> usize {
