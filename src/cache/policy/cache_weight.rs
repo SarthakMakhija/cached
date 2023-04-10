@@ -186,14 +186,22 @@ impl<Key> CacheWeight<Key>
     }
 
     pub(crate) fn update(&self, key_id: &KeyId, weight: Weight) -> bool {
-        if let Some(mut pair) = self.key_weights.get_mut(key_id) {
+        if let Some(mut existing) = self.key_weights.get_mut(key_id) {
             {
                 let mut guard = self.weight_used.write();
-                *guard += weight - pair.weight;
+                *guard += weight - existing.weight;
             }
-            let weighted_key = pair.value_mut();
+            if weight > existing.weight {
+                let difference = weight - existing.weight;
+                self.stats_counter.add_weight(difference as u64);
+            } else {
+                let difference = existing.weight - weight;
+                self.stats_counter.add_weight(!(difference - 1) as u64);
+            }
+
+            let weighted_key = existing.value_mut();
             weighted_key.weight = weight;
-            //TODO: stats
+
             return true;
         }
         false
@@ -228,6 +236,7 @@ impl<Key> CacheWeight<Key>
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
+
     use parking_lot::RwLock;
 
     use crate::cache::key_description::KeyDescription;
@@ -306,6 +315,17 @@ mod tests {
     }
 
     #[test]
+    fn update_key_weight_given_the_updated_weight_is_less_and_increase_stats() {
+        let cache_weight = CacheWeight::new(10, Arc::new(ConcurrentStatsCounter::new()));
+
+        cache_weight.add(&KeyDescription::new("disk", 1, 3040, 3));
+        assert_eq!(3, cache_weight.stats_counter.weight_added());
+
+        cache_weight.update(&1, 2);
+        assert_eq!(2, cache_weight.stats_counter.weight_added());
+    }
+
+    #[test]
     fn update_key_weight_given_the_updated_weight_is_more() {
         let cache_weight = CacheWeight::new(10, Arc::new(ConcurrentStatsCounter::new()));
 
@@ -317,6 +337,17 @@ mod tests {
     }
 
     #[test]
+    fn update_key_weight_given_the_updated_weight_is_more_and_increase_stats() {
+        let cache_weight = CacheWeight::new(10, Arc::new(ConcurrentStatsCounter::new()));
+
+        cache_weight.add(&KeyDescription::new("disk", 1, 3040, 4));
+        assert_eq!(4, cache_weight.stats_counter.weight_added());
+
+        cache_weight.update(&1, 8);
+        assert_eq!(8, cache_weight.stats_counter.weight_added());
+    }
+
+    #[test]
     fn update_key_weight_given_the_updated_weight_is_same() {
         let cache_weight = CacheWeight::new(10, Arc::new(ConcurrentStatsCounter::new()));
 
@@ -325,6 +356,17 @@ mod tests {
 
         cache_weight.update(&1, 4);
         assert_eq!(4, cache_weight.get_weight_used());
+    }
+
+    #[test]
+    fn update_key_weight_given_the_updated_weight_is_same_and_make_no_changes_in_stats() {
+        let cache_weight = CacheWeight::new(10, Arc::new(ConcurrentStatsCounter::new()));
+
+        cache_weight.add(&KeyDescription::new("disk", 1, 3040, 4));
+        assert_eq!(4, cache_weight.stats_counter.weight_added());
+
+        cache_weight.update(&1, 4);
+        assert_eq!(4, cache_weight.stats_counter.weight_added());
     }
 
     #[test]
@@ -350,7 +392,7 @@ mod tests {
         cache_weight.add(&KeyDescription::new("disk", 1, 3040, 3));
         assert_eq!(3, cache_weight.get_weight_used());
 
-        let delete_hook = |_| { };
+        let delete_hook = |_| {};
         cache_weight.delete(&1, &delete_hook);
 
         assert_eq!(3, cache_weight.stats_counter.weight_removed())
