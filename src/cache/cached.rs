@@ -64,18 +64,14 @@ impl<Key, Value> CacheD<Key, Value>
     pub fn put_with_ttl(&self, key: Key, value: Value, time_to_live: Duration) -> CommandSendResult {
         let weight = (self.config.weight_calculation_fn)(&key, &value);
         self.command_executor.send(CommandType::PutWithTTL(
-            self.key_description(key, weight),
-            value,
-            time_to_live)
+            self.key_description(key, weight), value, time_to_live)
         )
     }
 
     pub fn put_with_weight_and_ttl(&self, key: Key, value: Value, weight: Weight, time_to_live: Duration) -> CommandSendResult {
         assert!(weight > 0);
         self.command_executor.send(CommandType::PutWithTTL(
-            self.key_description(key, weight),
-            value,
-            time_to_live,
+            self.key_description(key, weight), value, time_to_live,
         ))
     }
 
