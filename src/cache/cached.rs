@@ -34,8 +34,8 @@ impl<Key, Value> CacheD<Key, Value>
     pub fn new(config: Config<Key, Value>) -> Self {
         assert!(config.counters > 0);
 
-        let store = Store::new((config.clock).clone_box());
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
+        let store = Store::new((config.clock).clone_box(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(config.counters, config.total_cache_weight, stats_counter.clone()));
         let pool = Pool::new(config.access_pool_size, config.access_buffer_size, admission_policy.clone());
         let command_buffer_size = config.command_buffer_size;

@@ -5,6 +5,7 @@ use std::time::Duration;
 use dashmap::DashMap;
 
 use crate::cache::clock::ClockType;
+use crate::cache::stats::ConcurrentStatsCounter;
 use crate::cache::store::key_value_ref::KeyValueRef;
 use crate::cache::store::stored_value::StoredValue;
 use crate::cache::types::KeyId;
@@ -16,27 +17,32 @@ pub(crate) struct Store<Key, Value>
     where Key: Hash + Eq, {
     store: DashMap<Key, StoredValue<Value>>,
     clock: ClockType,
+    stats_counter: Arc<ConcurrentStatsCounter>,
 }
 
 impl<Key, Value> Store<Key, Value>
     where Key: Hash + Eq, {
-    pub(crate) fn new(clock: ClockType) -> Arc<Store<Key, Value>> {
+    pub(crate) fn new(clock: ClockType, stats_counter: Arc<ConcurrentStatsCounter>) -> Arc<Store<Key, Value>> {
         Arc::new(Store {
             store: DashMap::new(), //TODO: define capacity
             clock,
+            stats_counter
         })
     }
 
     pub(crate) fn put(&self, key: Key, value: Value, key_id: KeyId) {
         self.store.insert(key, StoredValue::never_expiring(value, key_id));
+        self.stats_counter.add_key();
     }
 
     pub(crate) fn put_with_ttl(&self, key: Key, value: Value, key_id: KeyId, time_to_live: Duration) {
         self.store.insert(key, StoredValue::expiring(value, key_id, time_to_live, &self.clock));
+        self.stats_counter.add_key();
     }
 
     pub(crate) fn delete(&self, key: &Key) -> Option<KeyId> {
         if let Some(pair) = self.store.remove(key) {
+            self.stats_counter.delete_key();
             return Some(pair.1.key_id())
         }
         None
@@ -70,11 +76,13 @@ impl<Key, Value> Store<Key, Value>
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use std::time::Duration;
 
     use setup::FutureClock;
 
     use crate::cache::clock::SystemClock;
+    use crate::cache::stats::ConcurrentStatsCounter;
     use crate::cache::store::Store;
     use crate::cache::store::stored_value::StoredValue;
     use crate::cache::store::tests::setup::Name;
@@ -104,7 +112,7 @@ mod tests {
     #[test]
     fn get_value_for_an_existing_key() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock);
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
 
         store.put("topic", "microservices", 1);
 
@@ -113,9 +121,18 @@ mod tests {
     }
 
     #[test]
+    fn put_a_key_value_and_increase_stats() {
+        let clock = SystemClock::boxed();
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+
+        store.put("topic", "microservices", 1);
+        assert_eq!(1, store.stats_counter.keys_added());
+    }
+
+    #[test]
     fn put_with_ttl() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock);
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
 
         store.put_with_ttl("topic", "microservices", 1, Duration::from_millis(5));
 
@@ -124,9 +141,18 @@ mod tests {
     }
 
     #[test]
+    fn put_with_ttl_and_increase_stats() {
+        let clock = SystemClock::boxed();
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+
+        store.put_with_ttl("topic", "microservices", 1, Duration::from_millis(5));
+        assert_eq!(1, store.stats_counter.keys_added());
+    }
+
+    #[test]
     fn put_with_ttl_and_get_the_value_of_an_expired_key() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock);
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
 
         store.put_with_ttl("topic", "microservices", 1, Duration::from_nanos(1));
 
@@ -137,7 +163,7 @@ mod tests {
     #[test]
     fn get_value_ref_for_an_existing_key_if_value_is_not_cloneable() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock);
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
 
         store.put("name", Name { first: "John".to_string(), last: "Mcnamara".to_string() }, 1);
 
@@ -148,7 +174,7 @@ mod tests {
     #[test]
     fn get_value_for_a_non_existing_key() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock);
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
 
         let value: Option<&str> = store.get(&"non-existing");
         assert_eq!(None, value);
@@ -156,7 +182,7 @@ mod tests {
 
     #[test]
     fn get_value_for_an_expired_key() {
-        let store = Store::new(Box::new(FutureClock {}));
+        let store = Store::new(Box::new(FutureClock {}), Arc::new(ConcurrentStatsCounter::new()));
         {
             let clock = SystemClock::boxed();
             store.store.insert("topic", StoredValue::expiring("microservices", 1, Duration::from_secs(5), &clock));
@@ -168,7 +194,7 @@ mod tests {
 
     #[test]
     fn get_value_for_an_unexpired_key() {
-        let store = Store::new(Box::new(FutureClock {}));
+        let store = Store::new(Box::new(FutureClock {}), Arc::new(ConcurrentStatsCounter::new()));
         {
             let clock = SystemClock::boxed();
             store.store.insert("topic", StoredValue::expiring("microservices", 1, Duration::from_secs(15), &clock));
@@ -181,7 +207,7 @@ mod tests {
     #[test]
     fn delete_a_key() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock);
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
 
         store.put("topic", "microservices", 10);
         let key_id = store.delete(&"topic");
@@ -192,9 +218,20 @@ mod tests {
     }
 
     #[test]
+    fn delete_a_key_and_increase_stats() {
+        let clock = SystemClock::boxed();
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+
+        store.put("topic", "microservices", 10);
+
+        let _ = store.delete(&"topic");
+        assert_eq!(1, store.stats_counter.keys_deleted());
+    }
+
+    #[test]
     fn delete_a_non_existing_key() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock);
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
 
         let key_id = store.delete(&"non-existing");
 
@@ -204,9 +241,18 @@ mod tests {
     }
 
     #[test]
+    fn delete_a_non_existing_key_and_do_not_increase_stats() {
+        let clock = SystemClock::boxed();
+        let store = Store::<&str, &str>::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+
+        let _ = store.delete(&"non-existing");
+        assert_eq!(0, store.stats_counter.keys_deleted());
+    }
+
+    #[test]
     fn marks_a_key_deleted() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock);
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
 
         store.put("topic", "microservices", 10);
         store.mark_deleted(&"topic");

@@ -63,7 +63,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
                     CommandType::PutWithTTL(key_description, value, ttl) =>
                         Self::put_with_ttl(&store, &key_description, &delete_hook, value, ttl, &admission_policy, &stats_counter),
                     CommandType::Delete(key) =>
-                        Self::delete(&store, &key, &admission_policy, &stats_counter),
+                        Self::delete(&store, &key, &admission_policy),
                 };
                 pair.acknowledgement.done(status);
                 if !keep_running.load(Ordering::Acquire) {
@@ -84,7 +84,6 @@ impl<Key, Value> CommandExecutor<Key, Value>
         let status = admission_policy.maybe_add(key_description, delete_hook);
         if let CommandStatus::Accepted = status {
             store.put(key_description.clone_key(), value, key_description.id);
-            stats_counter.add_key();
         } else {
             stats_counter.reject_key();
         }
@@ -102,7 +101,6 @@ impl<Key, Value> CommandExecutor<Key, Value>
         let status = admission_policy.maybe_add(key_description, delete_hook);
         if let CommandStatus::Accepted = status {
             store.put_with_ttl(key_description.clone_key(), value, key_description.id, ttl);
-            stats_counter.add_key();
         } else {
             stats_counter.reject_key();
         }
@@ -112,12 +110,10 @@ impl<Key, Value> CommandExecutor<Key, Value>
     fn delete(
         store: &Arc<Store<Key, Value>>,
         key: &Key,
-        admission_policy: &Arc<AdmissionPolicy<Key>>,
-        stats_counter: &Arc<ConcurrentStatsCounter>) -> CommandStatus {
+        admission_policy: &Arc<AdmissionPolicy<Key>>) -> CommandStatus {
         let key_id = store.delete(key);
         if let Some(key_id) = key_id {
             admission_policy.delete(&key_id);
-            stats_counter.delete_key();
             return CommandStatus::Accepted;
         }
         CommandStatus::Rejected
@@ -160,8 +156,8 @@ mod tests {
 
     #[tokio::test]
     async fn puts_a_key_value_and_shutdown() {
-        let store = Store::new(SystemClock::boxed());
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
+        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
@@ -193,8 +189,8 @@ mod tests {
 
     #[tokio::test]
     async fn puts_a_key_value() {
-        let store = Store::new(SystemClock::boxed());
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
+        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
@@ -215,32 +211,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn puts_a_key_value_and_increase_stats() {
-        let store = Store::new(SystemClock::boxed());
-        let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
-
-        let command_executor = CommandExecutor::new(
-            store.clone(),
-            admission_policy,
-            stats_counter.clone(),
-            10,
-        );
-
-        let command_acknowledgement = command_executor.send(CommandType::Put(
-            KeyDescription::new("topic", 1, 1029, 10),
-            "microservices",
-        )).unwrap();
-        command_acknowledgement.handle().await;
-
-        command_executor.shutdown();
-        assert_eq!(1, stats_counter.keys_added());
-    }
-
-    #[tokio::test]
     async fn key_value_gets_rejected_given_its_weight_is_more_than_the_cache_weight() {
-        let store = Store::new(SystemClock::boxed());
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
+        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
@@ -263,8 +236,8 @@ mod tests {
 
     #[tokio::test]
     async fn rejects_a_key_value_and_increase_stats() {
-        let store = Store::new(SystemClock::boxed());
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
+        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
@@ -287,8 +260,8 @@ mod tests {
 
     #[tokio::test]
     async fn puts_a_couple_of_key_values() {
-        let store = Store::new(SystemClock::boxed());
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
+        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
@@ -316,8 +289,8 @@ mod tests {
 
     #[tokio::test]
     async fn puts_a_key_value_with_ttl() {
-        let store = Store::new(SystemClock::boxed());
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
+        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
@@ -339,33 +312,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn puts_a_key_value_with_ttl_and_increase_stats() {
-        let store = Store::new(SystemClock::boxed());
-        let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
-
-        let command_executor = CommandExecutor::new(
-            store.clone(),
-            admission_policy,
-            stats_counter.clone(),
-            10,
-        );
-
-        let acknowledgement = command_executor.send(CommandType::PutWithTTL(
-            KeyDescription::new("topic", 1, 1029, 10),
-            "microservices",
-            Duration::from_secs(10),
-        )).unwrap();
-        acknowledgement.handle().await;
-
-        command_executor.shutdown();
-        assert_eq!(1, stats_counter.keys_added());
-    }
-
-    #[tokio::test]
     async fn rejects_a_key_value_with_ttl_and_increase_stats() {
-        let store = Store::new(SystemClock::boxed());
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
+        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
@@ -388,8 +337,8 @@ mod tests {
 
     #[tokio::test]
     async fn deletes_a_key() {
-        let store = Store::new(SystemClock::boxed());
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
+        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
         let command_executor = CommandExecutor::new(
             store.clone(),
@@ -414,36 +363,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn deletes_a_key_and_increase_stats() {
-        let store = Store::new(SystemClock::boxed());
-        let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
-        let command_executor = CommandExecutor::new(
-            store.clone(),
-            admission_policy,
-            stats_counter.clone(),
-            10,
-        );
-
-        let acknowledgement = command_executor.send(CommandType::PutWithTTL(
-            KeyDescription::new("topic", 1, 1029, 10),
-            "microservices",
-            Duration::from_secs(10),
-        )).unwrap();
-        acknowledgement.handle().await;
-
-        let acknowledgement =
-            command_executor.send(CommandType::Delete("topic")).unwrap();
-        acknowledgement.handle().await;
-
-        command_executor.shutdown();
-        assert_eq!(1, stats_counter.keys_deleted());
-    }
-
-    #[tokio::test]
     async fn deletion_of_a_non_existing_key_value_gets_rejected() {
-        let store: Arc<Store<&str, &str>> = Store::new(SystemClock::boxed());
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
+        let store: Arc<Store<&str, &str>> = Store::new(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
@@ -479,8 +401,8 @@ mod sociable_tests {
 
     #[tokio::test]
     async fn puts_a_key_value() {
-        let store = Store::new(SystemClock::boxed());
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
+        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
@@ -505,8 +427,8 @@ mod sociable_tests {
 
     #[tokio::test]
     async fn puts_a_key_value_by_eliminating_victims() {
-        let store = Store::new(SystemClock::boxed());
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
+        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 10, stats_counter.clone()));
 
         let key_hashes = vec![10, 14, 116];
@@ -545,8 +467,8 @@ mod sociable_tests {
 
     #[tokio::test]
     async fn deletes_a_key() {
-        let store = Store::new(SystemClock::boxed());
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
+        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
         let command_executor = CommandExecutor::new(
             store.clone(),
