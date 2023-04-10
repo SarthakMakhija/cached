@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crossbeam_utils::CachePadded;
 
-const TOTAL_STATS: usize = 8;
+const TOTAL_STATS: usize = 10;
 
 #[repr(usize)]
 pub(crate) enum StatsType {
@@ -14,6 +14,8 @@ pub(crate) enum StatsType {
     KeysRejected = 5,
     WeightAdded = 6,
     WeightRemoved = 7,
+    AccessAdded = 8,
+    AccessDropped = 9,
 }
 
 #[repr(transparent)]
@@ -41,6 +43,10 @@ impl ConcurrentStatsCounter {
     pub(crate) fn add_weight(&self, delta: u64) { self.add(StatsType::WeightAdded, delta); }
 
     pub(crate) fn remove_weight(&self, delta: u64) { self.add(StatsType::WeightRemoved, delta); }
+
+    pub(crate) fn add_access(&self, delta: u64) { self.add(StatsType::AccessAdded, delta); }
+
+    pub(crate) fn drop_access(&self, delta: u64) { self.add(StatsType::AccessDropped, delta); }
 
     pub(crate) fn hits(&self) -> u64 {
         self.get(StatsType::CacheHits)
@@ -71,6 +77,10 @@ impl ConcurrentStatsCounter {
     }
 
     pub(crate) fn weight_removed(&self) -> u64 { self.get(StatsType::WeightRemoved) }
+
+    pub(crate) fn access_added(&self) -> u64 { self.get(StatsType::AccessAdded) }
+
+    pub(crate) fn access_dropped(&self) -> u64 { self.get(StatsType::AccessDropped) }
 
     pub(crate) fn hit_ratio(&self) -> f64 {
         let hits = self.hits();
@@ -186,5 +196,23 @@ mod tests {
         stats_counter.remove_weight(1);
 
         assert_eq!(2, stats_counter.weight_removed());
+    }
+
+    #[test]
+    fn access_added() {
+        let stats_counter = ConcurrentStatsCounter::new();
+        stats_counter.add_access(1);
+        stats_counter.add_access(1);
+
+        assert_eq!(2, stats_counter.access_added());
+    }
+
+    #[test]
+    fn access_dropped() {
+        let stats_counter = ConcurrentStatsCounter::new();
+        stats_counter.drop_access(1);
+        stats_counter.drop_access(1);
+
+        assert_eq!(2, stats_counter.access_dropped());
     }
 }

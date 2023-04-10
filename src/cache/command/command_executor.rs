@@ -143,12 +143,13 @@ mod tests {
     use crate::cache::command::command_executor::CommandExecutor;
     use crate::cache::key_description::KeyDescription;
     use crate::cache::policy::admission_policy::AdmissionPolicy;
+    use crate::cache::stats::ConcurrentStatsCounter;
     use crate::cache::store::Store;
 
     #[tokio::test]
     async fn puts_a_key_value_and_shutdown() {
         let store = Store::new(SystemClock::boxed());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, Arc::new(ConcurrentStatsCounter::new())));
 
         let command_executor = CommandExecutor::new(
             store.clone(),
@@ -179,7 +180,7 @@ mod tests {
     #[tokio::test]
     async fn puts_a_key_value() {
         let store = Store::new(SystemClock::boxed());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, Arc::new(ConcurrentStatsCounter::new())));
 
         let command_executor = CommandExecutor::new(
             store.clone(),
@@ -200,7 +201,7 @@ mod tests {
     #[tokio::test]
     async fn key_value_gets_rejected_given_its_weight_is_more_than_the_cache_weight() {
         let store = Store::new(SystemClock::boxed());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, Arc::new(ConcurrentStatsCounter::new())));
 
         let command_executor = CommandExecutor::new(
             store.clone(),
@@ -222,7 +223,7 @@ mod tests {
     #[tokio::test]
     async fn puts_a_couple_of_key_values() {
         let store = Store::new(SystemClock::boxed());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, Arc::new(ConcurrentStatsCounter::new())));
 
         let command_executor = CommandExecutor::new(
             store.clone(),
@@ -249,7 +250,7 @@ mod tests {
     #[tokio::test]
     async fn puts_a_key_value_with_ttl() {
         let store = Store::new(SystemClock::boxed());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, Arc::new(ConcurrentStatsCounter::new())));
 
         let command_executor = CommandExecutor::new(
             store.clone(),
@@ -271,7 +272,7 @@ mod tests {
     #[tokio::test]
     async fn deletes_a_key() {
         let store = Store::new(SystemClock::boxed());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, Arc::new(ConcurrentStatsCounter::new())));
         let command_executor = CommandExecutor::new(
             store.clone(),
             admission_policy,
@@ -296,7 +297,7 @@ mod tests {
     #[tokio::test]
     async fn deletion_of_a_non_existing_key_value_gets_rejected() {
         let store: Arc<Store<&str, &str>> = Store::new(SystemClock::boxed());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, Arc::new(ConcurrentStatsCounter::new())));
 
         let command_executor = CommandExecutor::new(
             store.clone(),
@@ -325,12 +326,13 @@ mod sociable_tests {
     use crate::cache::key_description::KeyDescription;
     use crate::cache::policy::admission_policy::AdmissionPolicy;
     use crate::cache::pool::BufferConsumer;
+    use crate::cache::stats::ConcurrentStatsCounter;
     use crate::cache::store::Store;
 
     #[tokio::test]
     async fn puts_a_key_value() {
         let store = Store::new(SystemClock::boxed());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, Arc::new(ConcurrentStatsCounter::new())));
 
         let command_executor = CommandExecutor::new(
             store.clone(),
@@ -354,7 +356,7 @@ mod sociable_tests {
     #[tokio::test]
     async fn puts_a_key_value_by_eliminating_victims() {
         let store = Store::new(SystemClock::boxed());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 10));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new())));
 
         let key_hashes = vec![10, 14, 116];
         admission_policy.accept(key_hashes);
@@ -392,7 +394,7 @@ mod sociable_tests {
     #[tokio::test]
     async fn deletes_a_key() {
         let store = Store::new(SystemClock::boxed());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, Arc::new(ConcurrentStatsCounter::new())));
         let command_executor = CommandExecutor::new(
             store.clone(),
             admission_policy.clone(),
