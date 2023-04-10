@@ -43,7 +43,7 @@ impl<Key, Value> CacheD<Key, Value>
         CacheD {
             config,
             store: store.clone(),
-            command_executor: CommandExecutor::new(store, admission_policy, command_buffer_size),
+            command_executor: CommandExecutor::new(store, admission_policy, stats_counter.clone(), command_buffer_size),
             pool,
             id_generator: IncreasingIdGenerator::new(),
             stats_counter

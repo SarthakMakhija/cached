@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crossbeam_utils::CachePadded;
 
-const TOTAL_STATS: usize = 10;
+const TOTAL_STATS: usize = 9;
 
 #[repr(usize)]
 pub(crate) enum StatsType {
@@ -10,12 +10,11 @@ pub(crate) enum StatsType {
     CacheMisses = 1,
     KeysAdded = 2,
     KeysDeleted = 3,
-    KeysEvicted = 4,
-    KeysRejected = 5,
-    WeightAdded = 6,
-    WeightRemoved = 7,
-    AccessAdded = 8,
-    AccessDropped = 9,
+    KeysRejected = 4,
+    WeightAdded = 5,
+    WeightRemoved = 6,
+    AccessAdded = 7,
+    AccessDropped = 8,
 }
 
 #[repr(transparent)]
@@ -48,6 +47,12 @@ impl ConcurrentStatsCounter {
 
     pub(crate) fn drop_access(&self, delta: u64) { self.add(StatsType::AccessDropped, delta); }
 
+    pub(crate) fn add_key(&self) { self.add(StatsType::KeysAdded, 1); }
+
+    pub(crate) fn reject_key(&self) { self.add(StatsType::KeysRejected, 1); }
+
+    pub(crate) fn delete_key(&self) { self.add(StatsType::KeysDeleted, 1); }
+
     pub(crate) fn hits(&self) -> u64 {
         self.get(StatsType::CacheHits)
     }
@@ -64,13 +69,7 @@ impl ConcurrentStatsCounter {
         self.get(StatsType::KeysDeleted)
     }
 
-    pub(crate) fn keys_evicted(&self) -> u64 {
-        self.get(StatsType::KeysEvicted)
-    }
-
-    pub(crate) fn keys_rejected(&self) -> u64 {
-        self.get(StatsType::KeysRejected)
-    }
+    pub(crate) fn keys_rejected(&self) -> u64 { self.get(StatsType::KeysRejected) }
 
     pub(crate) fn weight_added(&self) -> u64 {
         self.get(StatsType::WeightAdded)
@@ -127,8 +126,8 @@ mod tests {
     #[test]
     fn increase_keys_added() {
         let stats_counter = ConcurrentStatsCounter::new();
-        stats_counter.add(StatsType::KeysAdded, 1);
-        stats_counter.add(StatsType::KeysAdded, 1);
+        stats_counter.add_key();
+        stats_counter.add_key();
 
         assert_eq!(2, stats_counter.keys_added());
     }
@@ -143,19 +142,10 @@ mod tests {
     }
 
     #[test]
-    fn increase_keys_evicted() {
-        let stats_counter = ConcurrentStatsCounter::new();
-        stats_counter.add(StatsType::KeysEvicted, 1);
-        stats_counter.add(StatsType::KeysEvicted, 1);
-
-        assert_eq!(2, stats_counter.keys_evicted());
-    }
-
-    #[test]
     fn increase_keys_rejected() {
         let stats_counter = ConcurrentStatsCounter::new();
-        stats_counter.add(StatsType::KeysRejected, 1);
-        stats_counter.add(StatsType::KeysRejected, 1);
+        stats_counter.reject_key();
+        stats_counter.reject_key();
 
         assert_eq!(2, stats_counter.keys_rejected());
     }
