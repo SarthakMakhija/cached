@@ -34,15 +34,9 @@ impl ConcurrentStatsCounter {
         }
     }
 
-    //TODO: Confirm ordering
-    pub(crate) fn add(&self, stats_type: StatsType, count: u64) {
-        self.entries[stats_type as usize].0.fetch_add(count, Ordering::AcqRel);
-    }
+    pub(crate) fn found_a_hit(&self) { self.add(StatsType::CacheHits, 1); }
 
-    //TODO: Confirm ordering
-    pub(crate) fn get(&self, stats_type: StatsType) -> u64 {
-        self.entries[stats_type as usize].0.load(Ordering::Acquire)
-    }
+    pub(crate) fn found_a_miss(&self) { self.add(StatsType::CacheMisses, 1); }
 
     pub(crate) fn hits(&self) -> u64 {
         self.get(StatsType::CacheHits)
@@ -84,6 +78,16 @@ impl ConcurrentStatsCounter {
         }
         (hits as f64) / (hits + misses) as f64
     }
+
+    //TODO: Confirm ordering
+    fn add(&self, stats_type: StatsType, count: u64) {
+        self.entries[stats_type as usize].0.fetch_add(count, Ordering::AcqRel);
+    }
+
+    //TODO: Confirm ordering
+    fn get(&self, stats_type: StatsType) -> u64 {
+        self.entries[stats_type as usize].0.load(Ordering::Acquire)
+    }
 }
 
 #[cfg(test)]
@@ -93,8 +97,8 @@ mod tests {
     #[test]
     fn increase_cache_hits() {
         let stats_counter = ConcurrentStatsCounter::new();
-        stats_counter.add(StatsType::CacheHits, 1);
-        stats_counter.add(StatsType::CacheHits, 1);
+        stats_counter.found_a_hit();
+        stats_counter.found_a_hit();
 
         assert_eq!(2, stats_counter.hits());
     }
@@ -102,8 +106,8 @@ mod tests {
     #[test]
     fn increase_cache_misses() {
         let stats_counter = ConcurrentStatsCounter::new();
-        stats_counter.add(StatsType::CacheMisses, 1);
-        stats_counter.add(StatsType::CacheMisses, 1);
+        stats_counter.found_a_miss();
+        stats_counter.found_a_miss();
 
         assert_eq!(2, stats_counter.misses());
     }
