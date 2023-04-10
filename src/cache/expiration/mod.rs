@@ -19,7 +19,7 @@ pub(crate) struct TTLTicker {
 
 impl TTLTicker {
     pub(crate) fn new<EvictHook>(shards: usize, tick_duration: Duration, clock: ClockType, evict_hook: EvictHook) -> Arc<TTLTicker>
-        where EvictHook: Fn(&KeyId) -> () + Send + Sync + 'static {
+        where EvictHook: Fn(&KeyId) + Send + Sync + 'static {
         let ticker = Arc::new(
             TTLTicker {
                 shards: (0..shards)
@@ -67,7 +67,7 @@ impl TTLTicker {
     }
 
     fn spin<EvictHook>(self: Arc<TTLTicker>, tick_duration: Duration, clock: ClockType, evict_hook: EvictHook)
-        where EvictHook: Fn(&KeyId) -> () + Send + Sync + 'static {
+        where EvictHook: Fn(&KeyId) + Send + Sync + 'static {
         let keep_running = self.keep_running.clone();
         let receiver = tick(tick_duration);
 
