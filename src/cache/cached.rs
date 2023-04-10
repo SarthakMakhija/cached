@@ -25,7 +25,6 @@ pub struct CacheD<Key, Value>
     command_executor: CommandExecutor<Key, Value>,
     pool: Pool<AdmissionPolicy<Key>>,
     id_generator: IncreasingIdGenerator,
-    stats_counter: Arc<ConcurrentStatsCounter>,
 }
 
 impl<Key, Value> CacheD<Key, Value>
@@ -43,10 +42,9 @@ impl<Key, Value> CacheD<Key, Value>
         CacheD {
             config,
             store: store.clone(),
-            command_executor: CommandExecutor::new(store, admission_policy, stats_counter.clone(), command_buffer_size),
+            command_executor: CommandExecutor::new(store, admission_policy, stats_counter, command_buffer_size),
             pool,
             id_generator: IncreasingIdGenerator::new(),
-            stats_counter
         }
     }
 
@@ -91,13 +89,11 @@ impl<Key, Value> CacheD<Key, Value>
             self.mark_key_accessed(key);
             return Some(value_ref);
         }
-        self.stats_counter.found_a_miss();
         None
     }
 
     fn mark_key_accessed(&self, key: &Key) {
         self.pool.add((self.config.key_hash_fn)(key));
-        self.stats_counter.found_a_hit();
     }
 
     fn key_description(&self, key: Key, weight: Weight) -> KeyDescription<Key> {
@@ -114,7 +110,6 @@ impl<Key, Value> CacheD<Key, Value>
             self.mark_key_accessed(key);
             return Some(value);
         }
-        self.stats_counter.found_a_miss();
         None
     }
 
@@ -218,14 +213,6 @@ mod tests {
         assert!(value.is_none());
     }
 
-    #[test]
-    fn get_value_ref_for_a_non_existing_key_and_increase_stats() {
-        let cached: CacheD<&str, &str> = CacheD::new(ConfigBuilder::new().counters(10).build());
-
-        let _ = cached.get_ref(&"non-existing");
-        assert_eq!(1, cached.stats_counter.misses());
-    }
-
     #[tokio::test]
     async fn get_value_ref_for_an_existing_key() {
         let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
@@ -236,18 +223,6 @@ mod tests {
 
         let value = cached.get_ref(&"topic");
         assert_eq!(&"microservices", value.unwrap().value().value_ref());
-    }
-
-    #[tokio::test]
-    async fn get_value_ref_for_an_existing_key_and_increase_stats() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
-
-        let acknowledgement =
-            cached.put("topic", "microservices").unwrap();
-        acknowledgement.handle().await;
-
-        let _ = cached.get_ref(&"topic");
-        assert_eq!(1, cached.stats_counter.hits());
     }
 
     #[tokio::test]
@@ -262,33 +237,12 @@ mod tests {
         assert_eq!(Some("microservices"), value);
     }
 
-    #[tokio::test]
-    async fn get_value_for_an_existing_key_and_increase_stats() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
-
-        let acknowledgement =
-            cached.put("topic", "microservices").unwrap();
-        acknowledgement.handle().await;
-
-        let _ = cached.get(&"topic");
-        assert_eq!(1, cached.stats_counter.hits());
-    }
-
     #[test]
     fn get_value_for_a_non_existing_key() {
         let cached: CacheD<&str, &str> = CacheD::new(ConfigBuilder::new().counters(10).build());
 
         let value = cached.get(&"non-existing");
         assert_eq!(None, value);
-    }
-
-    #[test]
-    fn get_value_for_a_non_existing_key_and_increase_stats() {
-        let cached: CacheD<&str, &str> = CacheD::new(ConfigBuilder::new().counters(10).build());
-
-        let value = cached.get(&"non-existing");
-        assert_eq!(None, value);
-        assert_eq!(1, cached.stats_counter.misses());
     }
 
     #[tokio::test]

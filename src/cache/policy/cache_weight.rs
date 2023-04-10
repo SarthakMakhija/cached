@@ -191,13 +191,7 @@ impl<Key> CacheWeight<Key>
                 let mut guard = self.weight_used.write();
                 *guard += weight - existing.weight;
             }
-            if weight > existing.weight {
-                let difference = weight - existing.weight;
-                self.stats_counter.add_weight(difference as u64);
-            } else {
-                let difference = existing.weight - weight;
-                self.stats_counter.add_weight(!(difference - 1) as u64);
-            }
+            self.update_stats(weight, existing.weight);
 
             let weighted_key = existing.value_mut();
             weighted_key.weight = weight;
@@ -230,6 +224,16 @@ impl<Key> CacheWeight<Key>
                                -> FrequencyCounterBasedMinHeapSamples<'_, Key, Freq>
         where Freq: Fn(KeyHash) -> FrequencyEstimate {
         FrequencyCounterBasedMinHeapSamples::new(&self.key_weights, size, frequency_counter)
+    }
+
+    fn update_stats(&self, new_weight: Weight, existing_weight: Weight) {
+        if new_weight > existing_weight {
+            let difference = new_weight - existing_weight;
+            self.stats_counter.add_weight(difference as u64);
+        } else {
+            let difference = existing_weight - new_weight;
+            self.stats_counter.add_weight(!(difference - 1) as u64);
+        }
     }
 }
 

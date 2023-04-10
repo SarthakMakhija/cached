@@ -26,7 +26,7 @@ impl<Key, Value> Store<Key, Value>
         Arc::new(Store {
             store: DashMap::new(), //TODO: define capacity
             clock,
-            stats_counter
+            stats_counter,
         })
     }
 
@@ -43,7 +43,7 @@ impl<Key, Value> Store<Key, Value>
     pub(crate) fn delete(&self, key: &Key) -> Option<KeyId> {
         if let Some(pair) = self.store.remove(key) {
             self.stats_counter.delete_key();
-            return Some(pair.1.key_id())
+            return Some(pair.1.key_id());
         }
         None
     }
@@ -57,9 +57,12 @@ impl<Key, Value> Store<Key, Value>
 
     pub(crate) fn get_ref(&self, key: &Key) -> Option<KeyValueRef<'_, Key, StoredValue<Value>>> {
         let maybe_value = self.store.get(key);
-        maybe_value
+        let mapped_value = maybe_value
             .filter(|stored_value| stored_value.is_alive(&self.clock))
-            .map(|key_value_ref| KeyValueRef::new(key_value_ref))
+            .map(|key_value_ref| KeyValueRef::new(key_value_ref));
+
+        if mapped_value.is_some() { self.stats_counter.found_a_hit(); } else { self.stats_counter.found_a_miss(); }
+        mapped_value
     }
 }
 
@@ -68,9 +71,12 @@ impl<Key, Value> Store<Key, Value>
           Value: Clone, {
     pub(crate) fn get(&self, key: &Key) -> Option<Value> {
         let maybe_value = self.store.get(key);
-        maybe_value
+        let mapped_value = maybe_value
             .filter(|stored_value| stored_value.is_alive(&self.clock))
-            .map(|key_value_ref| { key_value_ref.value().value() })
+            .map(|key_value_ref| { key_value_ref.value().value() });
+
+        if mapped_value.is_some() { self.stats_counter.found_a_hit(); } else { self.stats_counter.found_a_miss(); }
+        mapped_value
     }
 }
 
@@ -118,6 +124,17 @@ mod tests {
 
         let value = store.get(&"topic");
         assert_eq!(Some("microservices"), value);
+    }
+
+    #[test]
+    fn get_value_for_an_existing_key_and_increase_stats() {
+        let clock = SystemClock::boxed();
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+
+        store.put("topic", "microservices", 1);
+
+        let _ = store.get(&"topic");
+        assert_eq!(1, store.stats_counter.hits());
     }
 
     #[test]
@@ -172,12 +189,32 @@ mod tests {
     }
 
     #[test]
+    fn get_value_ref_for_an_existing_key_and_increase_stats() {
+        let clock = SystemClock::boxed();
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+
+        store.put("name", Name { first: "John".to_string(), last: "Mcnamara".to_string() }, 1);
+
+        let _ = store.get_ref(&"name");
+        assert_eq!(1, store.stats_counter.hits());
+    }
+
+    #[test]
     fn get_value_for_a_non_existing_key() {
         let clock = SystemClock::boxed();
         let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
 
         let value: Option<&str> = store.get(&"non-existing");
         assert_eq!(None, value);
+    }
+
+    #[test]
+    fn get_value_for_a_non_existing_key_and_increase_stats() {
+        let clock = SystemClock::boxed();
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+
+        let _value: Option<&str> = store.get(&"non-existing");
+        assert_eq!(1, store.stats_counter.misses());
     }
 
     #[test]
@@ -193,6 +230,18 @@ mod tests {
     }
 
     #[test]
+    fn get_value_for_an_expired_key_and_increase_stats() {
+        let store = Store::new(Box::new(FutureClock {}), Arc::new(ConcurrentStatsCounter::new()));
+        {
+            let clock = SystemClock::boxed();
+            store.store.insert("topic", StoredValue::expiring("microservices", 1, Duration::from_secs(5), &clock));
+        }
+
+        let _ = store.get(&"topic");
+        assert_eq!(1, store.stats_counter.misses());
+    }
+
+    #[test]
     fn get_value_for_an_unexpired_key() {
         let store = Store::new(Box::new(FutureClock {}), Arc::new(ConcurrentStatsCounter::new()));
         {
@@ -202,6 +251,18 @@ mod tests {
 
         let value = store.get(&"topic");
         assert_eq!(Some("microservices"), value);
+    }
+
+    #[test]
+    fn get_value_for_an_unexpired_key_and_increase_stats() {
+        let store = Store::new(Box::new(FutureClock {}), Arc::new(ConcurrentStatsCounter::new()));
+        {
+            let clock = SystemClock::boxed();
+            store.store.insert("topic", StoredValue::expiring("microservices", 1, Duration::from_secs(15), &clock));
+        }
+
+        let _ = store.get(&"topic");
+        assert_eq!(1, store.stats_counter.hits());
     }
 
     #[test]
