@@ -13,7 +13,7 @@ pub(crate) enum StatsType {
     KeysEvicted = 4,
     KeysRejected = 5,
     WeightAdded = 6,
-    WeightEvicted = 7,
+    WeightRemoved = 7,
 }
 
 #[repr(transparent)]
@@ -37,6 +37,10 @@ impl ConcurrentStatsCounter {
     pub(crate) fn found_a_hit(&self) { self.add(StatsType::CacheHits, 1); }
 
     pub(crate) fn found_a_miss(&self) { self.add(StatsType::CacheMisses, 1); }
+
+    pub(crate) fn add_weight(&self, delta: u64) { self.add(StatsType::WeightAdded, delta); }
+
+    pub(crate) fn remove_weight(&self, delta: u64) { self.add(StatsType::WeightRemoved, delta); }
 
     pub(crate) fn hits(&self) -> u64 {
         self.get(StatsType::CacheHits)
@@ -66,9 +70,7 @@ impl ConcurrentStatsCounter {
         self.get(StatsType::WeightAdded)
     }
 
-    pub(crate) fn weight_evicted(&self) -> u64 {
-        self.get(StatsType::WeightEvicted)
-    }
+    pub(crate) fn weight_removed(&self) -> u64 { self.get(StatsType::WeightRemoved) }
 
     pub(crate) fn hit_ratio(&self) -> f64 {
         let hits = self.hits();
@@ -168,18 +170,21 @@ mod tests {
     #[test]
     fn weight_added() {
         let stats_counter = ConcurrentStatsCounter::new();
-        stats_counter.add(StatsType::WeightAdded, 1);
-        stats_counter.add(StatsType::WeightAdded, 1);
+        stats_counter.add_weight(1);
+        stats_counter.add_weight(1);
 
         assert_eq!(2, stats_counter.weight_added());
     }
 
     #[test]
-    fn weight_evicted() {
+    fn weight_removed() {
         let stats_counter = ConcurrentStatsCounter::new();
-        stats_counter.add(StatsType::WeightEvicted, 1);
-        stats_counter.add(StatsType::WeightEvicted, 1);
+        stats_counter.add_weight(1);
+        stats_counter.add_weight(1);
 
-        assert_eq!(2, stats_counter.weight_evicted());
+        stats_counter.remove_weight(1);
+        stats_counter.remove_weight(1);
+
+        assert_eq!(2, stats_counter.weight_removed());
     }
 }
