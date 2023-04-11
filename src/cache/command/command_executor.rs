@@ -32,6 +32,7 @@ struct CommandAcknowledgementPair<Key, Value>
 impl<Key, Value> CommandExecutor<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + 'static {
+
     pub(crate) fn new(
         store: Arc<Store<Key, Value>>,
         admission_policy: Arc<AdmissionPolicy<Key>>,

@@ -1,5 +1,3 @@
-pub(crate) mod config;
-
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
@@ -13,13 +11,15 @@ use crate::cache::clock::ClockType;
 use crate::cache::expiration::config::TTLConfig;
 use crate::cache::types::{ExpireAfter, KeyId};
 
+pub(crate) mod config;
+
 pub(crate) struct TTLTicker {
     shards: Arc<[RwLock<HashMap<KeyId, ExpireAfter>>]>,
     keep_running: Arc<AtomicBool>,
 }
 
 impl TTLTicker {
-    pub(crate) fn new<EvictHook>(config: TTLConfig, clock: ClockType, evict_hook: EvictHook) -> Arc<TTLTicker>
+    pub(crate) fn new<EvictHook>(config: TTLConfig, evict_hook: EvictHook) -> Arc<TTLTicker>
         where EvictHook: Fn(&KeyId) + Send + Sync + 'static {
         let ticker = Arc::new(
             TTLTicker {
@@ -28,7 +28,7 @@ impl TTLTicker {
                 keep_running: Arc::new(AtomicBool::new(true)),
             }
         );
-        ticker.clone().spin(config.tick_duration(), clock, evict_hook);
+        ticker.clone().spin(config.tick_duration(), config.clock(), evict_hook);
         ticker
     }
 
@@ -137,7 +137,7 @@ mod tests {
     fn shard_index_0() {
         let clock = Box::new(UnixEpochClock {});
         let no_operation_evict_hook = |_key: &KeyId| {};
-        let ticker = TTLTicker::new(TTLConfig::new(4, Duration::from_secs(300)), clock.clone(), no_operation_evict_hook);
+        let ticker = TTLTicker::new(TTLConfig::new(4, Duration::from_secs(300), clock.clone()), no_operation_evict_hook);
 
         let shard_index = ticker.shard_index(&clock.now());
         assert_eq!(0, shard_index);
@@ -147,7 +147,7 @@ mod tests {
     fn shard_index_1() {
         let clock = Box::new(UnixEpochClock {});
         let no_operation_evict_hook = |_key: &KeyId| {};
-        let ticker = TTLTicker::new(TTLConfig::new(4, Duration::from_secs(300)), clock.clone(), no_operation_evict_hook);
+        let ticker = TTLTicker::new(TTLConfig::new(4, Duration::from_secs(300), clock.clone()), no_operation_evict_hook);
 
         let later_time = clock.now().add(Duration::from_secs(5));
         let shard_index = ticker.shard_index(&later_time);
@@ -158,7 +158,7 @@ mod tests {
     fn add() {
         let clock = Box::new(UnixEpochClock {});
         let no_operation_evict_hook = |_key: &KeyId| {};
-        let ticker = TTLTicker::new(TTLConfig::new(4, Duration::from_secs(300)), clock.clone(), no_operation_evict_hook);
+        let ticker = TTLTicker::new(TTLConfig::new(4, Duration::from_secs(300), clock.clone()), no_operation_evict_hook);
 
         let key_id = 10;
         let expire_after = clock.now().add(Duration::from_secs(5));
@@ -172,7 +172,7 @@ mod tests {
     fn update() {
         let clock = Box::new(UnixEpochClock {});
         let no_operation_evict_hook = |_key: &KeyId| {};
-        let ticker = TTLTicker::new(TTLConfig::new(4, Duration::from_secs(300)), clock.clone(), no_operation_evict_hook);
+        let ticker = TTLTicker::new(TTLConfig::new(4, Duration::from_secs(300), clock.clone()), no_operation_evict_hook);
 
         let key_id = 10;
         let expire_after = clock.now().add(Duration::from_secs(5));
@@ -189,7 +189,7 @@ mod tests {
     fn delete() {
         let clock = Box::new(UnixEpochClock {});
         let no_operation_evict_hook = |_key: &KeyId| {};
-        let ticker = TTLTicker::new(TTLConfig::new(4, Duration::from_secs(300)), clock.clone(), no_operation_evict_hook);
+        let ticker = TTLTicker::new(TTLConfig::new(4, Duration::from_secs(300), clock.clone()), no_operation_evict_hook);
 
         let key_id = 10;
         let expire_after = clock.now().add(Duration::from_secs(5));
@@ -207,7 +207,7 @@ mod tests {
 
         let clock = SystemClock::boxed();
         let evict_hook = move |key_id: &KeyId| { evicted_keys.clone().keys.lock().push(*key_id) };
-        let ticker = TTLTicker::new(TTLConfig::new(1, Duration::from_millis(5)), clock.clone_box(), evict_hook);
+        let ticker = TTLTicker::new(TTLConfig::new(1, Duration::from_millis(5), clock.clone_box()), evict_hook);
 
         let key_id = 10;
         let expire_after = clock.now();
@@ -227,7 +227,7 @@ mod tests {
 
         let clock = SystemClock::boxed();
         let evict_hook = move |key_id: &KeyId| { evicted_keys.keys.lock().push(*key_id) };
-        let ticker = TTLTicker::new(TTLConfig::new(1, Duration::from_millis(5)), clock.clone_box(), evict_hook);
+        let ticker = TTLTicker::new(TTLConfig::new(1, Duration::from_millis(5), clock.clone_box()), evict_hook);
 
         let expire_after = clock.now();
         ticker.add(40, expire_after);
@@ -248,7 +248,7 @@ mod tests {
     fn shutdown() {
         let clock = SystemClock::boxed();
         let no_operation_evict_hook = |_key: &KeyId| {};
-        let ticker = TTLTicker::new(TTLConfig::new(1, Duration::from_millis(5)), clock.clone_box(), no_operation_evict_hook);
+        let ticker = TTLTicker::new(TTLConfig::new(1, Duration::from_millis(5), clock.clone_box()), no_operation_evict_hook);
 
         let expire_after = clock.now();
         ticker.add(10, expire_after);
