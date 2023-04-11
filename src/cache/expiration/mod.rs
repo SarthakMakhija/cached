@@ -32,7 +32,7 @@ impl TTLTicker {
         ticker
     }
 
-    pub(crate) fn add(self: &Arc<TTLTicker>, key_id: KeyId, expire_after: ExpireAfter) {
+    pub(crate) fn put(self: &Arc<TTLTicker>, key_id: KeyId, expire_after: ExpireAfter) {
         let shard_index = self.shard_index(&expire_after);
         self.shards[shard_index].write().insert(key_id, expire_after);
     }
@@ -155,14 +155,14 @@ mod tests {
     }
 
     #[test]
-    fn add() {
+    fn put() {
         let clock = Box::new(UnixEpochClock {});
         let no_operation_evict_hook = |_key: &KeyId| {};
         let ticker = TTLTicker::new(TTLConfig::new(4, Duration::from_secs(300), clock.clone()), no_operation_evict_hook);
 
         let key_id = 10;
         let expire_after = clock.now().add(Duration::from_secs(5));
-        ticker.add(key_id, expire_after);
+        ticker.put(key_id, expire_after);
 
         let stored_value = ticker.get(&key_id, &expire_after).unwrap();
         assert_eq!(expire_after, stored_value);
@@ -176,7 +176,7 @@ mod tests {
 
         let key_id = 10;
         let expire_after = clock.now().add(Duration::from_secs(5));
-        ticker.add(key_id, expire_after);
+        ticker.put(key_id, expire_after);
 
         let updated_expiry = clock.now().add(Duration::from_secs(30));
         ticker.update(key_id, &expire_after, updated_expiry);
@@ -193,7 +193,7 @@ mod tests {
 
         let key_id = 10;
         let expire_after = clock.now().add(Duration::from_secs(5));
-        ticker.add(key_id, expire_after);
+        ticker.put(key_id, expire_after);
 
         ticker.delete(&key_id, &expire_after);
         let stored_value = ticker.get(&key_id, &expire_after);
@@ -211,7 +211,7 @@ mod tests {
 
         let key_id = 10;
         let expire_after = clock.now();
-        ticker.add(key_id, expire_after);
+        ticker.put(key_id, expire_after);
 
         thread::sleep(Duration::from_secs(1));
 
@@ -230,8 +230,8 @@ mod tests {
         let ticker = TTLTicker::new(TTLConfig::new(1, Duration::from_millis(5), clock.clone_box()), evict_hook);
 
         let expire_after = clock.now();
-        ticker.add(40, expire_after);
-        ticker.add(50, expire_after.add(Duration::from_secs(300)));
+        ticker.put(40, expire_after);
+        ticker.put(50, expire_after.add(Duration::from_secs(300)));
 
         thread::sleep(Duration::from_secs(1));
 
@@ -251,7 +251,7 @@ mod tests {
         let ticker = TTLTicker::new(TTLConfig::new(1, Duration::from_millis(5), clock.clone_box()), no_operation_evict_hook);
 
         let expire_after = clock.now();
-        ticker.add(10, expire_after);
+        ticker.put(10, expire_after);
         ticker.shutdown();
 
         thread::sleep(Duration::from_secs(1));
@@ -260,7 +260,7 @@ mod tests {
         assert!(stored_value.is_none());
 
         //add after shutdown
-        ticker.add(20, clock.now());
+        ticker.put(20, clock.now());
         thread::sleep(Duration::from_secs(1));
 
         let stored_value = ticker.get(&20, &expire_after);
