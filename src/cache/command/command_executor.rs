@@ -112,9 +112,9 @@ impl<Key, Value> CommandExecutor<Key, Value>
         store: &Arc<Store<Key, Value>>,
         key: &Key,
         admission_policy: &Arc<AdmissionPolicy<Key>>) -> CommandStatus {
-        let key_id = store.delete(key);
-        if let Some(key_id) = key_id {
-            admission_policy.delete(&key_id);
+        let may_be_key_id_expiry = store.delete(key);
+        if let Some(key_id_expiry) = may_be_key_id_expiry {
+            admission_policy.delete(&key_id_expiry.0);
             return CommandStatus::Accepted;
         }
         CommandStatus::Rejected

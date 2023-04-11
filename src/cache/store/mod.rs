@@ -13,6 +13,9 @@ use crate::cache::types::{ExpireAfter, KeyId};
 pub mod stored_value;
 pub mod key_value_ref;
 
+#[derive(Eq, PartialEq, Debug)]
+pub(crate) struct KeyIdExpiry(pub(crate) KeyId, pub(crate) Option<ExpireAfter>);
+
 pub(crate) struct Store<Key, Value>
     where Key: Hash + Eq, {
     store: DashMap<Key, StoredValue<Value>>,
@@ -45,10 +48,10 @@ impl<Key, Value> Store<Key, Value>
         expire_after.unwrap()
     }
 
-    pub(crate) fn delete(&self, key: &Key) -> Option<KeyId> {
+    pub(crate) fn delete(&self, key: &Key) -> Option<KeyIdExpiry> {
         if let Some(pair) = self.store.remove(key) {
             self.stats_counter.delete_key();
-            return Some(pair.1.key_id());
+            return Some(KeyIdExpiry(pair.1.key_id(), pair.1.expire_after()));
         }
         None
     }
@@ -295,11 +298,11 @@ mod tests {
         let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
 
         store.put("topic", "microservices", 10);
-        let key_id = store.delete(&"topic");
+        let key_id_expiry = store.delete(&"topic");
 
         let value = store.get(&"topic");
         assert_eq!(None, value);
-        assert_eq!(Some(10), key_id);
+        assert_eq!(10, key_id_expiry.unwrap().0);
     }
 
     #[test]
@@ -318,11 +321,11 @@ mod tests {
         let clock = SystemClock::boxed();
         let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
 
-        let key_id = store.delete(&"non-existing");
+        let key_id_expiry = store.delete(&"non-existing");
 
         let value: Option<&str> = store.get(&"non-existing");
         assert_eq!(None, value);
-        assert_eq!(None, key_id);
+        assert_eq!(None, key_id_expiry);
     }
 
     #[test]
