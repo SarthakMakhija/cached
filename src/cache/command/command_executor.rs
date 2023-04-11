@@ -29,10 +29,36 @@ struct CommandAcknowledgementPair<Key, Value>
     acknowledgement: Arc<CommandAcknowledgement>,
 }
 
+struct PutParameter<'a, Key, Value, DeleteHook>
+    where Key: Hash + Eq + Send + Sync + Clone + 'static,
+          Value: Send + Sync + 'static,
+          DeleteHook: Fn(Key) {
+    store: &'a Arc<Store<Key, Value>>,
+    key_description: &'a KeyDescription<Key>,
+    delete_hook: &'a DeleteHook,
+    value: Value,
+    admission_policy: &'a Arc<AdmissionPolicy<Key>>,
+    stats_counter: &'a Arc<ConcurrentStatsCounter>,
+}
+
+struct PutWithTTLParameter<'a, Key, Value, DeleteHook>
+    where Key: Hash + Eq + Send + Sync + Clone + 'static,
+          Value: Send + Sync + 'static,
+          DeleteHook: Fn(Key) {
+    put_parameter: PutParameter<'a, Key, Value, DeleteHook>,
+    ttl: Duration,
+}
+
+struct DeleteParameter<'a, Key, Value>
+    where Key: Hash + Eq + Send + Sync + Clone + 'static {
+    store: &'a Arc<Store<Key, Value>>,
+    key: &'a Key,
+    admission_policy: &'a Arc<AdmissionPolicy<Key>>,
+}
+
 impl<Key, Value> CommandExecutor<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + 'static {
-
     pub(crate) fn new(
         store: Arc<Store<Key, Value>>,
         admission_policy: Arc<AdmissionPolicy<Key>>,
@@ -50,7 +76,6 @@ impl<Key, Value> CommandExecutor<Key, Value>
             store: Arc<Store<Key, Value>>,
             admission_policy: Arc<AdmissionPolicy<Key>>,
             stats_counter: Arc<ConcurrentStatsCounter>) {
-
         let keep_running = self.keep_running.clone();
         let clone = store.clone();
         let delete_hook = move |key| { clone.delete(&key); };
@@ -60,11 +85,32 @@ impl<Key, Value> CommandExecutor<Key, Value>
                 let command = pair.command;
                 let status = match command {
                     CommandType::Put(key_description, value) =>
-                        Self::put(&store, &key_description, &delete_hook, value, &admission_policy, &stats_counter),
+                        Self::put(PutParameter {
+                            store: &store,
+                            key_description: &key_description,
+                            delete_hook: &delete_hook,
+                            value,
+                            admission_policy: &admission_policy,
+                            stats_counter: &stats_counter,
+                        }),
                     CommandType::PutWithTTL(key_description, value, ttl) =>
-                        Self::put_with_ttl(&store, &key_description, &delete_hook, value, ttl, &admission_policy, &stats_counter),
+                        Self::put_with_ttl(PutWithTTLParameter {
+                            put_parameter: PutParameter {
+                                store: &store,
+                                key_description: &key_description,
+                                delete_hook: &delete_hook,
+                                value,
+                                admission_policy: &admission_policy,
+                                stats_counter: &stats_counter,
+                            },
+                            ttl,
+                        }),
                     CommandType::Delete(key) =>
-                        Self::delete(&store, &key, &admission_policy),
+                        Self::delete(DeleteParameter {
+                            store: &store,
+                            key: &key,
+                            admission_policy: &admission_policy,
+                        }),
                 };
                 pair.acknowledgement.done(status);
                 if !keep_running.load(Ordering::Acquire) {
@@ -75,46 +121,45 @@ impl<Key, Value> CommandExecutor<Key, Value>
         });
     }
 
-    fn put<DeleteHook>(
-        store: &Arc<Store<Key, Value>>,
-        key_description: &KeyDescription<Key>,
-        delete_hook: &DeleteHook,
-        value: Value,
-        admission_policy: &Arc<AdmissionPolicy<Key>>,
-        stats_counter: &Arc<ConcurrentStatsCounter>) -> CommandStatus where DeleteHook: Fn(Key) {
-        let status = admission_policy.maybe_add(key_description, delete_hook);
+    fn put<DeleteHook>(put_parameters: PutParameter<Key, Value, DeleteHook>) -> CommandStatus where DeleteHook: Fn(Key) {
+        let status = put_parameters.admission_policy.maybe_add(
+            put_parameters.key_description,
+            put_parameters.delete_hook,
+        );
         if let CommandStatus::Accepted = status {
-            store.put(key_description.clone_key(), value, key_description.id);
+            put_parameters.store.put(
+                put_parameters.key_description.clone_key(),
+                put_parameters.value,
+                put_parameters.key_description.id,
+            );
         } else {
-            stats_counter.reject_key();
+            put_parameters.stats_counter.reject_key();
         }
         status
     }
 
-    fn put_with_ttl<DeleteHook>(
-        store: &Arc<Store<Key, Value>>,
-        key_description: &KeyDescription<Key>,
-        delete_hook: &DeleteHook,
-        value: Value,
-        ttl: Duration,
-        admission_policy: &Arc<AdmissionPolicy<Key>>,
-        stats_counter: &Arc<ConcurrentStatsCounter>) -> CommandStatus where DeleteHook: Fn(Key) {
-        let status = admission_policy.maybe_add(key_description, delete_hook);
+    fn put_with_ttl<DeleteHook>(put_with_ttl_parameter: PutWithTTLParameter<Key, Value, DeleteHook>) -> CommandStatus where DeleteHook: Fn(Key) {
+        let status = put_with_ttl_parameter.put_parameter.admission_policy.maybe_add(
+            put_with_ttl_parameter.put_parameter.key_description,
+            put_with_ttl_parameter.put_parameter.delete_hook
+        );
         if let CommandStatus::Accepted = status {
-            store.put_with_ttl(key_description.clone_key(), value, key_description.id, ttl);
+            put_with_ttl_parameter.put_parameter.store.put_with_ttl(
+                put_with_ttl_parameter.put_parameter.key_description.clone_key(),
+                put_with_ttl_parameter.put_parameter.value,
+                put_with_ttl_parameter.put_parameter.key_description.id,
+                put_with_ttl_parameter.ttl,
+            );
         } else {
-            stats_counter.reject_key();
+            put_with_ttl_parameter.put_parameter.stats_counter.reject_key();
         }
         status
     }
 
-    fn delete(
-        store: &Arc<Store<Key, Value>>,
-        key: &Key,
-        admission_policy: &Arc<AdmissionPolicy<Key>>) -> CommandStatus {
-        let may_be_key_id_expiry = store.delete(key);
+    fn delete(delete_parameter: DeleteParameter<Key, Value>) -> CommandStatus {
+        let may_be_key_id_expiry = delete_parameter.store.delete(delete_parameter.key);
         if let Some(key_id_expiry) = may_be_key_id_expiry {
-            admission_policy.delete(&key_id_expiry.0);
+            delete_parameter.admission_policy.delete(&key_id_expiry.0);
             return CommandStatus::Accepted;
         }
         CommandStatus::Rejected
