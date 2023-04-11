@@ -8,9 +8,7 @@ use hashbrown::HashMap;
 use parking_lot::RwLock;
 
 use crate::cache::clock::ClockType;
-use crate::cache::types::KeyId;
-
-pub(crate) type ExpireAfter = SystemTime;
+use crate::cache::types::{ExpireAfter, KeyId};
 
 pub(crate) struct TTLTicker {
     shards: Arc<[RwLock<HashMap<KeyId, ExpireAfter>>]>,

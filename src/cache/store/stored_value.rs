@@ -1,13 +1,13 @@
 use std::ops::Add;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use crate::cache::clock::ClockType;
-use crate::cache::types::KeyId;
+use crate::cache::types::{ExpireAfter, KeyId};
 
 pub struct StoredValue<Value> {
     value: Value,
     key_id: KeyId,
-    expire_after: Option<SystemTime>,
+    expire_after: Option<ExpireAfter>,
     pub(crate) is_soft_deleted: bool,
 }
 
