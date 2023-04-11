@@ -93,7 +93,12 @@ impl<Key> AdmissionPolicy<Key>
 
     pub(crate) fn delete(&self, key_id: &KeyId) {
         let no_operation_delete_hook = |_key| {};
-        self.cache_weight.delete(key_id, &no_operation_delete_hook);
+        self.delete_with_hook(key_id, &no_operation_delete_hook);
+    }
+
+    pub(crate) fn delete_with_hook<DeleteHook>(&self, key_id: &KeyId, delete_hook: &DeleteHook)
+        where DeleteHook: Fn(Key) {
+        self.cache_weight.delete(key_id, delete_hook);
     }
 
     pub(crate) fn contains(&self, key_id: &KeyId) -> bool {
@@ -336,6 +341,20 @@ mod tests {
 
         policy.delete(&1);
         assert!(!policy.contains(&1));
+    }
+
+    #[test]
+    fn deletes_a_key_with_hook() {
+        let policy = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let deleted_keys = DeletedKeys { keys: RwLock::new(Vec::new()) };
+        let delete_hook = |key| { deleted_keys.keys.write().push(key) };
+
+        let addition_status = policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 5), &delete_hook);
+        assert_eq!(CommandStatus::Accepted, addition_status);
+
+        policy.delete_with_hook(&1, &delete_hook);
+        assert!(!policy.contains(&1));
+        assert_eq!("topic", deleted_keys.keys.read()[0]);
     }
 
     #[test]

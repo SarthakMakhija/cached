@@ -86,30 +86,22 @@ impl<Key, Value> CommandExecutor<Key, Value>
                 let status = match command {
                     CommandType::Put(key_description, value) =>
                         Self::put(PutParameter {
-                            store: &store,
-                            key_description: &key_description,
-                            delete_hook: &delete_hook,
-                            value,
-                            admission_policy: &admission_policy,
-                            stats_counter: &stats_counter,
+                            store: &store, key_description: &key_description,
+                            delete_hook: &delete_hook, value,
+                            admission_policy: &admission_policy, stats_counter: &stats_counter,
                         }),
                     CommandType::PutWithTTL(key_description, value, ttl) =>
                         Self::put_with_ttl(PutWithTTLParameter {
                             put_parameter: PutParameter {
-                                store: &store,
-                                key_description: &key_description,
-                                delete_hook: &delete_hook,
-                                value,
-                                admission_policy: &admission_policy,
-                                stats_counter: &stats_counter,
+                                store: &store, key_description: &key_description,
+                                delete_hook: &delete_hook, value,
+                                admission_policy: &admission_policy, stats_counter: &stats_counter,
                             },
                             ttl,
                         }),
                     CommandType::Delete(key) =>
                         Self::delete(DeleteParameter {
-                            store: &store,
-                            key: &key,
-                            admission_policy: &admission_policy,
+                            store: &store, key: &key, admission_policy: &admission_policy,
                         }),
                 };
                 pair.acknowledgement.done(status);
