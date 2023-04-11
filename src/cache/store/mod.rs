@@ -8,7 +8,7 @@ use crate::cache::clock::ClockType;
 use crate::cache::stats::ConcurrentStatsCounter;
 use crate::cache::store::key_value_ref::KeyValueRef;
 use crate::cache::store::stored_value::StoredValue;
-use crate::cache::types::KeyId;
+use crate::cache::types::{ExpireAfter, KeyId};
 
 pub mod stored_value;
 pub mod key_value_ref;
@@ -35,9 +35,14 @@ impl<Key, Value> Store<Key, Value>
         self.stats_counter.add_key();
     }
 
-    pub(crate) fn put_with_ttl(&self, key: Key, value: Value, key_id: KeyId, time_to_live: Duration) {
-        self.store.insert(key, StoredValue::expiring(value, key_id, time_to_live, &self.clock));
+    pub(crate) fn put_with_ttl(&self, key: Key, value: Value, key_id: KeyId, time_to_live: Duration) -> ExpireAfter {
+        let stored_value = StoredValue::expiring(value, key_id, time_to_live, &self.clock);
+        let expire_after = stored_value.expire_after();
+
+        self.store.insert(key, stored_value);
         self.stats_counter.add_key();
+
+        expire_after.unwrap()
     }
 
     pub(crate) fn delete(&self, key: &Key) -> Option<KeyId> {
@@ -82,16 +87,17 @@ impl<Key, Value> Store<Key, Value>
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Add;
     use std::sync::Arc;
     use std::time::Duration;
 
     use setup::FutureClock;
 
-    use crate::cache::clock::SystemClock;
+    use crate::cache::clock::{Clock, SystemClock};
     use crate::cache::stats::ConcurrentStatsCounter;
     use crate::cache::store::Store;
     use crate::cache::store::stored_value::StoredValue;
-    use crate::cache::store::tests::setup::Name;
+    use crate::cache::store::tests::setup::{Name, UnixEpochClock};
 
     mod setup {
         use std::ops::Add;
@@ -111,6 +117,15 @@ mod tests {
         impl Clock for FutureClock {
             fn now(&self) -> SystemTime {
                 SystemTime::now().add(Duration::from_secs(10))
+            }
+        }
+
+        #[derive(Clone)]
+        pub(crate) struct UnixEpochClock;
+
+        impl Clock for UnixEpochClock {
+            fn now(&self) -> SystemTime {
+                SystemTime::UNIX_EPOCH
             }
         }
     }
@@ -155,6 +170,15 @@ mod tests {
 
         let value = store.get(&"topic");
         assert_eq!(Some("microservices"), value);
+    }
+
+    #[test]
+    fn put_with_ttl_and_get_expire_after() {
+        let clock = Box::new(UnixEpochClock {});
+        let store = Store::new(clock.clone(), Arc::new(ConcurrentStatsCounter::new()));
+
+        let expire_after = store.put_with_ttl("topic", "microservices", 1, Duration::from_secs(5));
+        assert_eq!(clock.now().add(Duration::from_secs(5)), expire_after);
     }
 
     #[test]

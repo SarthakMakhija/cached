@@ -43,6 +43,8 @@ impl<Value> StoredValue<Value> {
     pub fn value_ref(&self) -> &Value { &self.value }
 
     pub fn key_id(&self) -> KeyId { self.key_id }
+
+    pub fn expire_after(&self) -> Option<ExpireAfter> { self.expire_after }
 }
 
 impl<Value> StoredValue<Value>
