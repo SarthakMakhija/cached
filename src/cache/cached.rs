@@ -14,7 +14,7 @@ use crate::cache::stats::ConcurrentStatsCounter;
 use crate::cache::store::key_value_ref::KeyValueRef;
 use crate::cache::store::Store;
 use crate::cache::store::stored_value::StoredValue;
-use crate::cache::types::Weight;
+use crate::cache::types::{KeyId, Weight};
 use crate::cache::unique_id::increasing_id_generator::IncreasingIdGenerator;
 
 //TODO: Lifetime 'static?
@@ -38,7 +38,7 @@ impl<Key, Value> CacheD<Key, Value>
         let store = Store::new(config.clock.clone_box(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(config.counters, config.total_cache_weight, stats_counter.clone()));
         let pool = Pool::new(config.access_pool_size, config.access_buffer_size, admission_policy.clone());
-        let ttl_ticker = TTLTicker::new(config.ttl_config(), |_key_id| {});
+        let ttl_ticker = Self::ttl_ticker(&config, store.clone(), admission_policy.clone());
         let command_buffer_size = config.command_buffer_size;
 
         CacheD {
@@ -97,6 +97,18 @@ impl<Key, Value> CacheD<Key, Value>
     fn key_description(&self, key: Key, weight: Weight) -> KeyDescription<Key> {
         let hash = (self.config.key_hash_fn)(&key);
         KeyDescription::new(key, self.id_generator.next(), hash, weight)
+    }
+
+    fn ttl_ticker(config: &Config<Key, Value>, store: Arc<Store<Key, Value>>, admission_policy: Arc<AdmissionPolicy<Key>>) -> Arc<TTLTicker> {
+        let store_evict_hook = move |key| {
+            store.delete(&key);
+        };
+        let cache_weight_evict_hook = move |key_id: &KeyId| {
+            admission_policy.delete_with_hook(key_id, &store_evict_hook);
+        };
+
+        let ttl_ticker = TTLTicker::new(config.ttl_config(), cache_weight_evict_hook);
+        ttl_ticker
     }
 }
 
@@ -189,6 +201,21 @@ mod tests {
 
         let value = cached.get(&"topic");
         assert_eq!(Some("microservices"), value);
+    }
+
+    #[tokio::test]
+    async fn put_a_key_value_with_ttl_and_ttl_ticker_evicts_it() {
+        let cached = CacheD::new(ConfigBuilder::new().shards(1).ttl_tick_duration(Duration::from_millis(10)).build());
+
+        let acknowledgement =
+            cached.put_with_ttl("topic", "microservices", Duration::from_millis(20)).unwrap();
+        acknowledgement.handle().await;
+
+        let value = cached.get(&"topic");
+        assert_eq!(Some("microservices"), value);
+
+        thread::sleep(Duration::from_millis(20));
+        assert_eq!(None, cached.get(&"topic"));
     }
 
     #[tokio::test]

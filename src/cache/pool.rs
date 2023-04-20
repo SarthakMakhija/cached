@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use parking_lot::RwLock;
 use rand::{Rng, thread_rng};
+use crate::cache::types::KeyHash;
 
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -23,7 +24,7 @@ struct Buffer<Consumer: BufferConsumer> {
 }
 
 pub(crate) trait BufferConsumer {
-    fn accept(&self, key_hashes: Vec<u64>);
+    fn accept(&self, key_hashes: Vec<KeyHash>);
 }
 
 impl<Consumer> Buffer<Consumer>
@@ -36,7 +37,7 @@ impl<Consumer> Buffer<Consumer>
         }
     }
 
-    pub(crate) fn add(&mut self, key_hash: u64) {
+    pub(crate) fn add(&mut self, key_hash: KeyHash) {
         self.key_hashes.push(key_hash);
 
         if self.key_hashes.len() >= self.capacity.0 {
@@ -56,7 +57,7 @@ impl<Consumer> Pool<Consumer>
         Pool { buffers, pool_size }
     }
 
-    pub(crate) fn add(&self, key_hash: u64) {
+    pub(crate) fn add(&self, key_hash: KeyHash) {
         let pool_size = self.pool_size.0;
         let index = thread_rng().gen_range(0..pool_size);
         self.buffers[index].write().add(key_hash);
