@@ -107,8 +107,7 @@ impl<Key, Value> CacheD<Key, Value>
             admission_policy.delete_with_hook(key_id, &store_evict_hook);
         };
 
-        let ttl_ticker = TTLTicker::new(config.ttl_config(), cache_weight_evict_hook);
-        ttl_ticker
+        TTLTicker::new(config.ttl_config(), cache_weight_evict_hook)
     }
 }
 
