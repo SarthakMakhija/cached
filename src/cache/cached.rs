@@ -148,6 +148,17 @@ impl<Key, Value> CacheD<Key, Value>
             keys,
         }
     }
+
+    pub fn multi_get_map_iterator<'a, MapFn, MappedValue>(&'a self, keys: Vec<&'a Key>, map_fn: MapFn) -> MultiGetMapIterator<'a, Key, Value, MapFn, MappedValue>
+        where MapFn: Fn(Value) -> MappedValue {
+        MultiGetMapIterator {
+            iterator: MultiGetIterator {
+                cache: self,
+                keys,
+            },
+            map_fn,
+        }
+    }
 }
 
 pub struct MultiGetIterator<'a, Key, Value>
@@ -171,6 +182,33 @@ impl<'a, Key, Value> Iterator for MultiGetIterator<'a, Key, Value>
 
         self.keys.remove(0);
         Some(value)
+    }
+}
+
+pub struct MultiGetMapIterator<'a, Key, Value, MapFn, MappedValue>
+    where Key: Hash + Eq + Send + Sync + Clone + 'static,
+          Value: Send + Sync + Clone + 'static,
+          MapFn: Fn(Value) -> MappedValue, {
+    iterator: MultiGetIterator<'a, Key, Value>,
+    map_fn: MapFn,
+}
+
+impl<'a, Key, Value, MapFn, MappedValue> Iterator for MultiGetMapIterator<'a, Key, Value, MapFn, MappedValue>
+    where Key: Hash + Eq + Send + Sync + Clone + 'static,
+          Value: Send + Sync + Clone + 'static,
+          MapFn: Fn(Value) -> MappedValue, {
+    type Item = Option<MappedValue>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.iterator.next() {
+            None => None,
+            Some(optional_value) => {
+                if let Some(value) = optional_value {
+                    return Some(Some((self.map_fn)(value)));
+                }
+                Some(None)
+            }
+        }
     }
 }
 
@@ -428,6 +466,30 @@ mod tests {
         assert_eq!(None, iterator.next().unwrap());
         assert_eq!(Some("in-memory"), iterator.next().unwrap());
         assert_eq!(Some("SSD"), iterator.next().unwrap());
+        assert_eq!(None, iterator.next());
+    }
+
+    #[tokio::test]
+    async fn map_multiple_keys_via_an_iterator() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        let acknowledgement =
+            cached.put("topic", "microservices").unwrap();
+        acknowledgement.handle().await;
+
+        let acknowledgement =
+            cached.put("disk", "ssd").unwrap();
+        acknowledgement.handle().await;
+
+        let acknowledgement =
+            cached.put("cache", "in-memory").unwrap();
+        acknowledgement.handle().await;
+
+        let mut iterator = cached.multi_get_map_iterator(vec![&"topic", &"non-existing", &"cache", &"disk"], |value| value.to_uppercase());
+        assert_eq!(Some("MICROSERVICES".to_string()), iterator.next().unwrap());
+        assert_eq!(None, iterator.next().unwrap());
+        assert_eq!(Some("IN-MEMORY".to_string()), iterator.next().unwrap());
+        assert_eq!(Some("SSD".to_string()), iterator.next().unwrap());
         assert_eq!(None, iterator.next());
     }
 }
