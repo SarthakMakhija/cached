@@ -200,15 +200,12 @@ impl<'a, Key, Value, MapFn, MappedValue> Iterator for MultiGetMapIterator<'a, Ke
     type Item = Option<MappedValue>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.iterator.next() {
-            None => None,
-            Some(optional_value) => {
-                if let Some(value) = optional_value {
-                    return Some(Some((self.map_fn)(value)));
-                }
-                Some(None)
+        self.iterator.next().map(|optional_value| {
+            match optional_value {
+                None => None,
+                Some(value) => Some((self.map_fn)(value))
             }
-        }
+        })
     }
 }
 
