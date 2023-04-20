@@ -9,6 +9,7 @@ use crossbeam_channel::Receiver;
 use crate::cache::command::{CommandStatus, CommandType};
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
 use crate::cache::command::error::CommandSendError;
+use crate::cache::expiration::TTLTicker;
 use crate::cache::key_description::KeyDescription;
 use crate::cache::policy::admission_policy::AdmissionPolicy;
 use crate::cache::stats::ConcurrentStatsCounter;
@@ -47,6 +48,7 @@ struct PutWithTTLParameter<'a, Key, Value, DeleteHook>
           DeleteHook: Fn(Key) {
     put_parameter: PutParameter<'a, Key, Value, DeleteHook>,
     ttl: Duration,
+    ttl_ticker: &'a Arc<TTLTicker>
 }
 
 struct DeleteParameter<'a, Key, Value>
@@ -54,6 +56,7 @@ struct DeleteParameter<'a, Key, Value>
     store: &'a Arc<Store<Key, Value>>,
     key: &'a Key,
     admission_policy: &'a Arc<AdmissionPolicy<Key>>,
+    ttl_ticker: &'a Arc<TTLTicker>
 }
 
 impl<Key, Value> CommandExecutor<Key, Value>
@@ -63,11 +66,12 @@ impl<Key, Value> CommandExecutor<Key, Value>
         store: Arc<Store<Key, Value>>,
         admission_policy: Arc<AdmissionPolicy<Key>>,
         stats_counter: Arc<ConcurrentStatsCounter>,
+        ttl_ticker: Arc<TTLTicker>,
         command_channel_size: usize) -> Self {
         let (sender, receiver) = crossbeam_channel::bounded(command_channel_size);
         let command_executor = CommandExecutor { sender, keep_running: Arc::new(AtomicBool::new(true)) };
 
-        command_executor.spin(receiver, store, admission_policy, stats_counter);
+        command_executor.spin(receiver, store, admission_policy, stats_counter, ttl_ticker);
         command_executor
     }
 
@@ -75,10 +79,12 @@ impl<Key, Value> CommandExecutor<Key, Value>
             receiver: Receiver<CommandAcknowledgementPair<Key, Value>>,
             store: Arc<Store<Key, Value>>,
             admission_policy: Arc<AdmissionPolicy<Key>>,
-            stats_counter: Arc<ConcurrentStatsCounter>) {
+            stats_counter: Arc<ConcurrentStatsCounter>,
+            ttl_ticker: Arc<TTLTicker>) {
+
         let keep_running = self.keep_running.clone();
-        let clone = store.clone();
-        let delete_hook = move |key| { clone.delete(&key); };
+        let store_clone = store.clone();
+        let delete_hook = move |key| { store_clone.delete(&key); };
 
         thread::spawn(move || {
             while let Ok(pair) = receiver.recv() {
@@ -88,20 +94,21 @@ impl<Key, Value> CommandExecutor<Key, Value>
                         Self::put(PutParameter {
                             store: &store, key_description: &key_description,
                             delete_hook: &delete_hook, value,
-                            admission_policy: &admission_policy, stats_counter: &stats_counter,
+                            admission_policy: &admission_policy, stats_counter: &stats_counter
                         }),
                     CommandType::PutWithTTL(key_description, value, ttl) =>
                         Self::put_with_ttl(PutWithTTLParameter {
                             put_parameter: PutParameter {
                                 store: &store, key_description: &key_description,
                                 delete_hook: &delete_hook, value,
-                                admission_policy: &admission_policy, stats_counter: &stats_counter,
+                                admission_policy: &admission_policy, stats_counter: &stats_counter
                             },
                             ttl,
+                            ttl_ticker: &ttl_ticker
                         }),
                     CommandType::Delete(key) =>
                         Self::delete(DeleteParameter {
-                            store: &store, key: &key, admission_policy: &admission_policy,
+                            store: &store, key: &key, admission_policy: &admission_policy, ttl_ticker: &ttl_ticker
                         }),
                 };
                 pair.acknowledgement.done(status);
@@ -136,11 +143,15 @@ impl<Key, Value> CommandExecutor<Key, Value>
             put_with_ttl_parameter.put_parameter.delete_hook
         );
         if let CommandStatus::Accepted = status {
-            put_with_ttl_parameter.put_parameter.store.put_with_ttl(
+            let expiry = put_with_ttl_parameter.put_parameter.store.put_with_ttl(
                 put_with_ttl_parameter.put_parameter.key_description.clone_key(),
                 put_with_ttl_parameter.put_parameter.value,
                 put_with_ttl_parameter.put_parameter.key_description.id,
                 put_with_ttl_parameter.ttl,
+            );
+            put_with_ttl_parameter.ttl_ticker.put(
+                put_with_ttl_parameter.put_parameter.key_description.id,
+                expiry
             );
         } else {
             put_with_ttl_parameter.put_parameter.stats_counter.reject_key();
@@ -152,6 +163,9 @@ impl<Key, Value> CommandExecutor<Key, Value>
         let may_be_key_id_expiry = delete_parameter.store.delete(delete_parameter.key);
         if let Some(key_id_expiry) = may_be_key_id_expiry {
             delete_parameter.admission_policy.delete(&key_id_expiry.0);
+            if let Some(expiry) = key_id_expiry.1 {
+                delete_parameter.ttl_ticker.delete(&key_id_expiry.0, &expiry);
+            }
             return CommandStatus::Accepted;
         }
         CommandStatus::Rejected
@@ -187,10 +201,16 @@ mod tests {
     use crate::cache::clock::SystemClock;
     use crate::cache::command::{CommandStatus, CommandType};
     use crate::cache::command::command_executor::CommandExecutor;
+    use crate::cache::expiration::config::TTLConfig;
+    use crate::cache::expiration::TTLTicker;
     use crate::cache::key_description::KeyDescription;
     use crate::cache::policy::admission_policy::AdmissionPolicy;
     use crate::cache::stats::ConcurrentStatsCounter;
     use crate::cache::store::Store;
+
+    fn no_action_ttl_ticker() -> Arc<TTLTicker> {
+        TTLTicker::new(TTLConfig::new(4, Duration::from_secs(300), SystemClock::boxed()), |_key_id| {})
+    }
 
     #[tokio::test]
     async fn puts_a_key_value_and_shutdown() {
@@ -202,6 +222,7 @@ mod tests {
             store.clone(),
             admission_policy,
             stats_counter,
+            no_action_ttl_ticker(),
             10,
         );
         command_executor.shutdown();
@@ -235,6 +256,7 @@ mod tests {
             store.clone(),
             admission_policy,
             stats_counter,
+            no_action_ttl_ticker(),
             10,
         );
 
@@ -258,6 +280,7 @@ mod tests {
             store.clone(),
             admission_policy,
             stats_counter.clone(),
+            no_action_ttl_ticker(),
             10,
         );
 
@@ -282,6 +305,7 @@ mod tests {
             store.clone(),
             admission_policy,
             stats_counter.clone(),
+            no_action_ttl_ticker(),
             10,
         );
 
@@ -306,6 +330,7 @@ mod tests {
             store.clone(),
             admission_policy,
             stats_counter,
+            no_action_ttl_ticker(),
             10,
         );
 
@@ -331,10 +356,12 @@ mod tests {
         let store = Store::new(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
+        let ttl_ticker = no_action_ttl_ticker();
         let command_executor = CommandExecutor::new(
             store.clone(),
             admission_policy,
             stats_counter,
+            ttl_ticker.clone(),
             10,
         );
 
@@ -347,6 +374,11 @@ mod tests {
 
         command_executor.shutdown();
         assert_eq!(Some("microservices"), store.get(&"topic"));
+
+        let expiry = store.get_ref(&"topic").unwrap().value().expire_after().unwrap();
+        let expiry_in_ttl_ticker = ttl_ticker.get(&1, &expiry).unwrap();
+
+        assert_eq!(expiry, expiry_in_ttl_ticker);
     }
 
     #[tokio::test]
@@ -359,6 +391,7 @@ mod tests {
             store.clone(),
             admission_policy,
             stats_counter.clone(),
+            no_action_ttl_ticker(),
             10,
         );
 
@@ -378,19 +411,28 @@ mod tests {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
         let store = Store::new(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
+        let ttl_ticker = no_action_ttl_ticker();
+
         let command_executor = CommandExecutor::new(
             store.clone(),
             admission_policy,
             stats_counter,
+            ttl_ticker.clone(),
             10,
         );
 
         let acknowledgement = command_executor.send(CommandType::PutWithTTL(
-            KeyDescription::new("topic", 1, 1029, 10),
+            KeyDescription::new("topic", 10, 1029, 10),
             "microservices",
             Duration::from_secs(10),
         )).unwrap();
         acknowledgement.handle().await;
+
+        let expiry = store.get_ref(&"topic").unwrap().value().expire_after().unwrap();
+        let expiry_in_ttl_ticker = ttl_ticker.get(&10, &expiry).unwrap();
+
+        assert_eq!(Some("microservices"), store.get(&"topic"));
+        assert_eq!(expiry, expiry_in_ttl_ticker);
 
         let acknowledgement =
             command_executor.send(CommandType::Delete("topic")).unwrap();
@@ -398,6 +440,7 @@ mod tests {
 
         command_executor.shutdown();
         assert_eq!(None, store.get(&"topic"));
+        assert_eq!(None, ttl_ticker.get(&10, &expiry));
     }
 
     #[tokio::test]
@@ -410,6 +453,7 @@ mod tests {
             store.clone(),
             admission_policy,
             stats_counter,
+            no_action_ttl_ticker(),
             10,
         );
 
@@ -431,11 +475,17 @@ mod sociable_tests {
     use crate::cache::clock::SystemClock;
     use crate::cache::command::{CommandStatus, CommandType};
     use crate::cache::command::command_executor::CommandExecutor;
+    use crate::cache::expiration::config::TTLConfig;
+    use crate::cache::expiration::TTLTicker;
     use crate::cache::key_description::KeyDescription;
     use crate::cache::policy::admission_policy::AdmissionPolicy;
     use crate::cache::pool::BufferConsumer;
     use crate::cache::stats::ConcurrentStatsCounter;
     use crate::cache::store::Store;
+
+    fn no_action_ttl_ticker() -> Arc<TTLTicker> {
+        TTLTicker::new(TTLConfig::new(4, Duration::from_secs(300), SystemClock::boxed()), |_key_id| {})
+    }
 
     #[tokio::test]
     async fn puts_a_key_value() {
@@ -447,6 +497,7 @@ mod sociable_tests {
             store.clone(),
             admission_policy.clone(),
             stats_counter,
+            no_action_ttl_ticker(),
             10,
         );
 
@@ -477,6 +528,7 @@ mod sociable_tests {
             store.clone(),
             admission_policy.clone(),
             stats_counter,
+            no_action_ttl_ticker(),
             10,
         );
 
@@ -512,6 +564,7 @@ mod sociable_tests {
             store.clone(),
             admission_policy.clone(),
             stats_counter,
+            no_action_ttl_ticker(),
             10,
         );
 

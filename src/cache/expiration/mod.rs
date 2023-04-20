@@ -57,7 +57,7 @@ impl TTLTicker {
         self.keep_running.store(false, Ordering::Release);
     }
 
-    fn get(self: &Arc<TTLTicker>, key_id: &KeyId, expire_after: &ExpireAfter) -> Option<ExpireAfter> {
+    pub(crate) fn get(self: &Arc<TTLTicker>, key_id: &KeyId, expire_after: &ExpireAfter) -> Option<ExpireAfter> {
         let shard_index = self.shard_index(expire_after);
         self.shards[shard_index].read().get(key_id).copied()
     }
