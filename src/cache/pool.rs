@@ -12,6 +12,7 @@ pub(crate) struct PoolSize(pub(crate) usize);
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub(crate) struct BufferSize(pub(crate) usize);
 
+//TODO: Can we get rid of RWLock? Disruptor?
 pub(crate) struct Pool<Consumer: BufferConsumer> {
     buffers: Vec<RwLock<Buffer<Consumer>>>,
     pool_size: PoolSize,

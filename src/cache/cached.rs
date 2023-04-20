@@ -90,6 +90,14 @@ impl<Key, Value> CacheD<Key, Value>
         None
     }
 
+    pub fn map_get_ref<MapFn, U>(&self, key: &Key, map_fn: MapFn) -> Option<U>
+        where MapFn: Fn(&StoredValue<Value>) -> U {
+        if let Some(value_ref) = self.get_ref(key) {
+            return Some(map_fn(value_ref.value()));
+        }
+        None
+    }
+
     fn mark_key_accessed(&self, key: &Key) {
         self.pool.add((self.config.key_hash_fn)(key));
     }
@@ -118,6 +126,14 @@ impl<Key, Value> CacheD<Key, Value>
         if let Some(value) = self.store.get(key) {
             self.mark_key_accessed(key);
             return Some(value);
+        }
+        None
+    }
+
+    pub fn map_get<MapFn, U>(&self, key: &Key, map_fn: MapFn) -> Option<U>
+        where MapFn: Fn(Value) -> U {
+        if let Some(value) = self.get(key) {
+            return Some(map_fn(value));
         }
         None
     }
@@ -222,7 +238,7 @@ mod tests {
         let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
 
         let acknowledgement =
-            cached.put_with_weight_and_ttl("topic", "microservices", 10,Duration::from_secs(120)).unwrap();
+            cached.put_with_weight_and_ttl("topic", "microservices", 10, Duration::from_secs(120)).unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get(&"topic");
@@ -234,6 +250,14 @@ mod tests {
         let cached: CacheD<&str, &str> = CacheD::new(ConfigBuilder::new().counters(10).build());
 
         let value = cached.get_ref(&"non-existing");
+        assert!(value.is_none());
+    }
+
+    #[test]
+    fn get_value_ref_for_a_non_existing_key_and_attempt_to_map_it() {
+        let cached: CacheD<&str, &str> = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        let value = cached.map_get_ref(&"non_existing", |stored_value| stored_value.value_ref().to_uppercase());
         assert!(value.is_none());
     }
 
@@ -250,6 +274,18 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn get_value_ref_for_an_existing_key_and_map_it() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        let acknowledgement =
+            cached.put("topic", "microservices").unwrap();
+        acknowledgement.handle().await;
+
+        let value = cached.map_get_ref(&"topic", |stored_value| stored_value.value_ref().to_uppercase());
+        assert_eq!("MICROSERVICES", value.unwrap());
+    }
+
+    #[tokio::test]
     async fn get_value_for_an_existing_key() {
         let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
 
@@ -261,11 +297,31 @@ mod tests {
         assert_eq!(Some("microservices"), value);
     }
 
+    #[tokio::test]
+    async fn get_value_for_an_existing_key_and_map_it() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        let acknowledgement =
+            cached.put("topic", "microservices").unwrap();
+        acknowledgement.handle().await;
+
+        let value = cached.map_get(&"topic", |value| value.to_uppercase());
+        assert_eq!("MICROSERVICES", value.unwrap());
+    }
+
     #[test]
     fn get_value_for_a_non_existing_key() {
         let cached: CacheD<&str, &str> = CacheD::new(ConfigBuilder::new().counters(10).build());
 
         let value = cached.get(&"non-existing");
+        assert_eq!(None, value);
+    }
+
+    #[test]
+    fn get_value_for_a_non_existing_key_and_attempt_to_map_it() {
+        let cached: CacheD<&str, &str> = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        let value = cached.map_get(&"topic", |value| value.to_uppercase());
         assert_eq!(None, value);
     }
 
