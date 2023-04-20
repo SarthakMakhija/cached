@@ -90,8 +90,8 @@ impl<Key, Value> CacheD<Key, Value>
         None
     }
 
-    pub fn map_get_ref<MapFn, U>(&self, key: &Key, map_fn: MapFn) -> Option<U>
-        where MapFn: Fn(&StoredValue<Value>) -> U {
+    pub fn map_get_ref<MapFn, MappedValue>(&self, key: &Key, map_fn: MapFn) -> Option<MappedValue>
+        where MapFn: Fn(&StoredValue<Value>) -> MappedValue {
         if let Some(value_ref) = self.get_ref(key) {
             return Some(map_fn(value_ref.value()));
         }
@@ -130,8 +130,8 @@ impl<Key, Value> CacheD<Key, Value>
         None
     }
 
-    pub fn map_get<MapFn, U>(&self, key: &Key, map_fn: MapFn) -> Option<U>
-        where MapFn: Fn(Value) -> U {
+    pub fn map_get<MapFn, MappedValue>(&self, key: &Key, map_fn: MapFn) -> Option<MappedValue>
+        where MapFn: Fn(Value) -> MappedValue {
         if let Some(value) = self.get(key) {
             return Some(map_fn(value));
         }
