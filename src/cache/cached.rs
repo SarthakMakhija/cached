@@ -6,7 +6,6 @@ use std::time::Duration;
 use crate::cache::command::command_executor::{CommandExecutor, CommandSendResult};
 use crate::cache::command::CommandType;
 use crate::cache::config::Config;
-use crate::cache::expiration::config::TTLConfig;
 use crate::cache::expiration::TTLTicker;
 use crate::cache::key_description::KeyDescription;
 use crate::cache::policy::admission_policy::AdmissionPolicy;
@@ -39,7 +38,7 @@ impl<Key, Value> CacheD<Key, Value>
         let store = Store::new(config.clock.clone_box(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(config.counters, config.total_cache_weight, stats_counter.clone()));
         let pool = Pool::new(config.access_pool_size, config.access_buffer_size, admission_policy.clone());
-        let ttl_ticker = TTLTicker::new(TTLConfig::new(8, Duration::from_secs(300), config.clock.clone_box()), |_key_id| {});
+        let ttl_ticker = TTLTicker::new(config.ttl_config(), |_key_id| {});
         let command_buffer_size = config.command_buffer_size;
 
         CacheD {

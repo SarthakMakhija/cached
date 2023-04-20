@@ -1,8 +1,10 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::time::Duration;
 
 use crate::cache::clock::{ClockType, SystemClock};
 use crate::cache::config::weight_calculation::Calculation;
+use crate::cache::expiration::config::TTLConfig;
 use crate::cache::pool::{BufferSize, PoolSize};
 use crate::cache::types::{KeyHash, TotalCounters, Weight};
 
@@ -16,6 +18,8 @@ const ACCESS_POOL_SIZE: PoolSize = PoolSize(30);
 const ACCESS_BUFFER_SIZE: BufferSize = BufferSize(64);
 const COUNTERS: TotalCounters = 1_000_000;
 const TOTAL_CACHE_WEIGHT: Weight = 100_000_000;
+const SHARDS: usize = 64;
+const TTL_TICK_DURATION: Duration = Duration::from_secs(1);
 
 pub struct Config<Key, Value>
     where Key: Hash + 'static,
@@ -28,6 +32,16 @@ pub struct Config<Key, Value>
     pub(crate) access_pool_size: PoolSize,
     pub(crate) access_buffer_size: BufferSize,
     pub total_cache_weight: Weight,
+    shards: usize,
+    ttl_tick_duration: Duration,
+}
+
+impl<Key, Value> Config<Key, Value>
+    where Key: Hash + 'static,
+          Value: 'static {
+    pub(crate) fn ttl_config(&self) -> TTLConfig {
+        TTLConfig::new(self.shards, self.ttl_tick_duration, self.clock.clone_box())
+    }
 }
 
 pub struct ConfigBuilder<Key, Value>
@@ -41,6 +55,8 @@ pub struct ConfigBuilder<Key, Value>
     access_pool_size: PoolSize,
     access_buffer_size: BufferSize,
     total_cache_weight: Weight,
+    shards: usize,
+    ttl_tick_duration: Duration,
 }
 
 impl<Key, Value> Default for ConfigBuilder<Key, Value>
@@ -70,6 +86,8 @@ impl<Key, Value> ConfigBuilder<Key, Value>
             command_buffer_size: COMMAND_BUFFER_SIZE,
             counters: COUNTERS,
             total_cache_weight: TOTAL_CACHE_WEIGHT,
+            shards: SHARDS,
+            ttl_tick_duration: TTL_TICK_DURATION,
         }
     }
 
@@ -113,6 +131,16 @@ impl<Key, Value> ConfigBuilder<Key, Value>
         self
     }
 
+    pub fn shards(mut self, shards: usize) -> ConfigBuilder<Key, Value> {
+        self.shards = shards;
+        self
+    }
+
+    pub fn ttl_tick_duration(mut self, duration: Duration) -> ConfigBuilder<Key, Value> {
+        self.ttl_tick_duration = duration;
+        self
+    }
+
     pub fn build(self) -> Config<Key, Value> {
         Config {
             key_hash_fn: self.key_hash_fn,
@@ -123,13 +151,15 @@ impl<Key, Value> ConfigBuilder<Key, Value>
             command_buffer_size: self.command_buffer_size,
             counters: self.counters,
             total_cache_weight: self.total_cache_weight,
+            shards: self.shards,
+            ttl_tick_duration: self.ttl_tick_duration,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::time::SystemTime;
+    use std::time::{Duration, SystemTime};
 
     use crate::cache::clock::ClockType;
     use crate::cache::config::ConfigBuilder;
@@ -225,5 +255,31 @@ mod tests {
         let config = builder.total_cache_weight(1048576).build();
 
         assert_eq!(1048576, config.total_cache_weight);
+    }
+
+    #[test]
+    fn shards() {
+        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+        let config = builder.shards(10).build();
+
+        assert_eq!(10, config.shards);
+    }
+
+    #[test]
+    fn ttl_tick_duration() {
+        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+        let config = builder.ttl_tick_duration(Duration::from_secs(5)).build();
+
+        assert_eq!(Duration::from_secs(5), config.ttl_tick_duration);
+    }
+
+    #[test]
+    fn ttl_config() {
+        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+        let config = builder.ttl_tick_duration(Duration::from_secs(5)).shards(16).build();
+
+        let ttl_config = config.ttl_config();
+        assert_eq!(16, ttl_config.shards());
+        assert_eq!(Duration::from_secs(5), ttl_config.tick_duration());
     }
 }
