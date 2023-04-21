@@ -16,6 +16,9 @@ pub mod key_value_ref;
 #[derive(Eq, PartialEq, Debug)]
 pub(crate) struct KeyIdExpiry(pub(crate) KeyId, pub(crate) Option<ExpireAfter>);
 
+#[derive(Eq, PartialEq, Debug)]
+pub(crate) struct UpdateEligibility(pub(crate) KeyIdExpiry);
+
 pub(crate) struct Store<Key, Value>
     where Key: Hash + Eq, {
     store: DashMap<Key, StoredValue<Value>>,
@@ -64,13 +67,24 @@ impl<Key, Value> Store<Key, Value>
     }
 
     pub(crate) fn get_ref(&self, key: &Key) -> Option<KeyValueRef<'_, Key, StoredValue<Value>>> {
-        let maybe_value = self.store.get(key);
-        let mapped_value = maybe_value
-            .filter(|stored_value| stored_value.is_alive(&self.clock))
-            .map(|key_value_ref| KeyValueRef::new(key_value_ref));
-
+        let mapped_value = self.contains(key);
         if mapped_value.is_some() { self.stats_counter.found_a_hit(); } else { self.stats_counter.found_a_miss(); }
         mapped_value
+    }
+
+    pub(crate) fn can_update(&self, key: &Key) -> Option<UpdateEligibility> {
+        let mapped_value = self.contains(key);
+        mapped_value.map(|key_value_ref| {
+            let stored_value = key_value_ref.value();
+            UpdateEligibility(KeyIdExpiry(stored_value.key_id(),stored_value.expire_after()))
+        })
+    }
+
+    fn contains(&self, key: &Key) -> Option<KeyValueRef<Key, StoredValue<Value>>> {
+        let maybe_value = self.store.get(key);
+        maybe_value
+            .filter(|stored_value| stored_value.is_alive(&self.clock))
+            .map(|key_value_ref| KeyValueRef::new(key_value_ref))
     }
 }
 
@@ -98,7 +112,7 @@ mod tests {
 
     use crate::cache::clock::{Clock, SystemClock};
     use crate::cache::stats::ConcurrentStatsCounter;
-    use crate::cache::store::Store;
+    use crate::cache::store::{KeyIdExpiry, Store, UpdateEligibility};
     use crate::cache::store::stored_value::StoredValue;
     use crate::cache::store::tests::setup::{Name, UnixEpochClock};
 
@@ -347,5 +361,26 @@ mod tests {
 
         let value = store.get(&"topic");
         assert_eq!(None, value);
+    }
+
+    #[test]
+    fn can_update() {
+        let clock = SystemClock::boxed();
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+
+        store.put("topic", "microservices", 10);
+        let update_eligibility = store.can_update(&"topic");
+
+        let expected_update_eligibility = UpdateEligibility(KeyIdExpiry(10, None));
+        assert_eq!(Some(expected_update_eligibility), update_eligibility);
+    }
+
+    #[test]
+    fn can_non_update() {
+        let clock = SystemClock::boxed();
+        let store: Arc<Store<&str, &str>> = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+
+        let update_eligibility = store.can_update(&"non_existing");
+        assert_eq!(None, update_eligibility);
     }
 }
