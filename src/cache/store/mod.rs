@@ -1,6 +1,6 @@
 use std::hash::Hash;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use dashmap::DashMap;
 
@@ -18,6 +18,21 @@ pub(crate) struct KeyIdExpiry(pub(crate) KeyId, pub(crate) Option<ExpireAfter>);
 
 #[derive(Eq, PartialEq, Debug)]
 pub(crate) struct UpdateEligibility(pub(crate) Option<KeyIdExpiry>);
+
+#[derive(Eq, PartialEq, Debug)]
+pub(crate) struct UpdateResponse(KeyIdExpiry, ExpireAfter);
+
+impl UpdateResponse {
+    pub(crate) fn key_id(&self) -> KeyId {
+        self.0.0
+    }
+    pub(crate) fn existing_expiry(&self) -> Option<ExpireAfter> {
+        self.0.1
+    }
+    pub(crate) fn new_expiry(&self) -> SystemTime {
+        self.1
+    }
+}
 
 const UPDATE_NOT_ELIGIBLE: UpdateEligibility = UpdateEligibility(None);
 
@@ -90,6 +105,19 @@ impl<Key, Value> Store<Key, Value>
             let stored_value = key_value_ref.value();
             UpdateEligibility(Some(KeyIdExpiry(stored_value.key_id(), stored_value.expire_after())))
         })
+    }
+
+    pub(crate) fn update_time_to_live(&self, key: &Key, time_to_live: Duration) -> Option<UpdateResponse> {
+        if let Some(mut existing) = self.store.get_mut(key) {
+            let new_expiry = StoredValue::<Value>::calculate_expiry(time_to_live, &self.clock);
+            let response = Some(UpdateResponse(
+                KeyIdExpiry(existing.key_id(), existing.expire_after()),
+                new_expiry,
+            ));
+            existing.update_expiry(new_expiry);
+            return response;
+        }
+        None
     }
 
     fn contains(&self, key: &Key) -> Option<KeyValueRef<Key, StoredValue<Value>>> {
@@ -394,6 +422,42 @@ mod tests {
 
         let update_eligibility = store.update_eligibility(&"non_existing");
         assert_eq!(UPDATE_NOT_ELIGIBLE, update_eligibility);
+    }
+
+    #[test]
+    fn update_time_to_live_for_non_existing_key() {
+        let clock = SystemClock::boxed();
+        let store: Arc<Store<&str, &str>> = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let response = store.update_time_to_live(&"topic", Duration::from_secs(5));
+
+        assert_eq!(None, response);
+    }
+
+    #[test]
+    fn update_time_to_live_for_an_existing_key() {
+        let clock = Box::new(UnixEpochClock {});
+        let store = Store::new(clock.clone(), Arc::new(ConcurrentStatsCounter::new()));
+
+        store.put("topic", "microservices", 10);
+        let update_response = store.update_time_to_live(&"topic", Duration::from_secs(5));
+        assert!(update_response.unwrap().existing_expiry().is_none());
+
+        let key_value_ref = store.get_ref(&"topic").unwrap();
+        let expected_expiry = clock.now().add(Duration::from_secs(5));
+        assert_eq!(Some(expected_expiry), key_value_ref.value().expire_after());
+    }
+
+    #[test]
+    fn update_time_to_live_for_an_existing_key_that_has_an_expiry() {
+        let clock = Box::new(UnixEpochClock {});
+        let store = Store::new(clock.clone(), Arc::new(ConcurrentStatsCounter::new()));
+
+        store.put_with_ttl("topic", "microservices", 10, Duration::from_secs(300));
+        let _ = store.update_time_to_live(&"topic", Duration::from_secs(15));
+
+        let key_value_ref = store.get_ref(&"topic").unwrap();
+        let expected_expiry = clock.now().add(Duration::from_secs(15));
+        assert_eq!(Some(expected_expiry), key_value_ref.value().expire_after());
     }
 }
 

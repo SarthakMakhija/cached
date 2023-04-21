@@ -1,5 +1,5 @@
 use std::ops::Add;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use crate::cache::clock::ClockType;
 use crate::cache::types::{ExpireAfter, KeyId};
@@ -25,7 +25,7 @@ impl<Value> StoredValue<Value> {
         StoredValue {
             value,
             key_id,
-            expire_after: Some(clock.now().add(time_to_live)),
+            expire_after: Some(Self::calculate_expiry(time_to_live, clock)),
             is_soft_deleted: false,
         }
     }
@@ -45,6 +45,14 @@ impl<Value> StoredValue<Value> {
     pub fn key_id(&self) -> KeyId { self.key_id }
 
     pub fn expire_after(&self) -> Option<ExpireAfter> { self.expire_after }
+
+    pub(crate) fn update_expiry(&mut self, expiry: ExpireAfter) {
+        self.expire_after = Some(expiry);
+    }
+
+    pub(crate) fn calculate_expiry(time_to_live: Duration, clock: &ClockType) -> SystemTime {
+        clock.now().add(time_to_live)
+    }
 }
 
 impl<Value> StoredValue<Value>
