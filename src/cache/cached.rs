@@ -3,6 +3,7 @@ use std::hash::Hash;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::cache::command::acknowledgement::CommandAcknowledgement;
 use crate::cache::command::command_executor::{CommandExecutor, CommandSendResult};
 use crate::cache::command::CommandType;
 use crate::cache::config::Config;
@@ -16,6 +17,7 @@ use crate::cache::store::Store;
 use crate::cache::store::stored_value::StoredValue;
 use crate::cache::types::{KeyId, Weight};
 use crate::cache::unique_id::increasing_id_generator::IncreasingIdGenerator;
+use crate::cache::upsert::UpsertRequest;
 
 //TODO: Lifetime 'static?
 pub struct CacheD<Key, Value>
@@ -75,6 +77,25 @@ impl<Key, Value> CacheD<Key, Value>
         self.command_executor.send(CommandType::PutWithTTL(
             self.key_description(key, weight), value, time_to_live,
         ))
+    }
+
+    pub fn upsert(&self, request: UpsertRequest<Key, Value>) -> CommandSendResult {
+        let (key, value, weight, time_to_live)
+            = (request.key, request.value, request.weight, request.time_to_live);
+
+        let update_eligibility = self.store.update_eligibility(&key);
+        if update_eligibility.is_not_eligible() {
+            assert!(value.is_some());
+            let value = value.unwrap();
+            let weight = weight.unwrap_or_else(|| (self.config.weight_calculation_fn)(&key, &value));
+
+            return if let Some(time_to_live) = time_to_live {
+                self.put_with_weight_and_ttl(key, value, weight, time_to_live)
+            } else {
+                self.put_with_weight(key, value, weight)
+            }
+        }
+        Ok(CommandAcknowledgement::new())
     }
 
     pub fn delete(&self, key: Key) -> CommandSendResult {
@@ -217,6 +238,7 @@ mod tests {
 
     use crate::cache::cached::CacheD;
     use crate::cache::config::ConfigBuilder;
+    use crate::cache::upsert::UpsertRequestBuilder;
 
     #[derive(Eq, PartialEq, Debug)]
     struct Name {
@@ -488,5 +510,52 @@ mod tests {
         assert_eq!(Some("IN-MEMORY".to_string()), iterator.next().unwrap());
         assert_eq!(Some("SSD".to_string()), iterator.next().unwrap());
         assert_eq!(None, iterator.next());
+    }
+
+    #[tokio::test]
+    async fn upsert_a_non_existing_key_value() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        let acknowledgement =
+            cached.upsert(UpsertRequestBuilder::new("topic").value("microservices").build()).unwrap();
+        acknowledgement.handle().await;
+
+        let value = cached.get_ref(&"topic");
+        let value_ref = value.unwrap();
+        let stored_value = value_ref.value();
+
+        assert_eq!("microservices", stored_value.value());
+    }
+
+    #[tokio::test]
+    async fn upsert_a_non_existing_key_value_with_weight() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        let acknowledgement =
+            cached.upsert(UpsertRequestBuilder::new("topic").value("microservices").weight(33).build()).unwrap();
+        acknowledgement.handle().await;
+
+        let value = cached.get_ref(&"topic");
+        let value_ref = value.unwrap();
+        let stored_value = value_ref.value();
+        let key_id = stored_value.key_id();
+
+        assert_eq!("microservices", stored_value.value());
+        assert_eq!(Some(33), cached.pool.get_buffer_consumer().weight_of(&key_id));
+    }
+
+    #[tokio::test]
+    async fn upsert_a_non_existing_key_value_with_time_to_live() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        let acknowledgement =
+            cached.upsert(UpsertRequestBuilder::new("topic").value("microservices").time_to_live(Duration::from_secs(10)).build()).unwrap();
+        acknowledgement.handle().await;
+
+        let value = cached.get_ref(&"topic");
+        let value_ref = value.unwrap();
+        let stored_value = value_ref.value();
+
+        assert_eq!("microservices", stored_value.value());
     }
 }

@@ -21,6 +21,16 @@ pub(crate) struct UpdateEligibility(pub(crate) Option<KeyIdExpiry>);
 
 const UPDATE_NOT_ELIGIBLE: UpdateEligibility = UpdateEligibility(None);
 
+impl UpdateEligibility {
+    pub(crate) fn is_eligible(&self) -> bool {
+        self.0.is_some()
+    }
+
+    pub(crate) fn is_not_eligible(&self) -> bool {
+        !self.is_eligible()
+    }
+}
+
 pub(crate) struct Store<Key, Value>
     where Key: Hash + Eq, {
     store: DashMap<Key, StoredValue<Value>>,
@@ -74,11 +84,11 @@ impl<Key, Value> Store<Key, Value>
         mapped_value
     }
 
-    pub(crate) fn can_update(&self, key: &Key) -> UpdateEligibility {
+    pub(crate) fn update_eligibility(&self, key: &Key) -> UpdateEligibility {
         let mapped_value = self.contains(key);
         mapped_value.map_or(UPDATE_NOT_ELIGIBLE, |key_value_ref| {
             let stored_value = key_value_ref.value();
-            UpdateEligibility(Some(KeyIdExpiry(stored_value.key_id(),stored_value.expire_after())))
+            UpdateEligibility(Some(KeyIdExpiry(stored_value.key_id(), stored_value.expire_after())))
         })
     }
 
@@ -371,7 +381,7 @@ mod tests {
         let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
 
         store.put("topic", "microservices", 10);
-        let update_eligibility = store.can_update(&"topic");
+        let update_eligibility = store.update_eligibility(&"topic");
 
         let expected_update_eligibility = UpdateEligibility(Some(KeyIdExpiry(10, None)));
         assert_eq!(expected_update_eligibility, update_eligibility);
@@ -382,7 +392,24 @@ mod tests {
         let clock = SystemClock::boxed();
         let store: Arc<Store<&str, &str>> = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
 
-        let update_eligibility = store.can_update(&"non_existing");
+        let update_eligibility = store.update_eligibility(&"non_existing");
         assert_eq!(UPDATE_NOT_ELIGIBLE, update_eligibility);
+    }
+}
+
+#[cfg(test)]
+mod update_eligibility_tests {
+    use crate::cache::store::{KeyIdExpiry, UpdateEligibility};
+
+    #[test]
+    fn is_not_update_eligible() {
+        let update_eligibility = UpdateEligibility(None);
+        assert!(update_eligibility.is_not_eligible());
+    }
+
+    #[test]
+    fn is_update_eligible() {
+        let update_eligibility = UpdateEligibility(Some(KeyIdExpiry(10, None)));
+        assert!(update_eligibility.is_eligible());
     }
 }

@@ -6,10 +6,10 @@ use crate::cache::types::Weight;
 pub struct UpsertRequest<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone,
           Value: Send + Sync {
-    key: Key,
-    value: Option<Value>,
-    weight: Option<Weight>,
-    time_to_live: Option<Duration>,
+    pub(crate) key: Key,
+    pub(crate) value: Option<Value>,
+    pub(crate) weight: Option<Weight>,
+    pub(crate) time_to_live: Option<Duration>,
 }
 
 pub struct UpsertRequestBuilder<Key, Value>
@@ -61,6 +61,7 @@ impl<Key, Value> UpsertRequestBuilder<Key, Value>
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
+
     use crate::cache::upsert::UpsertRequestBuilder;
 
     #[test]
