@@ -17,7 +17,9 @@ pub mod key_value_ref;
 pub(crate) struct KeyIdExpiry(pub(crate) KeyId, pub(crate) Option<ExpireAfter>);
 
 #[derive(Eq, PartialEq, Debug)]
-pub(crate) struct UpdateEligibility(pub(crate) KeyIdExpiry);
+pub(crate) struct UpdateEligibility(pub(crate) Option<KeyIdExpiry>);
+
+const UPDATE_NOT_ELIGIBLE: UpdateEligibility = UpdateEligibility(None);
 
 pub(crate) struct Store<Key, Value>
     where Key: Hash + Eq, {
@@ -72,11 +74,11 @@ impl<Key, Value> Store<Key, Value>
         mapped_value
     }
 
-    pub(crate) fn can_update(&self, key: &Key) -> Option<UpdateEligibility> {
+    pub(crate) fn can_update(&self, key: &Key) -> UpdateEligibility {
         let mapped_value = self.contains(key);
-        mapped_value.map(|key_value_ref| {
+        mapped_value.map_or(UPDATE_NOT_ELIGIBLE, |key_value_ref| {
             let stored_value = key_value_ref.value();
-            UpdateEligibility(KeyIdExpiry(stored_value.key_id(),stored_value.expire_after()))
+            UpdateEligibility(Some(KeyIdExpiry(stored_value.key_id(),stored_value.expire_after())))
         })
     }
 
@@ -112,7 +114,7 @@ mod tests {
 
     use crate::cache::clock::{Clock, SystemClock};
     use crate::cache::stats::ConcurrentStatsCounter;
-    use crate::cache::store::{KeyIdExpiry, Store, UpdateEligibility};
+    use crate::cache::store::{KeyIdExpiry, Store, UPDATE_NOT_ELIGIBLE, UpdateEligibility};
     use crate::cache::store::stored_value::StoredValue;
     use crate::cache::store::tests::setup::{Name, UnixEpochClock};
 
@@ -371,8 +373,8 @@ mod tests {
         store.put("topic", "microservices", 10);
         let update_eligibility = store.can_update(&"topic");
 
-        let expected_update_eligibility = UpdateEligibility(KeyIdExpiry(10, None));
-        assert_eq!(Some(expected_update_eligibility), update_eligibility);
+        let expected_update_eligibility = UpdateEligibility(Some(KeyIdExpiry(10, None)));
+        assert_eq!(expected_update_eligibility, update_eligibility);
     }
 
     #[test]
@@ -381,6 +383,6 @@ mod tests {
         let store: Arc<Store<&str, &str>> = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
 
         let update_eligibility = store.can_update(&"non_existing");
-        assert_eq!(None, update_eligibility);
+        assert_eq!(UPDATE_NOT_ELIGIBLE, update_eligibility);
     }
 }
