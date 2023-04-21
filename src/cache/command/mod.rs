@@ -2,6 +2,7 @@ use std::hash::Hash;
 use std::time::Duration;
 
 use crate::cache::key_description::KeyDescription;
+use crate::cache::types::Weight;
 
 pub mod acknowledgement;
 pub mod error;
@@ -12,7 +13,8 @@ pub(crate) enum CommandType<Key, Value>
     Put(KeyDescription<Key>, Value),
     PutWithTTL(KeyDescription<Key>, Value, Duration),
     Delete(Key),
-    UpdateTTL(Key, Duration)
+    UpdateTTL(Key, Duration),
+    UpdateWeight(Key, Weight)
 }
 
 impl<Key, Value> CommandType<Key, Value>
@@ -23,6 +25,7 @@ impl<Key, Value> CommandType<Key, Value>
             CommandType::PutWithTTL(_, _, _) => "PutWithTTL".to_string(),
             CommandType::Delete(_) => "Delete".to_string(),
             CommandType::UpdateTTL(_, _) => "UpdateTTL".to_string(),
+            CommandType::UpdateWeight(_, _) => "UpdateWeight".to_string(),
         }
     }
 }
@@ -77,5 +80,12 @@ mod tests {
         let update: CommandType<&str, &str> = CommandType::UpdateTTL("topic", Duration::from_secs(10));
 
         assert_eq!("UpdateTTL", update.description());
+    }
+
+    #[test]
+    fn command_description_update_weight() {
+        let update: CommandType<&str, &str> = CommandType::UpdateWeight("topic", 25);
+
+        assert_eq!("UpdateWeight", update.description());
     }
 }

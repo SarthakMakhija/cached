@@ -14,6 +14,7 @@ use crate::cache::key_description::KeyDescription;
 use crate::cache::policy::admission_policy::AdmissionPolicy;
 use crate::cache::stats::ConcurrentStatsCounter;
 use crate::cache::store::Store;
+use crate::cache::types::Weight;
 
 pub type CommandSendResult = Result<Arc<CommandAcknowledgement>, CommandSendError>;
 
@@ -65,6 +66,14 @@ struct UpdateTTLParameter<'a, Key, Value>
     key: &'a Key,
     ttl: Duration,
     ttl_ticker: &'a Arc<TTLTicker>,
+}
+
+struct UpdateWeightParameter<'a, Key, Value>
+    where Key: Hash + Eq + Send + Sync + Clone + 'static {
+    store: &'a Arc<Store<Key, Value>>,
+    key: &'a Key,
+    weight: Weight,
+    admission_policy: &'a Arc<AdmissionPolicy<Key>>,
 }
 
 impl<Key, Value> CommandExecutor<Key, Value>
@@ -133,6 +142,13 @@ impl<Key, Value> CommandExecutor<Key, Value>
                             ttl,
                             ttl_ticker: &ttl_ticker,
                         }),
+                    CommandType::UpdateWeight(key, weight) =>
+                        Self::update_weight(UpdateWeightParameter {
+                            store: &store,
+                            key: &key,
+                            weight,
+                            admission_policy: &admission_policy
+                        })
                 };
                 pair.acknowledgement.done(status);
                 if !keep_running.load(Ordering::Acquire) {
@@ -223,6 +239,14 @@ impl<Key, Value> CommandExecutor<Key, Value>
                 Some(existing_expiry) =>
                     update_ttl_parameter.ttl_ticker.update(update_response.key_id(), &existing_expiry, update_response.new_expiry())
             }
+            return CommandStatus::Accepted;
+        }
+        CommandStatus::Rejected
+    }
+
+    fn update_weight(update_weight_parameter: UpdateWeightParameter<Key, Value>) -> CommandStatus {
+        if let Some(key_id) = update_weight_parameter.store.get_key_id(update_weight_parameter.key) {
+            update_weight_parameter.admission_policy.update(&key_id, update_weight_parameter.weight);
             return CommandStatus::Accepted;
         }
         CommandStatus::Rejected
@@ -726,5 +750,50 @@ mod sociable_tests {
         command_executor.shutdown();
         assert_eq!(None, store.get(&"topic"));
         assert!(!admission_policy.contains(&1));
+    }
+
+    #[tokio::test]
+    async fn update_weight_of_a_non_existing_key() {
+        let stats_counter = Arc::new(ConcurrentStatsCounter::new());
+        let store: Arc<Store<&str, &str>> = Store::new(SystemClock::boxed(), stats_counter.clone());
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
+
+        let command_executor = CommandExecutor::new(
+            store.clone(),
+            admission_policy.clone(),
+            stats_counter,
+            no_action_ttl_ticker(),
+            10,
+        );
+
+        let status = command_executor.send(CommandType::UpdateWeight("topic", 15)).unwrap().handle().await;
+
+        command_executor.shutdown();
+        assert_eq!(CommandStatus::Rejected, status);
+    }
+
+    #[tokio::test]
+    async fn update_weight_of_an_existing_key() {
+        let stats_counter = Arc::new(ConcurrentStatsCounter::new());
+        let store: Arc<Store<&str, &str>> = Store::new(SystemClock::boxed(), stats_counter.clone());
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
+
+        let command_executor = CommandExecutor::new(
+            store.clone(),
+            admission_policy.clone(),
+            stats_counter,
+            no_action_ttl_ticker(),
+            10,
+        );
+        let acknowledgement = command_executor.send(CommandType::Put(
+            KeyDescription::new("topic", 1, 1029, 10),
+            "microservices",
+        )).unwrap();
+        acknowledgement.handle().await;
+
+        let _ = command_executor.send(CommandType::UpdateWeight("topic", 15)).unwrap().handle().await;
+
+        command_executor.shutdown();
+        assert_eq!(Some(15), admission_policy.weight_of(&1));
     }
 }

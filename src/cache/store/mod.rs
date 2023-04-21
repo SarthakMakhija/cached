@@ -99,6 +99,10 @@ impl<Key, Value> Store<Key, Value>
         mapped_value
     }
 
+    pub(crate) fn get_key_id(&self, key: &Key) -> Option<KeyId> {
+        self.contains(key).map(|key_value_ref| key_value_ref.value().key_id())
+    }
+
     pub(crate) fn update_eligibility(&self, key: &Key) -> UpdateEligibility {
         let mapped_value = self.contains(key);
         mapped_value.map_or(UPDATE_NOT_ELIGIBLE, |key_value_ref| {

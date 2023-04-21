@@ -10,6 +10,7 @@ pub struct UpsertRequest<Key, Value>
     pub(crate) value: Option<Value>,
     pub(crate) weight: Option<Weight>,
     pub(crate) time_to_live: Option<Duration>,
+    pub(crate) remove_time_to_live: bool
 }
 
 pub struct UpsertRequestBuilder<Key, Value>
@@ -19,6 +20,7 @@ pub struct UpsertRequestBuilder<Key, Value>
     value: Option<Value>,
     weight: Option<Weight>,
     time_to_live: Option<Duration>,
+    remove_time_to_live: bool,
 }
 
 impl<Key, Value> UpsertRequestBuilder<Key, Value>
@@ -30,6 +32,7 @@ impl<Key, Value> UpsertRequestBuilder<Key, Value>
             value: None,
             weight: None,
             time_to_live: None,
+            remove_time_to_live: false,
         }
     }
 
@@ -48,12 +51,18 @@ impl<Key, Value> UpsertRequestBuilder<Key, Value>
         self
     }
 
+    pub fn remove_time_to_live(mut self) -> UpsertRequestBuilder<Key, Value> {
+        self.remove_time_to_live = true;
+        self
+    }
+
     pub fn build(self) -> UpsertRequest<Key, Value> {
         UpsertRequest {
             key: self.key,
             value: self.value,
             weight: self.weight,
             time_to_live: self.time_to_live,
+            remove_time_to_live: self.remove_time_to_live
         }
     }
 }
@@ -84,5 +93,12 @@ mod tests {
         let upsert_request = UpsertRequestBuilder::new("topic").value("microservices").time_to_live(Duration::from_secs(10)).build();
 
         assert_eq!(Some(Duration::from_secs(10)), upsert_request.time_to_live);
+    }
+
+    #[test]
+    fn upsert_request_remove_time_to_live() {
+        let upsert_request = UpsertRequestBuilder::new("topic").value("microservices").remove_time_to_live().build();
+
+        assert!(upsert_request.remove_time_to_live);
     }
 }
