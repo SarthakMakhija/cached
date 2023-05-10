@@ -9,6 +9,7 @@ edition = "2021"
 tokio = { version = "1.26.0", features = ["full"] }
 
 [dependencies]
+bloomfilter = "1.0.9"
 crossbeam-channel = "0.5.7"
 crossbeam-utils = "0.8.15"
 dashmap = "5.4.0"
