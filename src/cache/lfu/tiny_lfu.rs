@@ -1,8 +1,10 @@
+use crate::cache::lfu::doorkeeper::DoorKeeper;
 use crate::cache::lfu::frequency_counter::FrequencyCounter;
-use crate::cache::types::{FrequencyEstimate, KeyHash, TotalCounters};
+use crate::cache::types::{DoorKeeperCapacity, FrequencyEstimate, KeyHash, TotalCounters};
 
 pub(crate) struct TinyLFU {
     key_access_frequency: FrequencyCounter,
+    door_keeper: DoorKeeper,
     total_increments: u64,
     reset_counters_at: u64,
 }
@@ -11,23 +13,30 @@ impl TinyLFU {
     pub(crate) fn new(counters: TotalCounters) -> TinyLFU {
         TinyLFU {
             key_access_frequency: FrequencyCounter::new(counters),
+            door_keeper: DoorKeeper::new(counters as DoorKeeperCapacity, 0.01),
             total_increments: 0,
             reset_counters_at: counters,
         }
     }
 
+    //TODO: probably need a better name
     pub(crate) fn add(&mut self, key_hashes: Vec<KeyHash>) {
         key_hashes.iter().for_each(|key_hash| self.increment_access_for(*key_hash));
     }
 
     pub(crate) fn estimate(&self, key_hash: KeyHash) -> FrequencyEstimate {
-        //TODO: Doorkeeper
-        self.key_access_frequency.estimate(key_hash)
+        let mut estimate = self.key_access_frequency.estimate(key_hash);
+        if self.door_keeper.has(&key_hash) {
+            estimate += 1;
+        }
+        estimate
     }
 
     fn increment_access_for(&mut self, key_hash: KeyHash) {
-        //TODO: Doorkeeper
-        self.key_access_frequency.increment(key_hash);
+        let added = self.door_keeper.add_if_missing(&key_hash);
+        if !added {
+            self.key_access_frequency.increment(key_hash);
+        }
         self.total_increments += 1;
         if self.total_increments >= self.reset_counters_at {
             self.reset();
@@ -37,6 +46,7 @@ impl TinyLFU {
     fn reset(&mut self) {
         self.total_increments = 0;
         self.key_access_frequency.reset();
+        self.door_keeper.clear();
     }
 }
 
@@ -50,6 +60,17 @@ mod tests {
         tiny_lfu.add(vec![10, 10, 10, 20]);
 
         assert_eq!(3, tiny_lfu.estimate(10));
+        assert_eq!(1, tiny_lfu.estimate(20));
+    }
+
+    #[test]
+    fn increment_frequency_access_for_keys_if_doorkeeper_already_has_some_keys() {
+        let mut tiny_lfu = TinyLFU::new(10);
+        tiny_lfu.door_keeper.add_if_missing(&10);
+
+        tiny_lfu.add(vec![10, 10, 10, 20]);
+
+        assert_eq!(4, tiny_lfu.estimate(10));
         assert_eq!(1, tiny_lfu.estimate(20));
     }
 

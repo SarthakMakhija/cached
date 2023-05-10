@@ -13,22 +13,50 @@ impl DoorKeeper {
         }
     }
 
-    pub(crate) fn add(&mut self, key: &KeyHash) {
-        self.bloom.set(key);
+    pub(crate) fn add_if_missing(&mut self, key: &KeyHash) -> bool {
+        if !self.has(key) {
+            self.bloom.set(key);
+            return true;
+        }
+        false
     }
 
-    pub(crate) fn has(&mut self, key: &KeyHash) -> bool {
+    pub(crate) fn has(&self, key: &KeyHash) -> bool {
         self.bloom.check(key)
     }
 
     pub(crate) fn clear(&mut self) {
         self.bloom.clear();
     }
+
+    fn add(&mut self, key: &KeyHash) {
+        self.bloom.set(key);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::cache::lfu::doorkeeper::DoorKeeper;
+
+    #[test]
+    fn add_if_missing() {
+        let mut door_keeper = DoorKeeper::new(100, 0.01);
+        door_keeper.add_if_missing(&200);
+
+        assert!(door_keeper.has(&200));
+        door_keeper.clear();
+    }
+
+    #[test]
+    fn do_not_add_if_not_missing() {
+        let mut door_keeper = DoorKeeper::new(100, 0.01);
+        door_keeper.add_if_missing(&200);
+        let added = door_keeper.add_if_missing(&200);
+
+        assert!(door_keeper.has(&200));
+        assert!(!added);
+        door_keeper.clear();
+    }
 
     #[test]
     fn add() {
