@@ -28,10 +28,6 @@ impl DoorKeeper {
     pub(crate) fn clear(&mut self) {
         self.bloom.clear();
     }
-
-    fn add(&mut self, key: &KeyHash) {
-        self.bloom.set(key);
-    }
 }
 
 #[cfg(test)]
@@ -61,7 +57,7 @@ mod tests {
     #[test]
     fn add() {
         let mut door_keeper = DoorKeeper::new(100, 0.01);
-        door_keeper.add(&200);
+        door_keeper.add_if_missing(&200);
 
         assert!(door_keeper.has(&200));
         door_keeper.clear();
@@ -70,8 +66,8 @@ mod tests {
     #[test]
     fn add_multiple_keys() {
         let mut door_keeper = DoorKeeper::new(100, 0.01);
-        door_keeper.add(&200);
-        door_keeper.add(&100);
+        door_keeper.add_if_missing(&200);
+        door_keeper.add_if_missing(&100);
 
         assert!(door_keeper.has(&100));
         assert!(door_keeper.has(&200));
@@ -81,8 +77,8 @@ mod tests {
     #[test]
     fn does_not_contain_after_clear() {
         let mut door_keeper = DoorKeeper::new(100, 0.01);
-        door_keeper.add(&200);
-        door_keeper.add(&100);
+        door_keeper.add_if_missing(&200);
+        door_keeper.add_if_missing(&100);
 
         door_keeper.clear();
         assert!(!door_keeper.has(&100));
