@@ -13,6 +13,15 @@ pub struct UpsertRequest<Key, Value>
     pub(crate) remove_time_to_live: bool
 }
 
+impl<Key, Value> UpsertRequest<Key, Value>
+    where Key: Hash + Eq + Send + Sync + Clone,
+          Value: Send + Sync {
+
+    pub(crate) fn value(self) -> Option<Value> {
+        self.value
+    }
+}
+
 pub struct UpsertRequestBuilder<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone,
           Value: Send + Sync {

@@ -20,14 +20,14 @@ pub(crate) struct KeyIdExpiry(pub(crate) KeyId, pub(crate) Option<ExpireAfter>);
 pub(crate) struct UpdateEligibility(pub(crate) Option<KeyIdExpiry>);
 
 #[derive(Eq, PartialEq, Debug)]
-pub(crate) struct UpdateResponse(KeyIdExpiry, Option<ExpireAfter>);
+pub(crate) struct UpdateResponse<Value>(Option<KeyIdExpiry>, Option<ExpireAfter>, Option<Value>);
 
-impl UpdateResponse {
-    pub(crate) fn key_id(&self) -> KeyId {
-        self.0.0
+impl<Value> UpdateResponse<Value> {
+    pub(crate) fn did_update_happen(&self) -> bool {
+        self.0.is_some()
     }
     pub(crate) fn existing_expiry(&self) -> Option<ExpireAfter> {
-        self.0.1
+        if self.did_update_happen() { self.0.as_ref().unwrap().1 } else { None }
     }
     pub(crate) fn new_expiry(&self) -> Option<ExpireAfter> {
         self.1
@@ -111,18 +111,19 @@ impl<Key, Value> Store<Key, Value>
         })
     }
 
-    pub(crate) fn update(&self, key: &Key, value: Option<Value>, time_to_live: Option<Duration>, remove_time_to_live: bool) -> Option<UpdateResponse> {
+    pub(crate) fn update(&self, key: &Key, value: Option<Value>, time_to_live: Option<Duration>, remove_time_to_live: bool) -> UpdateResponse<Value> {
         if let Some(mut existing) = self.store.get_mut(key) {
             let existing_expiry = existing.expire_after();
             let new_expiry = existing.update(value, time_to_live, remove_time_to_live, &self.clock);
 
-            let response = Some(UpdateResponse(
-                KeyIdExpiry(existing.key_id(), existing_expiry),
+            let response = UpdateResponse(
+                Some(KeyIdExpiry(existing.key_id(), existing_expiry)),
                 new_expiry,
-            ));
+                None,
+            );
             return response;
         }
-        None
+        UpdateResponse(None, None, value)
     }
 
     fn contains(&self, key: &Key) -> Option<KeyValueRef<Key, StoredValue<Value>>> {
@@ -421,7 +422,7 @@ mod tests {
     }
 
     #[test]
-    fn can_non_update() {
+    fn can_not_update() {
         let clock = SystemClock::boxed();
         let store: Arc<Store<&str, &str>> = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
 
@@ -435,7 +436,7 @@ mod tests {
         let store: Arc<Store<&str, &str>> = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
         let response = store.update(&"topic", None, Some(Duration::from_secs(5)), false);
 
-        assert_eq!(None, response);
+        assert!(!response.did_update_happen());
     }
 
     #[test]
@@ -445,7 +446,7 @@ mod tests {
 
         store.put("topic", "microservices", 10);
         let update_response = store.update(&"topic", None, Some(Duration::from_secs(5)), false);
-        assert!(update_response.unwrap().existing_expiry().is_none());
+        assert!(update_response.existing_expiry().is_none());
 
         let key_value_ref = store.get_ref(&"topic").unwrap();
         let expected_expiry = clock.now().add(Duration::from_secs(5));
