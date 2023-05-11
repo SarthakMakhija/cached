@@ -14,7 +14,6 @@ use crate::cache::key_description::KeyDescription;
 use crate::cache::policy::admission_policy::AdmissionPolicy;
 use crate::cache::stats::ConcurrentStatsCounter;
 use crate::cache::store::Store;
-use crate::cache::types::Weight;
 
 pub type CommandSendResult = Result<Arc<CommandAcknowledgement>, CommandSendError>;
 
@@ -58,22 +57,6 @@ struct DeleteParameter<'a, Key, Value>
     key: &'a Key,
     admission_policy: &'a Arc<AdmissionPolicy<Key>>,
     ttl_ticker: &'a Arc<TTLTicker>,
-}
-
-struct UpdateTTLParameter<'a, Key, Value>
-    where Key: Hash + Eq + Send + Sync + Clone + 'static {
-    store: &'a Arc<Store<Key, Value>>,
-    key: &'a Key,
-    ttl: Duration,
-    ttl_ticker: &'a Arc<TTLTicker>,
-}
-
-struct UpdateWeightParameter<'a, Key, Value>
-    where Key: Hash + Eq + Send + Sync + Clone + 'static {
-    store: &'a Arc<Store<Key, Value>>,
-    key: &'a Key,
-    weight: Weight,
-    admission_policy: &'a Arc<AdmissionPolicy<Key>>,
 }
 
 impl<Key, Value> CommandExecutor<Key, Value>
@@ -135,20 +118,6 @@ impl<Key, Value> CommandExecutor<Key, Value>
                             admission_policy: &admission_policy,
                             ttl_ticker: &ttl_ticker,
                         }),
-                    CommandType::UpdateTTL(key, ttl) =>
-                        Self::update_ttl(UpdateTTLParameter {
-                            store: &store,
-                            key: &key,
-                            ttl,
-                            ttl_ticker: &ttl_ticker,
-                        }),
-                    CommandType::UpdateWeight(key, weight) =>
-                        Self::update_weight(UpdateWeightParameter {
-                            store: &store,
-                            key: &key,
-                            weight,
-                            admission_policy: &admission_policy
-                        })
                 };
                 pair.acknowledgement.done(status);
                 if !keep_running.load(Ordering::Acquire) {
@@ -229,41 +198,17 @@ impl<Key, Value> CommandExecutor<Key, Value>
         }
         CommandStatus::Rejected
     }
-
-    fn update_ttl(update_ttl_parameter: UpdateTTLParameter<Key, Value>) -> CommandStatus {
-        let response = update_ttl_parameter.store.update_time_to_live(update_ttl_parameter.key, update_ttl_parameter.ttl);
-        if let Some(update_response) = response {
-            match update_response.existing_expiry() {
-                None =>
-                    update_ttl_parameter.ttl_ticker.put(update_response.key_id(), update_response.new_expiry()),
-                Some(existing_expiry) =>
-                    update_ttl_parameter.ttl_ticker.update(update_response.key_id(), &existing_expiry, update_response.new_expiry())
-            }
-            return CommandStatus::Accepted;
-        }
-        CommandStatus::Rejected
-    }
-
-    fn update_weight(update_weight_parameter: UpdateWeightParameter<Key, Value>) -> CommandStatus {
-        if let Some(key_id) = update_weight_parameter.store.get_key_id(update_weight_parameter.key) {
-            update_weight_parameter.admission_policy.update(&key_id, update_weight_parameter.weight);
-            return CommandStatus::Accepted;
-        }
-        CommandStatus::Rejected
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Add;
     use std::sync::Arc;
     use std::thread;
     use std::time::Duration;
 
-    use crate::cache::clock::{Clock, SystemClock};
+    use crate::cache::clock::SystemClock;
     use crate::cache::command::{CommandStatus, CommandType};
     use crate::cache::command::command_executor::CommandExecutor;
-    use crate::cache::command::command_executor::tests::setup::UnixEpochClock;
     use crate::cache::expiration::config::TTLConfig;
     use crate::cache::expiration::TTLTicker;
     use crate::cache::key_description::KeyDescription;
@@ -542,97 +487,6 @@ mod tests {
         command_executor.shutdown();
         assert_eq!(CommandStatus::Rejected, status);
     }
-
-    #[tokio::test]
-    async fn updates_the_ttl_of_non_existing_key() {
-        let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let store: Arc<Store<&str, &str>> = Store::new(SystemClock::boxed(), stats_counter.clone());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
-
-        let command_executor = CommandExecutor::new(
-            store.clone(),
-            admission_policy,
-            stats_counter,
-            no_action_ttl_ticker(),
-            10,
-        );
-
-        let command_acknowledgement = command_executor.send(CommandType::UpdateTTL(
-            "topic",
-            Duration::from_secs(5),
-        )).unwrap();
-        let command_status = command_acknowledgement.handle().await;
-
-        command_executor.shutdown();
-        assert_eq!(CommandStatus::Rejected, command_status);
-    }
-
-    #[tokio::test]
-    async fn updates_the_ttl_of_an_existing_key() {
-        let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let clock = Box::new(UnixEpochClock {});
-        let store: Arc<Store<&str, &str>> = Store::new(clock.clone(), stats_counter.clone());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
-        let ttl_ticker = no_action_ttl_ticker();
-
-        let command_executor = CommandExecutor::new(
-            store.clone(),
-            admission_policy,
-            stats_counter,
-            ttl_ticker.clone(),
-            10,
-        );
-
-        let command_acknowledgement = command_executor.send(CommandType::Put(
-            KeyDescription::new("topic", 1, 1029, 50),
-            "microservices",
-        )).unwrap();
-        let _ = command_acknowledgement.handle().await;
-
-        let _ = command_executor.send(CommandType::UpdateTTL("topic", Duration::from_secs(5))).unwrap().handle().await;
-
-        let key_value_ref = store.get_ref(&"topic").unwrap();
-
-        let new_expiry = clock.now().add(Duration::from_secs(5));
-        assert_eq!(Some(new_expiry), key_value_ref.value().expire_after());
-        assert_eq!(Some(new_expiry), ttl_ticker.get(&1, &new_expiry));
-
-        command_executor.shutdown();
-    }
-
-    #[tokio::test]
-    async fn updates_the_ttl_of_an_existing_key_that_has_an_expiry() {
-        let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let clock = Box::new(UnixEpochClock {});
-        let store: Arc<Store<&str, &str>> = Store::new(clock.clone(), stats_counter.clone());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
-        let ttl_ticker = no_action_ttl_ticker();
-
-        let command_executor = CommandExecutor::new(
-            store.clone(),
-            admission_policy,
-            stats_counter,
-            ttl_ticker.clone(),
-            10,
-        );
-
-        let command_acknowledgement = command_executor.send(CommandType::PutWithTTL(
-            KeyDescription::new("topic", 1, 1029, 50),
-            "microservices",
-            Duration::from_secs(25)
-        )).unwrap();
-        let _ = command_acknowledgement.handle().await;
-
-        let _ = command_executor.send(CommandType::UpdateTTL("topic", Duration::from_secs(300))).unwrap().handle().await;
-
-        let key_value_ref = store.get_ref(&"topic").unwrap();
-
-        let new_expiry = clock.now().add(Duration::from_secs(300));
-        assert_eq!(Some(new_expiry), key_value_ref.value().expire_after());
-        assert_eq!(Some(new_expiry), ttl_ticker.get(&1, &new_expiry));
-
-        command_executor.shutdown();
-    }
 }
 
 #[cfg(test)]
@@ -750,50 +604,5 @@ mod sociable_tests {
         command_executor.shutdown();
         assert_eq!(None, store.get(&"topic"));
         assert!(!admission_policy.contains(&1));
-    }
-
-    #[tokio::test]
-    async fn update_weight_of_a_non_existing_key() {
-        let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let store: Arc<Store<&str, &str>> = Store::new(SystemClock::boxed(), stats_counter.clone());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
-
-        let command_executor = CommandExecutor::new(
-            store.clone(),
-            admission_policy.clone(),
-            stats_counter,
-            no_action_ttl_ticker(),
-            10,
-        );
-
-        let status = command_executor.send(CommandType::UpdateWeight("topic", 15)).unwrap().handle().await;
-
-        command_executor.shutdown();
-        assert_eq!(CommandStatus::Rejected, status);
-    }
-
-    #[tokio::test]
-    async fn update_weight_of_an_existing_key() {
-        let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let store: Arc<Store<&str, &str>> = Store::new(SystemClock::boxed(), stats_counter.clone());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
-
-        let command_executor = CommandExecutor::new(
-            store.clone(),
-            admission_policy.clone(),
-            stats_counter,
-            no_action_ttl_ticker(),
-            10,
-        );
-        let acknowledgement = command_executor.send(CommandType::Put(
-            KeyDescription::new("topic", 1, 1029, 10),
-            "microservices",
-        )).unwrap();
-        acknowledgement.handle().await;
-
-        let _ = command_executor.send(CommandType::UpdateWeight("topic", 15)).unwrap().handle().await;
-
-        command_executor.shutdown();
-        assert_eq!(Some(15), admission_policy.weight_of(&1));
     }
 }
