@@ -12,8 +12,8 @@ use crate::cache::key_description::KeyDescription;
 use crate::cache::policy::admission_policy::AdmissionPolicy;
 use crate::cache::pool::Pool;
 use crate::cache::stats::ConcurrentStatsCounter;
+use crate::cache::store::{Store, TypeOfExpiryUpdate};
 use crate::cache::store::key_value_ref::KeyValueRef;
-use crate::cache::store::Store;
 use crate::cache::store::stored_value::StoredValue;
 use crate::cache::types::{KeyId, Weight};
 use crate::cache::unique_id::increasing_id_generator::IncreasingIdGenerator;
@@ -27,6 +27,7 @@ pub struct CacheD<Key, Value>
     store: Arc<Store<Key, Value>>,
     command_executor: CommandExecutor<Key, Value>,
     pool: Pool<AdmissionPolicy<Key>>,
+    ttl_ticker: Arc<TTLTicker>,
     id_generator: IncreasingIdGenerator,
 }
 
@@ -46,8 +47,9 @@ impl<Key, Value> CacheD<Key, Value>
         CacheD {
             config,
             store: store.clone(),
-            command_executor: CommandExecutor::new(store, admission_policy, stats_counter, ttl_ticker, command_buffer_size),
+            command_executor: CommandExecutor::new(store, admission_policy, stats_counter, ttl_ticker.clone(), command_buffer_size),
             pool,
+            ttl_ticker,
             id_generator: IncreasingIdGenerator::new(),
         }
     }
@@ -81,14 +83,12 @@ impl<Key, Value> CacheD<Key, Value>
 
     pub fn upsert(&self, request: UpsertRequest<Key, Value>) -> CommandSendResult {
         let updated_weight = request.updated_weight(&self.config.weight_calculation_fn);
-
         let (key, value, time_to_live)
             = (request.key, request.value, request.time_to_live);
 
         let update_response
             = self.store.update(&key, value, time_to_live, request.remove_time_to_live);
 
-        //TODO: TTLTicker
         if !update_response.did_update_happen() {
             let value = update_response.value();
             assert!(value.is_some());
@@ -102,11 +102,21 @@ impl<Key, Value> CacheD<Key, Value>
             } else {
                 self.put_with_weight(key, value, weight)
             };
-        } else {
-            let key_id = update_response.key_id_or_panic();
-            if let Some(weight) = updated_weight {
-                return self.command_executor.send(CommandType::UpdateWeight(key_id, weight));
-            }
+        }
+
+        match update_response.type_of_expiry_update() {
+            TypeOfExpiryUpdate::Added(key_id, expiry) =>
+                self.ttl_ticker.put(key_id, expiry),
+            TypeOfExpiryUpdate::Deleted(key_id, expiry) =>
+                self.ttl_ticker.delete(&key_id, &expiry),
+            TypeOfExpiryUpdate::Updated(key_id, old_expiry, new_expiry) =>
+                self.ttl_ticker.update(key_id, &old_expiry, new_expiry),
+            _ => {}
+        }
+
+        let key_id = update_response.key_id_or_panic();
+        if let Some(weight) = updated_weight {
+            return self.command_executor.send(CommandType::UpdateWeight(key_id, weight));
         }
         Ok(CommandAcknowledgement::accepted())
     }
@@ -642,15 +652,17 @@ mod tests {
         acknowledgement.handle().await;
 
         let acknowledgement =
-            cached.upsert(UpsertRequestBuilder::new("topic").time_to_live(Duration::from_secs(4)).build()).unwrap();
+            cached.upsert(UpsertRequestBuilder::new("topic").time_to_live(Duration::from_secs(100)).build()).unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get_ref(&"topic");
         let value_ref = value.unwrap();
         let stored_value = value_ref.value();
+        let key_id = stored_value.key_id();
 
         assert_eq!("microservices", stored_value.value());
-        assert_eq!(Some(clock.now().add(Duration::from_secs(4))), stored_value.expire_after());
+        assert_eq!(Some(clock.now().add(Duration::from_secs(100))), stored_value.expire_after());
+        assert_eq!(stored_value.expire_after(), cached.ttl_ticker.get(&key_id, &stored_value.expire_after().unwrap()));
     }
 
     #[tokio::test]
@@ -672,5 +684,28 @@ mod tests {
 
         assert_eq!("microservices", stored_value.value());
         assert_eq!(None, stored_value.expire_after());
+    }
+
+    #[tokio::test]
+    async fn add_the_time_to_live_of_an_existing_key() {
+        let clock: ClockType = Box::new(UnixEpochClock {});
+        let cached = CacheD::new(ConfigBuilder::new().clock(clock.clone_box()).counters(10).build());
+
+        let acknowledgement =
+            cached.put("topic", "microservices").unwrap();
+        acknowledgement.handle().await;
+
+        let acknowledgement =
+            cached.upsert(UpsertRequestBuilder::new("topic").time_to_live(Duration::from_secs(120)).build()).unwrap();
+        acknowledgement.handle().await;
+
+        let value = cached.get_ref(&"topic");
+        let value_ref = value.unwrap();
+        let stored_value = value_ref.value();
+        let key_id = stored_value.key_id();
+
+        assert_eq!("microservices", stored_value.value());
+        assert_eq!(Some(clock.now().add(Duration::from_secs(120))), stored_value.expire_after());
+        assert_eq!(stored_value.expire_after(), cached.ttl_ticker.get(&key_id, &stored_value.expire_after().unwrap()));
     }
 }
