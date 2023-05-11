@@ -80,26 +80,35 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn upsert(&self, request: UpsertRequest<Key, Value>) -> CommandSendResult {
-        let (key, value, weight, time_to_live)
-            = (request.key, request.value, request.weight, request.time_to_live);
+        let updated_weight = request.updated_weight(&self.config.weight_calculation_fn);
+
+        let (key, value, time_to_live)
+            = (request.key, request.value, request.time_to_live);
 
         let update_response
             = self.store.update(&key, value, time_to_live, request.remove_time_to_live);
 
+        //TODO: TTLTicker
         if !update_response.did_update_happen() {
             let value = update_response.value();
             assert!(value.is_some());
+            assert!(updated_weight.is_some());
 
             let value = value.unwrap();
-            let weight = weight.unwrap_or_else(|| (self.config.weight_calculation_fn)(&key, &value));
+            let weight = updated_weight.unwrap();
 
             return if let Some(time_to_live) = time_to_live {
                 self.put_with_weight_and_ttl(key, value, weight, time_to_live)
             } else {
                 self.put_with_weight(key, value, weight)
             };
+        } else {
+            let key_id = update_response.key_id_or_panic();
+            if let Some(weight) = updated_weight {
+                return self.command_executor.send(CommandType::UpdateWeight(key_id, weight));
+            }
         }
-        Ok(CommandAcknowledgement::new())
+        Ok(CommandAcknowledgement::accepted())
     }
 
     pub fn delete(&self, key: Key) -> CommandSendResult {
@@ -237,10 +246,13 @@ impl<'a, Key, Value, MapFn, MappedValue> Iterator for MultiGetMapIterator<'a, Ke
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Add;
     use std::thread;
     use std::time::Duration;
 
     use crate::cache::cached::CacheD;
+    use crate::cache::cached::tests::setup::UnixEpochClock;
+    use crate::cache::clock::ClockType;
     use crate::cache::config::ConfigBuilder;
     use crate::cache::upsert::UpsertRequestBuilder;
 
@@ -248,6 +260,21 @@ mod tests {
     struct Name {
         first: String,
         last: String,
+    }
+
+    mod setup {
+        use std::time::SystemTime;
+
+        use crate::cache::clock::Clock;
+
+        #[derive(Clone)]
+        pub(crate) struct UnixEpochClock;
+
+        impl Clock for UnixEpochClock {
+            fn now(&self) -> SystemTime {
+                SystemTime::UNIX_EPOCH
+            }
+        }
     }
 
     #[tokio::test]
@@ -550,7 +577,8 @@ mod tests {
 
     #[tokio::test]
     async fn upsert_a_non_existing_key_value_with_time_to_live() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let clock: ClockType = Box::new(UnixEpochClock {});
+        let cached = CacheD::new(ConfigBuilder::new().clock(clock.clone_box()).counters(10).build());
 
         let acknowledgement =
             cached.upsert(UpsertRequestBuilder::new("topic").value("microservices").time_to_live(Duration::from_secs(10)).build()).unwrap();
@@ -560,6 +588,89 @@ mod tests {
         let value_ref = value.unwrap();
         let stored_value = value_ref.value();
 
+        assert_eq!(Some(clock.now().add(Duration::from_secs(10))), stored_value.expire_after());
         assert_eq!("microservices", stored_value.value());
+    }
+
+    #[tokio::test]
+    async fn update_the_value_of_an_existing_key() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        let acknowledgement =
+            cached.put("topic", "microservices").unwrap();
+        acknowledgement.handle().await;
+
+        let acknowledgement =
+            cached.upsert(UpsertRequestBuilder::new("topic").value("storage engine").build()).unwrap();
+        acknowledgement.handle().await;
+
+        let value = cached.get_ref(&"topic");
+        let value_ref = value.unwrap();
+        let stored_value = value_ref.value();
+
+        assert_eq!("storage engine", stored_value.value());
+    }
+
+    #[tokio::test]
+    async fn update_the_weight_of_an_existing_key() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        let acknowledgement =
+            cached.put("topic", "microservices").unwrap();
+        acknowledgement.handle().await;
+
+        let acknowledgement =
+            cached.upsert(UpsertRequestBuilder::new("topic").weight(29).build()).unwrap();
+        acknowledgement.handle().await;
+
+        let value = cached.get_ref(&"topic");
+        let value_ref = value.unwrap();
+        let stored_value = value_ref.value();
+        let key_id = stored_value.key_id();
+
+        assert_eq!("microservices", stored_value.value());
+        assert_eq!(Some(29), cached.pool.get_buffer_consumer().weight_of(&key_id));
+    }
+
+    #[tokio::test]
+    async fn update_the_time_to_live_of_an_existing_key() {
+        let clock: ClockType = Box::new(UnixEpochClock {});
+        let cached = CacheD::new(ConfigBuilder::new().clock(clock.clone_box()).counters(10).build());
+
+        let acknowledgement =
+            cached.put("topic", "microservices").unwrap();
+        acknowledgement.handle().await;
+
+        let acknowledgement =
+            cached.upsert(UpsertRequestBuilder::new("topic").time_to_live(Duration::from_secs(4)).build()).unwrap();
+        acknowledgement.handle().await;
+
+        let value = cached.get_ref(&"topic");
+        let value_ref = value.unwrap();
+        let stored_value = value_ref.value();
+
+        assert_eq!("microservices", stored_value.value());
+        assert_eq!(Some(clock.now().add(Duration::from_secs(4))), stored_value.expire_after());
+    }
+
+    #[tokio::test]
+    async fn remove_the_time_to_live_of_an_existing_key() {
+        let clock: ClockType = Box::new(UnixEpochClock {});
+        let cached = CacheD::new(ConfigBuilder::new().clock(clock.clone_box()).counters(10).build());
+
+        let acknowledgement =
+            cached.put_with_ttl("topic", "microservices", Duration::from_secs(10)).unwrap();
+        acknowledgement.handle().await;
+
+        let acknowledgement =
+            cached.upsert(UpsertRequestBuilder::new("topic").remove_time_to_live().build()).unwrap();
+        acknowledgement.handle().await;
+
+        let value = cached.get_ref(&"topic");
+        let value_ref = value.unwrap();
+        let stored_value = value_ref.value();
+
+        assert_eq!("microservices", stored_value.value());
+        assert_eq!(None, stored_value.expire_after());
     }
 }

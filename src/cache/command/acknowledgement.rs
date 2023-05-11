@@ -34,6 +34,19 @@ impl CommandAcknowledgement {
             }
         )
     }
+    pub(crate) fn accepted() -> Arc<CommandAcknowledgement> {
+        Arc::new(
+            CommandAcknowledgement {
+                handle: CommandAcknowledgementHandle {
+                    done: AtomicBool::new(true),
+                    status: Arc::new(Mutex::new(CommandStatus::Accepted)),
+                    waker_state: Arc::new(Mutex::new(WakerState {
+                        waker: None
+                    })),
+                },
+            }
+        )
+    }
 
     pub(crate) fn done(&self, status: CommandStatus) {
         self.handle.done(status);

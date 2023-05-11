@@ -23,6 +23,9 @@ impl<Value> UpdateResponse<Value> {
     pub(crate) fn did_update_happen(&self) -> bool {
         self.0.is_some()
     }
+    pub(crate) fn key_id_or_panic(&self) -> KeyId {
+        self.0.as_ref().unwrap().0
+    }
     pub(crate) fn existing_expiry(&self) -> Option<ExpireAfter> {
         if self.did_update_happen() { self.0.as_ref().unwrap().1 } else { None }
     }
@@ -85,10 +88,6 @@ impl<Key, Value> Store<Key, Value>
         let mapped_value = self.contains(key);
         if mapped_value.is_some() { self.stats_counter.found_a_hit(); } else { self.stats_counter.found_a_miss(); }
         mapped_value
-    }
-
-    pub(crate) fn get_key_id(&self, key: &Key) -> Option<KeyId> {
-        self.contains(key).map(|key_value_ref| key_value_ref.value().key_id())
     }
 
     pub(crate) fn update(&self, key: &Key, value: Option<Value>, time_to_live: Option<Duration>, remove_time_to_live: bool) -> UpdateResponse<Value> {

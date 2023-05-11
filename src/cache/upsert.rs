@@ -1,5 +1,6 @@
 use std::hash::Hash;
 use std::time::Duration;
+use crate::cache::config::WeightCalculationFn;
 
 use crate::cache::types::Weight;
 
@@ -11,6 +12,15 @@ pub struct UpsertRequest<Key, Value>
     pub(crate) weight: Option<Weight>,
     pub(crate) time_to_live: Option<Duration>,
     pub(crate) remove_time_to_live: bool
+}
+
+impl<Key, Value> UpsertRequest<Key, Value>
+    where Key: Hash + Eq + Send + Sync + Clone,
+          Value: Send + Sync {
+
+    pub(crate) fn updated_weight(&self, weight_calculation_fn: &WeightCalculationFn<Key, Value>) -> Option<Weight> {
+        self.weight.or_else(|| self.value.as_ref().map(|v| (weight_calculation_fn)(&self.key, v)))
+    }
 }
 
 pub struct UpsertRequestBuilder<Key, Value>
@@ -100,5 +110,37 @@ mod tests {
         let upsert_request = UpsertRequestBuilder::new("topic").value("microservices").remove_time_to_live().build();
 
         assert!(upsert_request.remove_time_to_live);
+    }
+
+    #[test]
+    fn updated_weight_if_weight_is_provided() {
+        let upsert_request = UpsertRequestBuilder::new("topic").weight(10).build();
+        let weight_calculation_fn = Box::new(|_key: &&str, _value: &&str| 100);
+
+        assert_eq!(Some(10), upsert_request.updated_weight(&weight_calculation_fn));
+    }
+
+    #[test]
+    fn updated_weight_if_value_is_provided() {
+        let upsert_request = UpsertRequestBuilder::new("topic").value("cached").build();
+        let weight_calculation_fn = Box::new(|_key: &&str, value: &&str| value.len() as i64);
+
+        assert_eq!(Some(6), upsert_request.updated_weight(&weight_calculation_fn));
+    }
+
+    #[test]
+    fn updated_weight_if_weight_and_value_is_provided() {
+        let upsert_request = UpsertRequestBuilder::new("topic").value("cached").weight(22).build();
+        let weight_calculation_fn = Box::new(|_key: &&str, value: &&str| value.len() as i64);
+
+        assert_eq!(Some(22), upsert_request.updated_weight(&weight_calculation_fn));
+    }
+
+    #[test]
+    fn updated_weight_if_neither_weight_nor_value_is_provided() {
+        let upsert_request = UpsertRequestBuilder::new("topic").remove_time_to_live().build();
+        let weight_calculation_fn = Box::new(|_key: &&str, value: &&str| value.len() as i64);
+
+        assert_eq!(None, upsert_request.updated_weight(&weight_calculation_fn));
     }
 }

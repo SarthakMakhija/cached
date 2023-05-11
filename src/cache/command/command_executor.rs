@@ -111,6 +111,10 @@ impl<Key, Value> CommandExecutor<Key, Value>
                             ttl,
                             ttl_ticker: &ttl_ticker,
                         }),
+                    CommandType::UpdateWeight(key_id, weight) => {
+                        admission_policy.update(&key_id, weight);
+                        CommandStatus::Accepted
+                    }
                     CommandType::Delete(key) =>
                         Self::delete(DeleteParameter {
                             store: &store,
@@ -498,13 +502,13 @@ mod sociable_tests {
     use crate::cache::clock::SystemClock;
     use crate::cache::command::{CommandStatus, CommandType};
     use crate::cache::command::command_executor::CommandExecutor;
+    use crate::cache::command::command_executor::Store;
     use crate::cache::expiration::config::TTLConfig;
     use crate::cache::expiration::TTLTicker;
     use crate::cache::key_description::KeyDescription;
     use crate::cache::policy::admission_policy::AdmissionPolicy;
     use crate::cache::pool::BufferConsumer;
     use crate::cache::stats::ConcurrentStatsCounter;
-    use crate::cache::command::command_executor::Store;
 
     fn no_action_ttl_ticker() -> Arc<TTLTicker> {
         TTLTicker::new(TTLConfig::new(4, Duration::from_secs(300), SystemClock::boxed()), |_key_id| {})
@@ -604,5 +608,36 @@ mod sociable_tests {
         command_executor.shutdown();
         assert_eq!(None, store.get(&"topic"));
         assert!(!admission_policy.contains(&1));
+    }
+
+    #[tokio::test]
+    async fn updates_the_weight_of_the_key() {
+        let stats_counter = Arc::new(ConcurrentStatsCounter::new());
+        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
+
+        let command_executor = CommandExecutor::new(
+            store.clone(),
+            admission_policy.clone(),
+            stats_counter,
+            no_action_ttl_ticker(),
+            10,
+        );
+
+        let key_description = KeyDescription::new("topic", 1, 1029, 10);
+        let key_id = key_description.id;
+        let command_acknowledgement = command_executor.send(CommandType::Put(
+            key_description,
+            "microservices",
+        )).unwrap();
+        command_acknowledgement.handle().await;
+
+        let command_acknowledgement = command_executor.send(CommandType::UpdateWeight(
+            1, 20)).unwrap();
+        command_acknowledgement.handle().await;
+
+        command_executor.shutdown();
+        assert_eq!(Some("microservices"), store.get(&"topic"));
+        assert_eq!(Some(20), admission_policy.weight_of(&key_id));
     }
 }
