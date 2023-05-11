@@ -17,9 +17,6 @@ pub mod key_value_ref;
 pub(crate) struct KeyIdExpiry(pub(crate) KeyId, pub(crate) Option<ExpireAfter>);
 
 #[derive(Eq, PartialEq, Debug)]
-pub(crate) struct UpdateEligibility(pub(crate) Option<KeyIdExpiry>);
-
-#[derive(Eq, PartialEq, Debug)]
 pub(crate) struct UpdateResponse<Value>(Option<KeyIdExpiry>, Option<ExpireAfter>, Option<Value>);
 
 impl<Value> UpdateResponse<Value> {
@@ -32,17 +29,8 @@ impl<Value> UpdateResponse<Value> {
     pub(crate) fn new_expiry(&self) -> Option<ExpireAfter> {
         self.1
     }
-}
-
-const UPDATE_NOT_ELIGIBLE: UpdateEligibility = UpdateEligibility(None);
-
-impl UpdateEligibility {
-    pub(crate) fn is_eligible(&self) -> bool {
-        self.0.is_some()
-    }
-
-    pub(crate) fn is_not_eligible(&self) -> bool {
-        !self.is_eligible()
+    pub(crate) fn value(self) -> Option<Value> {
+        self.2
     }
 }
 
@@ -103,14 +91,6 @@ impl<Key, Value> Store<Key, Value>
         self.contains(key).map(|key_value_ref| key_value_ref.value().key_id())
     }
 
-    pub(crate) fn update_eligibility(&self, key: &Key) -> UpdateEligibility {
-        let mapped_value = self.contains(key);
-        mapped_value.map_or(UPDATE_NOT_ELIGIBLE, |key_value_ref| {
-            let stored_value = key_value_ref.value();
-            UpdateEligibility(Some(KeyIdExpiry(stored_value.key_id(), stored_value.expire_after())))
-        })
-    }
-
     pub(crate) fn update(&self, key: &Key, value: Option<Value>, time_to_live: Option<Duration>, remove_time_to_live: bool) -> UpdateResponse<Value> {
         if let Some(mut existing) = self.store.get_mut(key) {
             let existing_expiry = existing.expire_after();
@@ -158,7 +138,7 @@ mod tests {
 
     use crate::cache::clock::{Clock, SystemClock};
     use crate::cache::stats::ConcurrentStatsCounter;
-    use crate::cache::store::{KeyIdExpiry, Store, UPDATE_NOT_ELIGIBLE, UpdateEligibility};
+    use crate::cache::store::Store;
     use crate::cache::store::stored_value::StoredValue;
     use crate::cache::store::tests::setup::{Name, UnixEpochClock};
 
@@ -410,27 +390,6 @@ mod tests {
     }
 
     #[test]
-    fn can_update() {
-        let clock = SystemClock::boxed();
-        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
-
-        store.put("topic", "microservices", 10);
-        let update_eligibility = store.update_eligibility(&"topic");
-
-        let expected_update_eligibility = UpdateEligibility(Some(KeyIdExpiry(10, None)));
-        assert_eq!(expected_update_eligibility, update_eligibility);
-    }
-
-    #[test]
-    fn can_not_update() {
-        let clock = SystemClock::boxed();
-        let store: Arc<Store<&str, &str>> = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
-
-        let update_eligibility = store.update_eligibility(&"non_existing");
-        assert_eq!(UPDATE_NOT_ELIGIBLE, update_eligibility);
-    }
-
-    #[test]
     fn update_time_to_live_for_non_existing_key() {
         let clock = SystemClock::boxed();
         let store: Arc<Store<&str, &str>> = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
@@ -490,22 +449,5 @@ mod tests {
         let key_value_ref = store.get_ref(&"topic").unwrap();
 
         assert_eq!("cache", key_value_ref.value().value());
-    }
-}
-
-#[cfg(test)]
-mod update_eligibility_tests {
-    use crate::cache::store::{KeyIdExpiry, UpdateEligibility};
-
-    #[test]
-    fn is_not_update_eligible() {
-        let update_eligibility = UpdateEligibility(None);
-        assert!(update_eligibility.is_not_eligible());
-    }
-
-    #[test]
-    fn is_update_eligible() {
-        let update_eligibility = UpdateEligibility(Some(KeyIdExpiry(10, None)));
-        assert!(update_eligibility.is_eligible());
     }
 }

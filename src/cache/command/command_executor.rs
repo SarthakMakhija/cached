@@ -504,7 +504,7 @@ mod sociable_tests {
     use crate::cache::policy::admission_policy::AdmissionPolicy;
     use crate::cache::pool::BufferConsumer;
     use crate::cache::stats::ConcurrentStatsCounter;
-    use crate::cache::store::Store;
+    use crate::cache::command::command_executor::Store;
 
     fn no_action_ttl_ticker() -> Arc<TTLTicker> {
         TTLTicker::new(TTLConfig::new(4, Duration::from_secs(300), SystemClock::boxed()), |_key_id| {})

@@ -83,9 +83,13 @@ impl<Key, Value> CacheD<Key, Value>
         let (key, value, weight, time_to_live)
             = (request.key, request.value, request.weight, request.time_to_live);
 
-        let update_eligibility = self.store.update_eligibility(&key);
-        if update_eligibility.is_not_eligible() {
+        let update_response
+            = self.store.update(&key, value, time_to_live, request.remove_time_to_live);
+
+        if !update_response.did_update_happen() {
+            let value = update_response.value();
             assert!(value.is_some());
+
             let value = value.unwrap();
             let weight = weight.unwrap_or_else(|| (self.config.weight_calculation_fn)(&key, &value));
 
@@ -93,7 +97,7 @@ impl<Key, Value> CacheD<Key, Value>
                 self.put_with_weight_and_ttl(key, value, weight, time_to_live)
             } else {
                 self.put_with_weight(key, value, weight)
-            }
+            };
         }
         Ok(CommandAcknowledgement::new())
     }
