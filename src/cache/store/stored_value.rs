@@ -46,8 +46,22 @@ impl<Value> StoredValue<Value> {
 
     pub fn expire_after(&self) -> Option<ExpireAfter> { self.expire_after }
 
-    pub(crate) fn update_expiry(&mut self, expiry: ExpireAfter) {
-        self.expire_after = Some(expiry);
+    pub(crate) fn update(&mut self,
+                         value: Option<Value>,
+                         time_to_live: Option<Duration>,
+                         remove_time_to_live: bool,
+                         clock: &ClockType) -> Option<ExpireAfter> {
+
+        if remove_time_to_live {
+            self.expire_after = None;
+        } else if let Some(time_to_live) = time_to_live {
+            self.expire_after = Some(Self::calculate_expiry(time_to_live, clock));
+        }
+
+        if let Some(value) = value {
+            self.value = value
+        }
+        self.expire_after
     }
 
     pub(crate) fn calculate_expiry(time_to_live: Duration, clock: &ClockType) -> SystemTime {
@@ -154,5 +168,78 @@ mod tests {
         stored_value.is_soft_deleted = true;
 
         assert!(!stored_value.is_alive(&system_clock));
+    }
+
+    #[test]
+    fn update_and_remove_expiry() {
+        let system_clock = SystemClock::boxed();
+        let mut stored_value = StoredValue::expiring("storage-engine", 1, Duration::from_secs(5), &system_clock);
+
+        stored_value.update(None, None, true, &system_clock);
+        assert!(stored_value.expire_after.is_none());
+    }
+
+    #[test]
+    fn update_the_value() {
+        let system_clock = SystemClock::boxed();
+        let mut stored_value = StoredValue::expiring("storage-engine", 1, Duration::from_secs(5), &system_clock);
+
+        stored_value.update(Some("bitcask"), None, false, &system_clock);
+
+        let value = stored_value.value();
+        assert_eq!("bitcask", value);
+    }
+
+    #[test]
+    fn update_the_expiry() {
+        let clock: ClockType = Box::new(UnixEpochClock {});
+        let mut stored_value = StoredValue::expiring("storage-engine", 1, Duration::from_secs(5), &clock);
+
+        stored_value.update(None, Some(Duration::from_secs(300)), false, &clock);
+
+        let expiry_after = stored_value.expire_after.unwrap();
+        assert_eq!(clock.now().add(Duration::from_secs(300)), expiry_after);
+    }
+
+    #[test]
+    fn update_value_and_expiry() {
+        let clock: ClockType = Box::new(UnixEpochClock {});
+        let mut stored_value = StoredValue::expiring("storage-engine", 1, Duration::from_secs(5), &clock);
+
+        stored_value.update(Some("bitcask"), Some(Duration::from_secs(300)), false, &clock);
+
+        let expiry_after = stored_value.expire_after.unwrap();
+        assert_eq!(clock.now().add(Duration::from_secs(300)), expiry_after);
+
+        let value = stored_value.value();
+        assert_eq!("bitcask", value);
+    }
+
+    #[test]
+    fn update_value_and_remove_expiry() {
+        let clock: ClockType = Box::new(UnixEpochClock {});
+        let mut stored_value = StoredValue::expiring("storage-engine", 1, Duration::from_secs(5), &clock);
+
+        stored_value.update(Some("bitcask"), None, true, &clock);
+
+        let expiry_after = stored_value.expire_after;
+        assert!(expiry_after.is_none());
+
+        let value = stored_value.value();
+        assert_eq!("bitcask", value);
+    }
+
+    #[test]
+    fn update_value_and_remove_expiry_given_updated_time_to_live_is_also_provided() {
+        let clock: ClockType = Box::new(UnixEpochClock {});
+        let mut stored_value = StoredValue::expiring("storage-engine", 1, Duration::from_secs(5), &clock);
+
+        stored_value.update(Some("bitcask"), Some(Duration::from_secs(100)), true, &clock);
+
+        let expiry_after = stored_value.expire_after;
+        assert!(expiry_after.is_none());
+
+        let value = stored_value.value();
+        assert_eq!("bitcask", value);
     }
 }

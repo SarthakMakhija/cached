@@ -1,6 +1,6 @@
 use std::hash::Hash;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use dashmap::DashMap;
 
@@ -20,7 +20,7 @@ pub(crate) struct KeyIdExpiry(pub(crate) KeyId, pub(crate) Option<ExpireAfter>);
 pub(crate) struct UpdateEligibility(pub(crate) Option<KeyIdExpiry>);
 
 #[derive(Eq, PartialEq, Debug)]
-pub(crate) struct UpdateResponse(KeyIdExpiry, ExpireAfter);
+pub(crate) struct UpdateResponse(KeyIdExpiry, Option<ExpireAfter>);
 
 impl UpdateResponse {
     pub(crate) fn key_id(&self) -> KeyId {
@@ -29,7 +29,7 @@ impl UpdateResponse {
     pub(crate) fn existing_expiry(&self) -> Option<ExpireAfter> {
         self.0.1
     }
-    pub(crate) fn new_expiry(&self) -> SystemTime {
+    pub(crate) fn new_expiry(&self) -> Option<ExpireAfter> {
         self.1
     }
 }
@@ -111,14 +111,15 @@ impl<Key, Value> Store<Key, Value>
         })
     }
 
-    pub(crate) fn update_time_to_live(&self, key: &Key, time_to_live: Duration) -> Option<UpdateResponse> {
+    pub(crate) fn update(&self, key: &Key, value: Option<Value>, time_to_live: Option<Duration>, remove_time_to_live: bool) -> Option<UpdateResponse> {
         if let Some(mut existing) = self.store.get_mut(key) {
-            let new_expiry = StoredValue::<Value>::calculate_expiry(time_to_live, &self.clock);
+            let existing_expiry = existing.expire_after();
+            let new_expiry = existing.update(value, time_to_live, remove_time_to_live, &self.clock);
+
             let response = Some(UpdateResponse(
-                KeyIdExpiry(existing.key_id(), existing.expire_after()),
+                KeyIdExpiry(existing.key_id(), existing_expiry),
                 new_expiry,
             ));
-            existing.update_expiry(new_expiry);
             return response;
         }
         None
@@ -432,7 +433,7 @@ mod tests {
     fn update_time_to_live_for_non_existing_key() {
         let clock = SystemClock::boxed();
         let store: Arc<Store<&str, &str>> = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
-        let response = store.update_time_to_live(&"topic", Duration::from_secs(5));
+        let response = store.update(&"topic", None, Some(Duration::from_secs(5)), false);
 
         assert_eq!(None, response);
     }
@@ -443,7 +444,7 @@ mod tests {
         let store = Store::new(clock.clone(), Arc::new(ConcurrentStatsCounter::new()));
 
         store.put("topic", "microservices", 10);
-        let update_response = store.update_time_to_live(&"topic", Duration::from_secs(5));
+        let update_response = store.update(&"topic", None, Some(Duration::from_secs(5)), false);
         assert!(update_response.unwrap().existing_expiry().is_none());
 
         let key_value_ref = store.get_ref(&"topic").unwrap();
@@ -457,11 +458,37 @@ mod tests {
         let store = Store::new(clock.clone(), Arc::new(ConcurrentStatsCounter::new()));
 
         store.put_with_ttl("topic", "microservices", 10, Duration::from_secs(300));
-        let _ = store.update_time_to_live(&"topic", Duration::from_secs(15));
+        store.update(&"topic", None, Some(Duration::from_secs(15)), false);
 
         let key_value_ref = store.get_ref(&"topic").unwrap();
         let expected_expiry = clock.now().add(Duration::from_secs(15));
         assert_eq!(Some(expected_expiry), key_value_ref.value().expire_after());
+    }
+
+    #[test]
+    fn remove_time_to_live_for_an_existing_key_that_has_an_expiry() {
+        let clock = Box::new(UnixEpochClock {});
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+
+        store.put_with_ttl("topic", "microservices", 10, Duration::from_secs(300));
+        store.update(&"topic", None, None, true);
+
+        let key_value_ref = store.get_ref(&"topic").unwrap();
+        let expected_expiry = None;
+        assert_eq!(expected_expiry, key_value_ref.value().expire_after());
+    }
+
+    #[test]
+    fn update_value_for_an_existing() {
+        let clock = Box::new(UnixEpochClock {});
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+
+        store.put("topic", "microservices", 10);
+        store.update(&"topic", Some("cache"), None, false);
+
+        let key_value_ref = store.get_ref(&"topic").unwrap();
+
+        assert_eq!("cache", key_value_ref.value().value());
     }
 }
 
