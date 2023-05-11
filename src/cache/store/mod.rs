@@ -19,21 +19,51 @@ pub(crate) struct KeyIdExpiry(pub(crate) KeyId, pub(crate) Option<ExpireAfter>);
 #[derive(Eq, PartialEq, Debug)]
 pub(crate) struct UpdateResponse<Value>(Option<KeyIdExpiry>, Option<ExpireAfter>, Option<Value>);
 
+#[derive(Eq, PartialEq, Debug)]
+pub(crate) enum TypeOfExpiryUpdate {
+    Added(KeyId, ExpireAfter),
+    Deleted(KeyId, ExpireAfter),
+    Updated(KeyId, ExpireAfter, ExpireAfter),
+    Nothing,
+}
+
 impl<Value> UpdateResponse<Value> {
     pub(crate) fn did_update_happen(&self) -> bool {
         self.0.is_some()
     }
-    pub(crate) fn key_id_or_panic(&self) -> KeyId {
-        self.0.as_ref().unwrap().0
-    }
+
     pub(crate) fn existing_expiry(&self) -> Option<ExpireAfter> {
         if self.did_update_happen() { self.0.as_ref().unwrap().1 } else { None }
     }
+
     pub(crate) fn new_expiry(&self) -> Option<ExpireAfter> {
         self.1
     }
+
     pub(crate) fn value(self) -> Option<Value> {
         self.2
+    }
+
+    pub(crate) fn key_id_or_panic(&self) -> KeyId {
+        self.0.as_ref().unwrap().0
+    }
+
+    pub(crate) fn type_of_expiry_update(&self) -> TypeOfExpiryUpdate {
+        let existing_expiry = self.existing_expiry();
+        let new_expiry = self.1;
+        let key_id = self.key_id_or_panic();
+
+        if existing_expiry.is_none() && new_expiry.is_none() {
+            TypeOfExpiryUpdate::Nothing
+        } else if existing_expiry.is_none() && new_expiry.is_some() {
+            TypeOfExpiryUpdate::Added(key_id, new_expiry.unwrap())
+        } else if existing_expiry.is_some() && new_expiry.is_none() {
+            TypeOfExpiryUpdate::Deleted(key_id, existing_expiry.unwrap())
+        } else if existing_expiry.is_some() && new_expiry.is_some() && existing_expiry.ne(&new_expiry) {
+            TypeOfExpiryUpdate::Updated(key_id, existing_expiry.unwrap(), new_expiry.unwrap())
+        } else {
+            TypeOfExpiryUpdate::Nothing
+        }
     }
 }
 
@@ -448,5 +478,73 @@ mod tests {
         let key_value_ref = store.get_ref(&"topic").unwrap();
 
         assert_eq!("cache", key_value_ref.value().value());
+    }
+}
+
+#[cfg(test)]
+mod update_response_tests {
+    use std::ops::Add;
+    use std::time::Duration;
+    use crate::cache::clock::SystemClock;
+    use crate::cache::store::{KeyIdExpiry, TypeOfExpiryUpdate, UpdateResponse};
+
+    #[test]
+    fn type_of_expiry_update_nothing() {
+        let update_response: UpdateResponse<&str> = UpdateResponse(
+            Some(KeyIdExpiry(1, None)),
+            None,
+            None
+        );
+        assert_eq!(TypeOfExpiryUpdate::Nothing, update_response.type_of_expiry_update());
+    }
+
+    #[test]
+    fn type_of_expiry_update_added() {
+        let new_expiry = SystemClock::boxed().now();
+        let update_response: UpdateResponse<&str> = UpdateResponse(
+            Some(KeyIdExpiry(1, None)),
+            Some(new_expiry),
+            None
+        );
+        assert_eq!(TypeOfExpiryUpdate::Added(1, new_expiry), update_response.type_of_expiry_update());
+    }
+
+    #[test]
+    fn type_of_expiry_update_updated() {
+        let old_expiry = SystemClock::boxed().now().add(Duration::from_secs(5));
+        let new_expiry = SystemClock::boxed().now().add(Duration::from_secs(10));
+
+        let update_response: UpdateResponse<&str> = UpdateResponse(
+            Some(KeyIdExpiry(1, Some(old_expiry))),
+            Some(new_expiry),
+            None
+        );
+        assert_eq!(TypeOfExpiryUpdate::Updated(1, old_expiry, new_expiry), update_response.type_of_expiry_update());
+    }
+
+    #[test]
+    fn type_of_expiry_update_deleted() {
+        let old_expiry = SystemClock::boxed().now().add(Duration::from_secs(5));
+
+        let update_response: UpdateResponse<&str> = UpdateResponse(
+            Some(KeyIdExpiry(1, Some(old_expiry))),
+            None,
+            None
+        );
+        assert_eq!(TypeOfExpiryUpdate::Deleted(1, old_expiry), update_response.type_of_expiry_update());
+    }
+
+    #[test]
+    fn type_of_expiry_update_nothing_given_both_the_expire_time_is_same() {
+        let now = SystemClock::boxed().now();
+        let old_expiry = now.add(Duration::from_secs(5));
+        let new_expiry = now.add(Duration::from_secs(5));
+
+        let update_response: UpdateResponse<&str> = UpdateResponse(
+            Some(KeyIdExpiry(1, Some(old_expiry))),
+            Some(new_expiry),
+            None
+        );
+        assert_eq!(TypeOfExpiryUpdate::Nothing, update_response.type_of_expiry_update());
     }
 }
