@@ -109,6 +109,10 @@ impl<Key> AdmissionPolicy<Key>
         self.cache_weight.weight_of(key_id)
     }
 
+    pub(crate) fn weight_used(&self) -> Weight {
+        self.cache_weight.get_weight_used()
+    }
+
     pub(crate) fn shutdown(&self) {
         self.keep_running.store(false, Ordering::Release);
     }
@@ -391,5 +395,41 @@ mod tests {
         let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
 
         assert_eq!(None, policy.weight_of(&1));
+    }
+
+    #[test]
+    fn gets_the_weight_used() {
+        let policy = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let key_hashes = vec![10, 14, 116];
+        policy.access_frequency.write().add(key_hashes);
+
+        let deleted_keys = DeletedKeys { keys: RwLock::new(Vec::new()) };
+        let delete_hook = |key| { deleted_keys.keys.write().push(key) };
+
+        let status = policy.maybe_add(&KeyDescription::new("topic", 1, 10, 5), &delete_hook);
+        assert_eq!(CommandStatus::Accepted, status);
+
+        let status = policy.maybe_add(&KeyDescription::new("SSD", 2, 14, 5), &delete_hook);
+        assert_eq!(CommandStatus::Accepted, status);
+
+        assert_eq!(10, policy.weight_used());
+    }
+
+    #[test]
+    fn gets_the_weight_used_after_rejection() {
+        let policy = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let key_hashes = vec![14, 116];
+        policy.access_frequency.write().add(key_hashes);
+
+        let deleted_keys = DeletedKeys { keys: RwLock::new(Vec::new()) };
+        let delete_hook = |key| { deleted_keys.keys.write().push(key) };
+
+        let status = policy.maybe_add(&KeyDescription::new("topic", 1, 10, 5), &delete_hook);
+        assert_eq!(CommandStatus::Accepted, status);
+
+        let status = policy.maybe_add(&KeyDescription::new("SSD", 2, 14, 6), &delete_hook);
+        assert_eq!(CommandStatus::Accepted, status);
+
+        assert_eq!(6, policy.weight_used());
     }
 }

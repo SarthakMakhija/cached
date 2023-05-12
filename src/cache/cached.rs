@@ -142,6 +142,10 @@ impl<Key, Value> CacheD<Key, Value>
         None
     }
 
+    pub fn total_weight_used(&self) -> Weight {
+        self.pool.get_buffer_consumer().weight_used()
+    }
+
     fn mark_key_accessed(&self, key: &Key) {
         self.pool.add((self.config.key_hash_fn)(key));
     }
@@ -707,5 +711,16 @@ mod tests {
         assert_eq!("microservices", stored_value.value());
         assert_eq!(Some(clock.now().add(Duration::from_secs(120))), stored_value.expire_after());
         assert_eq!(stored_value.expire_after(), cached.ttl_ticker.get(&key_id, &stored_value.expire_after().unwrap()));
+    }
+
+    #[tokio::test]
+    async fn total_weight_used() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        let acknowledgement =
+            cached.put_with_weight("topic", "microservices", 50).unwrap();
+        acknowledgement.handle().await;
+
+        assert_eq!(50, cached.total_weight_used());
     }
 }
