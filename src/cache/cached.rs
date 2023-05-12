@@ -307,7 +307,7 @@ mod tests {
         let key_id = stored_value.key_id();
 
         assert_eq!("microservices", stored_value.value());
-        assert_eq!(Some(50), cached.pool.get_buffer_consumer().weight_of(&key_id));
+        assert_eq!(Some(50), cached.admission_policy.weight_of(&key_id));
     }
 
     #[tokio::test]
@@ -460,7 +460,7 @@ mod tests {
 
         let value = cached.get(&"topic");
         assert_eq!(None, value);
-        assert!(!cached.pool.get_buffer_consumer().contains(&key_id));
+        assert!(!cached.admission_policy.contains(&key_id));
     }
 
     #[tokio::test]
@@ -481,7 +481,7 @@ mod tests {
         thread::sleep(Duration::from_secs(2));
 
         let hasher = &(cached.config.key_hash_fn);
-        let policy = cached.pool.get_buffer_consumer();
+        let policy = cached.admission_policy;
 
         assert_eq!(2, policy.estimate(hasher(&"topic")));
         assert_eq!(1, policy.estimate(hasher(&"disk")));
@@ -588,7 +588,7 @@ mod tests {
         let key_id = stored_value.key_id();
 
         assert_eq!("microservices", stored_value.value());
-        assert_eq!(Some(33), cached.pool.get_buffer_consumer().weight_of(&key_id));
+        assert_eq!(Some(33), cached.admission_policy.weight_of(&key_id));
     }
 
     #[tokio::test]
