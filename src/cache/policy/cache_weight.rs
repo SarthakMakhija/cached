@@ -116,6 +116,7 @@ impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
                 Some(pair) => {
                     if !self.current_sample_key_ids.contains(pair.key()) {
                         let frequency = (self.frequency_counter)(pair.key_hash);
+                        self.current_sample_key_ids.insert(*pair.key());
                         self.sample.push(SampledKey::new(frequency, pair));
                         filled_in = true;
                     }
