@@ -10,8 +10,8 @@ use crate::cache::types::{KeyHash, TotalCounters, Weight};
 
 pub(crate) mod weight_calculation;
 
-pub type HashFn<Key> = dyn Fn(&Key) -> KeyHash;
-pub type WeightCalculationFn<Key, Value> = dyn Fn(&Key, &Value) -> Weight;
+pub type HashFn<Key> = dyn Fn(&Key) -> KeyHash + Send + Sync;
+pub type WeightCalculationFn<Key, Value> = dyn Fn(&Key, &Value) -> Weight + Send + Sync;
 
 const COMMAND_BUFFER_SIZE: usize = 32 * 1024;
 const ACCESS_POOL_SIZE: PoolSize = PoolSize(30);
