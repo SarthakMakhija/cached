@@ -19,7 +19,7 @@ pub(crate) struct Pool<Consumer: BufferConsumer> {
 }
 
 struct Buffer<Consumer: BufferConsumer> {
-    key_hashes: Vec<u64>,
+    key_hashes: Vec<KeyHash>,
     capacity: BufferSize,
     consumer: Arc<Consumer>,
 }
