@@ -26,6 +26,7 @@ pub struct CacheD<Key, Value>
     config: Config<Key, Value>,
     store: Arc<Store<Key, Value>>,
     command_executor: CommandExecutor<Key, Value>,
+    admission_policy: Arc<AdmissionPolicy<Key>>,
     pool: Pool<AdmissionPolicy<Key>>,
     ttl_ticker: Arc<TTLTicker>,
     id_generator: IncreasingIdGenerator,
@@ -47,7 +48,8 @@ impl<Key, Value> CacheD<Key, Value>
         CacheD {
             config,
             store: store.clone(),
-            command_executor: CommandExecutor::new(store, admission_policy, stats_counter, ttl_ticker.clone(), command_buffer_size),
+            command_executor: CommandExecutor::new(store, admission_policy.clone(), stats_counter, ttl_ticker.clone(), command_buffer_size),
+            admission_policy,
             pool,
             ttl_ticker,
             id_generator: IncreasingIdGenerator::new(),
@@ -143,7 +145,7 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn total_weight_used(&self) -> Weight {
-        self.pool.get_buffer_consumer().weight_used()
+        self.admission_policy.weight_used()
     }
 
     fn mark_key_accessed(&self, key: &Key) {
