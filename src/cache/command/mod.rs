@@ -14,6 +14,7 @@ pub(crate) enum CommandType<Key, Value>
     PutWithTTL(KeyDescription<Key>, Value, Duration),
     Delete(Key),
     UpdateWeight(KeyId, Weight),
+    Shutdown,
 }
 
 impl<Key, Value> CommandType<Key, Value>
@@ -24,6 +25,7 @@ impl<Key, Value> CommandType<Key, Value>
             CommandType::PutWithTTL(_, _, _) => "PutWithTTL".to_string(),
             CommandType::Delete(_) => "Delete".to_string(),
             CommandType::UpdateWeight(_, _) => "UpdateWeight".to_string(),
+            CommandType::Shutdown => "Shutdown".to_string(),
         }
     }
 }
@@ -68,15 +70,22 @@ mod tests {
 
     #[test]
     fn command_description_delete() {
-        let put: CommandType<&str, &str> = CommandType::Delete("topic");
+        let delete: CommandType<&str, &str> = CommandType::Delete("topic");
 
-        assert_eq!("Delete", put.description());
+        assert_eq!("Delete", delete.description());
     }
 
     #[test]
     fn command_description_update_weight() {
-        let put: CommandType<&str, &str> = CommandType::UpdateWeight(10, 200);
+        let update_weight: CommandType<&str, &str> = CommandType::UpdateWeight(10, 200);
 
-        assert_eq!("UpdateWeight", put.description());
+        assert_eq!("UpdateWeight", update_weight.description());
+    }
+
+    #[test]
+    fn command_description_shutdown() {
+        let shutdown: CommandType<&str, &str> = CommandType::Shutdown;
+
+        assert_eq!("Shutdown", shutdown.description());
     }
 }

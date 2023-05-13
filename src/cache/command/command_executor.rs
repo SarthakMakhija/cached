@@ -1,6 +1,5 @@
 use std::hash::Hash;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
@@ -21,7 +20,6 @@ pub(crate) struct CommandExecutor<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + 'static {
     sender: crossbeam_channel::Sender<CommandAcknowledgementPair<Key, Value>>,
-    keep_running: Arc<AtomicBool>,
 }
 
 struct CommandAcknowledgementPair<Key, Value>
@@ -69,7 +67,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
         ttl_ticker: Arc<TTLTicker>,
         command_channel_size: usize) -> Self {
         let (sender, receiver) = crossbeam_channel::bounded(command_channel_size);
-        let command_executor = CommandExecutor { sender, keep_running: Arc::new(AtomicBool::new(true)) };
+        let command_executor = CommandExecutor { sender };
 
         command_executor.spin(receiver, store, admission_policy, stats_counter, ttl_ticker);
         command_executor
@@ -81,7 +79,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
             admission_policy: Arc<AdmissionPolicy<Key>>,
             stats_counter: Arc<ConcurrentStatsCounter>,
             ttl_ticker: Arc<TTLTicker>) {
-        let keep_running = self.keep_running.clone();
+
         let store_clone = store.clone();
         let delete_hook = move |key| { store_clone.delete(&key); };
 
@@ -122,12 +120,13 @@ impl<Key, Value> CommandExecutor<Key, Value>
                             admission_policy: &admission_policy,
                             ttl_ticker: &ttl_ticker,
                         }),
+                    CommandType::Shutdown => {
+                        pair.acknowledgement.done(CommandStatus::Accepted);
+                        drop(receiver);
+                        break;
+                    }
                 };
                 pair.acknowledgement.done(status);
-                if !keep_running.load(Ordering::Acquire) {
-                    drop(receiver);
-                    break;
-                }
             }
         });
     }
@@ -148,8 +147,8 @@ impl<Key, Value> CommandExecutor<Key, Value>
         }
     }
 
-    pub(crate) fn shutdown(&self) {
-        self.keep_running.store(false, Ordering::Release);
+    pub(crate) fn shutdown(&self) -> CommandSendResult {
+        self.send(CommandType::Shutdown)
     }
 
     fn put<DeleteHook>(put_parameters: PutParameter<Key, Value, DeleteHook>) -> CommandStatus where DeleteHook: Fn(Key) {
@@ -207,7 +206,6 @@ impl<Key, Value> CommandExecutor<Key, Value>
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
-    use std::thread;
     use std::time::Duration;
 
     use crate::cache::clock::SystemClock;
@@ -252,24 +250,13 @@ mod tests {
             no_action_ttl_ticker(),
             10,
         );
-        command_executor.shutdown();
-
-        command_executor.send(CommandType::Put(
-            KeyDescription::new("topic", 1, 1029, 10),
-            "microservices",
-        )).unwrap().handle().await;
-
-        //introduce a delay to ensure that the thread in the spin method
-        //loads the shutdown flag before the next command is sent
-        thread::sleep(Duration::from_secs(1));
+        command_executor.shutdown().unwrap().handle().await;
 
         let send_result = command_executor.send(CommandType::Put(
-            KeyDescription::new("disk", 2, 2090, 10),
-            "SSD",
+            KeyDescription::new("topic", 1, 1029, 10),
+            "microservices",
         ));
 
-        assert_eq!(Some("microservices"), store.get(&"topic"));
-        assert_eq!(None, store.get(&"disk"));
         assert!(send_result.is_err())
     }
 
@@ -293,7 +280,7 @@ mod tests {
         )).unwrap();
         command_acknowledgement.handle().await;
 
-        command_executor.shutdown();
+        command_executor.shutdown().unwrap().handle().await;
         assert_eq!(Some("microservices"), store.get(&"topic"));
     }
 
@@ -317,7 +304,7 @@ mod tests {
         )).unwrap();
         let status = command_acknowledgement.handle().await;
 
-        command_executor.shutdown();
+        command_executor.shutdown().unwrap().handle().await;
         assert_eq!(None, store.get(&"topic"));
         assert_eq!(CommandStatus::Rejected, status);
     }
@@ -342,7 +329,7 @@ mod tests {
         )).unwrap();
         let status = command_acknowledgement.handle().await;
 
-        command_executor.shutdown();
+        command_executor.shutdown().unwrap().handle().await;
         assert_eq!(CommandStatus::Rejected, status);
         assert_eq!(1, stats_counter.keys_rejected());
     }
@@ -372,7 +359,7 @@ mod tests {
         acknowledgement.handle().await;
         other_acknowledgment.handle().await;
 
-        command_executor.shutdown();
+        command_executor.shutdown().unwrap().handle().await;
         assert_eq!(Some("microservices"), store.get(&"topic"));
         assert_eq!(Some("SSD"), store.get(&"disk"));
     }
@@ -399,7 +386,7 @@ mod tests {
         )).unwrap();
         acknowledgement.handle().await;
 
-        command_executor.shutdown();
+        command_executor.shutdown().unwrap().handle().await;
         assert_eq!(Some("microservices"), store.get(&"topic"));
 
         let expiry = store.get_ref(&"topic").unwrap().value().expire_after().unwrap();
@@ -429,7 +416,7 @@ mod tests {
         )).unwrap();
         acknowledgement.handle().await;
 
-        command_executor.shutdown();
+        command_executor.shutdown().unwrap().handle().await;
         assert_eq!(1, stats_counter.keys_rejected());
     }
 
@@ -465,7 +452,7 @@ mod tests {
             command_executor.send(CommandType::Delete("topic")).unwrap();
         acknowledgement.handle().await;
 
-        command_executor.shutdown();
+        command_executor.shutdown().unwrap().handle().await;
         assert_eq!(None, store.get(&"topic"));
         assert_eq!(None, ttl_ticker.get(&10, &expiry));
     }
@@ -488,7 +475,7 @@ mod tests {
             command_executor.send(CommandType::Delete("non-existing")).unwrap();
         let status = acknowledgement.handle().await;
 
-        command_executor.shutdown();
+        command_executor.shutdown().unwrap().handle().await;
         assert_eq!(CommandStatus::Rejected, status);
     }
 }
@@ -536,7 +523,7 @@ mod sociable_tests {
         )).unwrap();
         command_acknowledgement.handle().await;
 
-        command_executor.shutdown();
+        command_executor.shutdown().unwrap().handle().await;
         assert_eq!(Some("microservices"), store.get(&"topic"));
         assert!(admission_policy.contains(&key_id));
     }
@@ -573,7 +560,7 @@ mod sociable_tests {
         let status = command_acknowledgement.handle().await;
         assert_eq!(CommandStatus::Accepted, status);
 
-        command_executor.shutdown();
+        command_executor.shutdown().unwrap().handle().await;
 
         assert!(admission_policy.contains(&2));
         assert_eq!(Some("SSD"), store.get(&"disk"));
@@ -605,7 +592,7 @@ mod sociable_tests {
             command_executor.send(CommandType::Delete("topic")).unwrap();
         acknowledgement.handle().await;
 
-        command_executor.shutdown();
+        command_executor.shutdown().unwrap().handle().await;
         assert_eq!(None, store.get(&"topic"));
         assert!(!admission_policy.contains(&1));
     }
@@ -636,7 +623,7 @@ mod sociable_tests {
             1, 20)).unwrap();
         command_acknowledgement.handle().await;
 
-        command_executor.shutdown();
+        command_executor.shutdown().unwrap().handle().await;
         assert_eq!(Some("microservices"), store.get(&"topic"));
         assert_eq!(Some(20), admission_policy.weight_of(&key_id));
     }
