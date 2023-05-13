@@ -79,7 +79,6 @@ impl<Key, Value> CommandExecutor<Key, Value>
             admission_policy: Arc<AdmissionPolicy<Key>>,
             stats_counter: Arc<ConcurrentStatsCounter>,
             ttl_ticker: Arc<TTLTicker>) {
-
         let store_clone = store.clone();
         let delete_hook = move |key| { store_clone.delete(&key); };
 
@@ -138,8 +137,6 @@ impl<Key, Value> CommandExecutor<Key, Value>
             acknowledgement: acknowledgement.clone(),
         });
 
-
-        println!("send result is {:?}", send_result);
         match send_result {
             Ok(_) => Ok(acknowledgement),
             Err(err) => {
@@ -208,6 +205,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
+    use std::thread;
     use std::time::Duration;
 
     use crate::cache::clock::SystemClock;
@@ -253,6 +251,8 @@ mod tests {
             10,
         );
         command_executor.shutdown().unwrap().handle().await;
+
+        thread::sleep(Duration::from_secs(1));
 
         let send_result = command_executor.send(CommandType::Put(
             KeyDescription::new("topic", 1, 1029, 10),
@@ -487,8 +487,8 @@ mod sociable_tests {
     use std::sync::Arc;
     use std::thread;
     use std::time::Duration;
-    use crate::cache::buffer_event::BufferEvent;
 
+    use crate::cache::buffer_event::BufferEvent;
     use crate::cache::clock::SystemClock;
     use crate::cache::command::{CommandStatus, CommandType};
     use crate::cache::command::command_executor::CommandExecutor;
