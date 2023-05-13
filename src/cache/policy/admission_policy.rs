@@ -127,6 +127,12 @@ impl<Key> AdmissionPolicy<Key>
         self.keep_running.store(false, Ordering::Release);
     }
 
+    pub(crate) fn clear(&self) {
+        self.cache_weight.clear();
+        self.access_frequency.write().clear();
+        self.stats_counter.clear();
+    }
+
     //TODO: should we query the space_available from cache_weight?
     fn create_space<DeleteHook>(&self,
                                 space_left: Weight,
@@ -451,5 +457,27 @@ mod tests {
         assert_eq!(CommandStatus::Accepted, status);
 
         assert_eq!(6, policy.weight_used());
+    }
+
+    #[test]
+    fn clear() {
+        let policy = AdmissionPolicy::new(10, 20, Arc::new(ConcurrentStatsCounter::new()));
+        let no_operation_delete_hook = |_key| {};
+
+        let status = policy.maybe_add(&KeyDescription::new("topic", 1, 10, 5), &no_operation_delete_hook);
+        assert_eq!(CommandStatus::Accepted, status);
+
+        let status = policy.maybe_add(&KeyDescription::new("SSD", 2, 14, 6), &no_operation_delete_hook);
+        assert_eq!(CommandStatus::Accepted, status);
+
+        assert_eq!(11, policy.cache_weight.get_weight_used());
+        assert!(policy.contains(&1));
+        assert!(policy.contains(&2));
+
+        policy.clear();
+
+        assert_eq!(0, policy.cache_weight.get_weight_used());
+        assert!(!policy.contains(&1));
+        assert!(!policy.contains(&2));
     }
 }

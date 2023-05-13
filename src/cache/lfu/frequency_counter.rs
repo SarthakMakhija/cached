@@ -33,6 +33,12 @@ impl Row {
             *slice = (*slice >> 1) & HALF_COUNTERS_BITS;
         });
     }
+
+    fn clear(&mut self) {
+        self.0.iter_mut().for_each(|slice| {
+            *slice = 0;
+        });
+    }
 }
 
 const ROWS: usize = 4;
@@ -80,6 +86,13 @@ impl FrequencyCounter {
         (0..ROWS).for_each(|index| {
             let row = &mut self.matrix[index];
             row.half_counters();
+        });
+    }
+
+    pub(crate) fn clear(&mut self) {
+        (0..ROWS).for_each(|index| {
+            let row = &mut self.matrix[index];
+            row.clear();
         });
     }
 
@@ -175,7 +188,7 @@ mod tests {
     }
 
     #[test]
-    fn reset_count() {
+    fn reset_frequency_counter() {
         let mut frequency_counter = FrequencyCounter::new(2);
         frequency_counter.matrix[0] = Row(vec![15, 240]);
         frequency_counter.matrix[1] = Row(vec![64, 7]);
@@ -188,5 +201,33 @@ mod tests {
         assert_eq!(Row(vec![32, 3]), frequency_counter.matrix[1]);
         assert_eq!(Row(vec![96, 5]), frequency_counter.matrix[2]);
         assert_eq!(Row(vec![16, 7]), frequency_counter.matrix[3]);
+    }
+
+    #[test]
+    fn clear_row() {
+        let mut row = Row(vec![15, 10, 240, 255]);
+
+        row.clear();
+
+        assert_eq!(0, row.0[0]);
+        assert_eq!(0, row.0[1]);
+        assert_eq!(0, row.0[2]);
+        assert_eq!(0, row.0[3] >> 4 & MAX_VALUE_LOWER_FOUR_BITS);
+    }
+
+    #[test]
+    fn clear_frequency_counter() {
+        let mut frequency_counter = FrequencyCounter::new(2);
+        frequency_counter.matrix[0] = Row(vec![15, 240]);
+        frequency_counter.matrix[1] = Row(vec![64, 7]);
+        frequency_counter.matrix[2] = Row(vec![192, 10]);
+        frequency_counter.matrix[3] = Row(vec![48, 14]);
+
+        frequency_counter.clear();
+
+        assert_eq!(Row(vec![0, 0]), frequency_counter.matrix[0]);
+        assert_eq!(Row(vec![0, 0]), frequency_counter.matrix[1]);
+        assert_eq!(Row(vec![0, 0]), frequency_counter.matrix[2]);
+        assert_eq!(Row(vec![0, 0]), frequency_counter.matrix[3]);
     }
 }

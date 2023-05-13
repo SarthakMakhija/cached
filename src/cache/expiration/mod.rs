@@ -62,6 +62,12 @@ impl TTLTicker {
         self.shards[shard_index].read().get(key_id).copied()
     }
 
+    pub(crate) fn clear(&self) {
+        let _ = &self.shards.iter().for_each(|locked_store| {
+            locked_store.write().clear();
+        });
+    }
+
     fn shard_index(self: &Arc<TTLTicker>, time: &SystemTime) -> usize {
         let since_the_epoch = time.duration_since(UNIX_EPOCH).expect("Time went backwards");
         since_the_epoch.as_secs() as usize % self.shards.len()
@@ -265,5 +271,24 @@ mod tests {
 
         let stored_value = ticker.get(&20, &expire_after);
         assert!(stored_value.is_some());
+    }
+
+    #[test]
+    fn clear() {
+        let clock = Box::new(UnixEpochClock {});
+        let no_operation_evict_hook = |_key: &KeyId| {};
+        let ticker = TTLTicker::new(TTLConfig::new(4, Duration::from_secs(300), clock.clone()), no_operation_evict_hook);
+
+        let key_id = 10;
+        let expire_after = clock.now().add(Duration::from_secs(5));
+        ticker.put(key_id, expire_after);
+
+        let stored_value = ticker.get(&key_id, &expire_after).unwrap();
+        assert_eq!(expire_after, stored_value);
+
+        ticker.clear();
+
+        let stored_value = ticker.get(&key_id, &expire_after);
+        assert_eq!(None, stored_value);
     }
 }

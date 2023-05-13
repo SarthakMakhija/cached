@@ -90,6 +90,12 @@ impl ConcurrentStatsCounter {
         (hits as f64) / (hits + misses) as f64
     }
 
+    pub(crate) fn clear(&self) {
+        for entry in &self.entries {
+            entry.0.store(0, Ordering::Release);
+        }
+    }
+
     //TODO: Confirm ordering
     fn add(&self, stats_type: StatsType, count: u64) {
         self.entries[stats_type as usize].0.fetch_add(count, Ordering::AcqRel);
@@ -204,5 +210,16 @@ mod tests {
         stats_counter.drop_access(1);
 
         assert_eq!(2, stats_counter.access_dropped());
+    }
+
+    #[test]
+    fn clear() {
+        let stats_counter = ConcurrentStatsCounter::new();
+        stats_counter.add_key();
+        stats_counter.add_key();
+        assert_eq!(2, stats_counter.keys_added());
+
+        stats_counter.clear();
+        assert_eq!(0, stats_counter.keys_added());
     }
 }

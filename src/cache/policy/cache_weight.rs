@@ -227,6 +227,12 @@ impl<Key> CacheWeight<Key>
         FrequencyCounterBasedMinHeapSamples::new(&self.key_weights, size, frequency_counter)
     }
 
+    pub(crate) fn clear(&self) {
+        self.key_weights.clear();
+        let mut guard = self.weight_used.write();
+        *guard = 0;
+    }
+
     fn update_stats(&self, new_weight: Weight, existing_weight: Weight) {
         if new_weight > existing_weight {
             let difference = new_weight - existing_weight;
@@ -401,6 +407,20 @@ mod tests {
         cache_weight.delete(&1, &delete_hook);
 
         assert_eq!(3, cache_weight.stats_counter.weight_removed())
+    }
+
+    #[test]
+    fn clear() {
+        let cache_weight = CacheWeight::new(10, Arc::new(ConcurrentStatsCounter::new()));
+        cache_weight.add(&KeyDescription::new("disk", 1, 3040, 3));
+
+        assert_eq!(3, cache_weight.get_weight_used());
+        assert!(cache_weight.contains(&1));
+
+        cache_weight.clear();
+
+        assert_eq!(0, cache_weight.get_weight_used());
+        assert!(!cache_weight.contains(&1));
     }
 }
 

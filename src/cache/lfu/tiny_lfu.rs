@@ -32,6 +32,12 @@ impl TinyLFU {
         estimate
     }
 
+    pub(crate) fn clear(&mut self) {
+        self.total_increments = 0;
+        self.key_access_frequency.clear();
+        self.door_keeper.clear();
+    }
+
     fn increment_access_for(&mut self, key_hash: KeyHash) {
         let added = self.door_keeper.add_if_missing(&key_hash);
         if !added {

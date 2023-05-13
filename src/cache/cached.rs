@@ -151,7 +151,11 @@ impl<Key, Value> CacheD<Key, Value>
     pub fn shutdown(&self) {
         let _ = self.command_executor.shutdown();
         self.admission_policy.shutdown();
-        self.ttl_ticker.shutdown()
+        self.ttl_ticker.shutdown();
+
+        self.store.clear();
+        self.admission_policy.clear();
+        self.ttl_ticker.clear();
     }
 
     fn mark_key_accessed(&self, key: &Key) {
@@ -742,7 +746,11 @@ mod tests {
         cached.shutdown();
         thread::sleep(Duration::from_secs(1));
 
-        let put_result = cached.put("okok", "cached");
+        let put_result = cached.put("storage", "cached");
         assert!(put_result.is_err());
+
+        assert_eq!(0, cached.total_weight_used());
+        assert_eq!(None, cached.get(&"topic"));
+        assert_eq!(None, cached.get(&"cache"));
     }
 }

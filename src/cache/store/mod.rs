@@ -135,6 +135,10 @@ impl<Key, Value> Store<Key, Value>
         UpdateResponse(None, None, value)
     }
 
+    pub(crate) fn clear(&self) {
+        self.store.clear();
+    }
+
     fn contains(&self, key: &Key) -> Option<KeyValueRef<Key, StoredValue<Value>>> {
         let maybe_value = self.store.get(key);
         maybe_value
@@ -479,6 +483,20 @@ mod tests {
 
         assert_eq!("cache", key_value_ref.value().value());
     }
+
+    #[test]
+    fn clear() {
+        let clock = SystemClock::boxed();
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+
+        store.put("topic", "microservices", 1);
+
+        store.clear();
+
+        let value = store.get(&"topic");
+        assert_eq!(None, value);
+    }
+
 }
 
 #[cfg(test)]
