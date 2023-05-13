@@ -148,6 +148,12 @@ impl<Key, Value> CacheD<Key, Value>
         self.admission_policy.weight_used()
     }
 
+    pub fn shutdown(&self) {
+        let _ = self.command_executor.shutdown();
+        self.admission_policy.shutdown();
+        self.ttl_ticker.shutdown()
+    }
+
     fn mark_key_accessed(&self, key: &Key) {
         self.pool.add((self.config.key_hash_fn)(key));
     }
@@ -724,5 +730,19 @@ mod tests {
         acknowledgement.handle().await;
 
         assert_eq!(50, cached.total_weight_used());
+    }
+
+    #[tokio::test]
+    async fn shutdown() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        cached.put_with_weight("topic", "microservices", 50).unwrap().handle().await;
+        cached.put("cache", "cached").unwrap().handle().await;
+
+        cached.shutdown();
+        thread::sleep(Duration::from_secs(1));
+
+        let put_result = cached.put("okok", "cached");
+        assert!(put_result.is_err());
     }
 }
