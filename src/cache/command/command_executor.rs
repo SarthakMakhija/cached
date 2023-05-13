@@ -138,6 +138,8 @@ impl<Key, Value> CommandExecutor<Key, Value>
             acknowledgement: acknowledgement.clone(),
         });
 
+
+        println!("send result is {:?}", send_result);
         match send_result {
             Ok(_) => Ok(acknowledgement),
             Err(err) => {
@@ -485,6 +487,7 @@ mod sociable_tests {
     use std::sync::Arc;
     use std::thread;
     use std::time::Duration;
+    use crate::cache::buffer_event::BufferEvent;
 
     use crate::cache::clock::SystemClock;
     use crate::cache::command::{CommandStatus, CommandType};
@@ -535,7 +538,7 @@ mod sociable_tests {
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 10, stats_counter.clone()));
 
         let key_hashes = vec![10, 14, 116];
-        admission_policy.accept(key_hashes);
+        admission_policy.accept(BufferEvent::Full(key_hashes));
         thread::sleep(Duration::from_secs(1));
 
         let command_executor = CommandExecutor::new(

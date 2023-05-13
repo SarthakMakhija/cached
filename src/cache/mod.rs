@@ -12,3 +12,4 @@ pub(crate) mod key_description;
 pub(crate) mod unique_id;
 pub(crate) mod stats;
 pub(crate) mod expiration;
+pub(crate) mod buffer_event;

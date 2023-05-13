@@ -6,6 +6,7 @@ use std::thread;
 use crossbeam_channel::{Receiver, select};
 use parking_lot::RwLock;
 
+use crate::cache::buffer_event::BufferEvent;
 use crate::cache::command::CommandStatus;
 use crate::cache::key_description::KeyDescription;
 use crate::cache::lfu::tiny_lfu::TinyLFU;
@@ -21,7 +22,7 @@ pub(crate) struct AdmissionPolicy<Key>
     where Key: Hash + Eq + Send + Sync + Clone + 'static, {
     access_frequency: Arc<RwLock<TinyLFU>>,
     cache_weight: CacheWeight<Key>,
-    sender: crossbeam_channel::Sender<Vec<KeyHash>>,
+    sender: crossbeam_channel::Sender<BufferEvent>,
     keep_running: Arc<AtomicBool>,
     stats_counter: Arc<ConcurrentStatsCounter>,
 }
@@ -49,13 +50,21 @@ impl<Key> AdmissionPolicy<Key>
         policy
     }
 
-    fn start(&self, receiver: Receiver<Vec<KeyHash>>) {
+    fn start(&self, receiver: Receiver<BufferEvent>) {
         let keep_running = self.keep_running.clone();
         let access_frequency = self.access_frequency.clone();
 
         thread::spawn(move || {
-            while let Ok(key_hashes) = receiver.recv() {
-                { access_frequency.write().add(key_hashes); }
+            while let Ok(event) = receiver.recv() {
+                match event {
+                    BufferEvent::Full(key_hashes) => {
+                        { access_frequency.write().add(key_hashes); }
+                    }
+                    BufferEvent::Shutdown => {
+                        drop(receiver);
+                        break;
+                    }
+                }
                 if !keep_running.load(Ordering::Acquire) {
                     drop(receiver);
                     break;
@@ -114,6 +123,7 @@ impl<Key> AdmissionPolicy<Key>
     }
 
     pub(crate) fn shutdown(&self) {
+        let _ = self.sender.clone().send(BufferEvent::Shutdown);
         self.keep_running.store(false, Ordering::Release);
     }
 
@@ -146,18 +156,26 @@ impl<Key> AdmissionPolicy<Key>
 
 impl<Key> BufferConsumer for AdmissionPolicy<Key>
     where Key: Hash + Eq + Send + Sync + Clone + 'static, {
-    fn accept(&self, key_hashes: Vec<KeyHash>) {
-        let size = key_hashes.len();
+    fn accept(&self, event: BufferEvent) {
+        let size = if let BufferEvent::Full(ref key_hashes) = event {
+            key_hashes.len()
+        } else {
+            0
+        };
         select! {
-            send(self.sender.clone(), key_hashes) -> response => {
+            send(self.sender.clone(), event) -> response => {
                 match response {
-                    Ok(_) => { self.stats_counter.add_access(size as u64); },
-                    Err(_) => { self.stats_counter.drop_access(size as u64); }
+                    Ok(_) => {
+                        if size > 0 {self.stats_counter.add_access(size as u64);}
+                    },
+                    Err(_) => {
+                        if size > 0 {self.stats_counter.drop_access(size as u64);}
+                    }
                 }
             },
             default => {
                 println!("dropping accesses that represent key access");
-                self.stats_counter.drop_access(size as u64);
+                if size > 0 {self.stats_counter.drop_access(size as u64);}
             }
         }
     }
@@ -170,6 +188,7 @@ mod tests {
     use std::time::Duration;
 
     use parking_lot::RwLock;
+    use crate::cache::buffer_event::BufferEvent;
 
     use crate::cache::command::CommandStatus;
     use crate::cache::key_description::KeyDescription;
@@ -186,14 +205,14 @@ mod tests {
         let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
         let key_hashes = vec![10, 14];
 
+        policy.accept(BufferEvent::Full(key_hashes));
+        thread::sleep(Duration::from_secs(1));
+
         policy.shutdown();
-        policy.accept(key_hashes);
         thread::sleep(Duration::from_secs(1));
 
         let key_hashes = vec![116, 19];
-        policy.accept(key_hashes);
-
-        thread::sleep(Duration::from_secs(1));
+        policy.accept(BufferEvent::Full(key_hashes));
 
         let actual_frequencies = vec![
             policy.estimate(10),
@@ -210,7 +229,7 @@ mod tests {
         let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
         let key_hashes = vec![10, 14, 116, 19, 19, 10];
 
-        policy.accept(key_hashes);
+        policy.accept(BufferEvent::Full(key_hashes));
         thread::sleep(Duration::from_millis(10));
 
         let actual_frequencies = vec![
@@ -230,12 +249,13 @@ mod tests {
         let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
         let key_hashes = vec![10, 14];
 
+        policy.accept(BufferEvent::Full(key_hashes));
         policy.shutdown();
-        policy.accept(key_hashes);
+
         thread::sleep(Duration::from_secs(1));
 
         let key_hashes = vec![116, 19];
-        policy.accept(key_hashes);
+        policy.accept(BufferEvent::Full(key_hashes));
 
         thread::sleep(Duration::from_secs(1));
 
