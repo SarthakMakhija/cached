@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crossbeam_utils::CachePadded;
@@ -5,7 +6,8 @@ use crossbeam_utils::CachePadded;
 const TOTAL_STATS: usize = 9;
 
 #[repr(usize)]
-pub(crate) enum StatsType {
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+pub enum StatsType {
     CacheHits = 0,
     CacheMisses = 1,
     KeysAdded = 2,
@@ -15,6 +17,39 @@ pub(crate) enum StatsType {
     WeightRemoved = 6,
     AccessAdded = 7,
     AccessDropped = 8,
+}
+
+impl StatsType {
+    const VALUES: [Self; TOTAL_STATS] = [
+        Self::CacheHits,
+        Self::CacheMisses,
+        Self::KeysAdded,
+        Self::KeysDeleted,
+        Self::KeysRejected,
+        Self::WeightAdded,
+        Self::WeightRemoved,
+        Self::AccessAdded,
+        Self::AccessDropped
+    ];
+}
+
+#[derive(Debug, PartialEq)]
+pub struct StatsSummary {
+    pub stats_by_type: HashMap<StatsType, u64>,
+    pub hit_ratio: f64,
+}
+
+impl StatsSummary {
+    pub(crate) fn new(stats_by_type: HashMap<StatsType, u64>, hit_ratio: f64) -> Self {
+        StatsSummary {
+            stats_by_type,
+            hit_ratio,
+        }
+    }
+
+    pub fn get(&self, stats_type: &StatsType) -> Option<u64> {
+        self.stats_by_type.get(stats_type).copied()
+    }
 }
 
 #[repr(transparent)]
@@ -54,32 +89,32 @@ impl ConcurrentStatsCounter {
     pub(crate) fn delete_key(&self) { self.add(StatsType::KeysDeleted, 1); }
 
     pub(crate) fn hits(&self) -> u64 {
-        self.get(StatsType::CacheHits)
+        self.get(&StatsType::CacheHits)
     }
 
     pub(crate) fn misses(&self) -> u64 {
-        self.get(StatsType::CacheMisses)
+        self.get(&StatsType::CacheMisses)
     }
 
     pub(crate) fn keys_added(&self) -> u64 {
-        self.get(StatsType::KeysAdded)
+        self.get(&StatsType::KeysAdded)
     }
 
     pub(crate) fn keys_deleted(&self) -> u64 {
-        self.get(StatsType::KeysDeleted)
+        self.get(&StatsType::KeysDeleted)
     }
 
-    pub(crate) fn keys_rejected(&self) -> u64 { self.get(StatsType::KeysRejected) }
+    pub(crate) fn keys_rejected(&self) -> u64 { self.get(&StatsType::KeysRejected) }
 
     pub(crate) fn weight_added(&self) -> u64 {
-        self.get(StatsType::WeightAdded)
+        self.get(&StatsType::WeightAdded)
     }
 
-    pub(crate) fn weight_removed(&self) -> u64 { self.get(StatsType::WeightRemoved) }
+    pub(crate) fn weight_removed(&self) -> u64 { self.get(&StatsType::WeightRemoved) }
 
-    pub(crate) fn access_added(&self) -> u64 { self.get(StatsType::AccessAdded) }
+    pub(crate) fn access_added(&self) -> u64 { self.get(&StatsType::AccessAdded) }
 
-    pub(crate) fn access_dropped(&self) -> u64 { self.get(StatsType::AccessDropped) }
+    pub(crate) fn access_dropped(&self) -> u64 { self.get(&StatsType::AccessDropped) }
 
     pub(crate) fn hit_ratio(&self) -> f64 {
         let hits = self.hits();
@@ -96,19 +131,29 @@ impl ConcurrentStatsCounter {
         }
     }
 
+    pub(crate) fn summary(&self) -> StatsSummary {
+        let mut stats_by_type = HashMap::new();
+        for stats_type in StatsType::VALUES.iter().copied() {
+            stats_by_type.insert(stats_type, self.get(&stats_type));
+        }
+        StatsSummary::new(stats_by_type, self.hit_ratio())
+    }
+
     //TODO: Confirm ordering
     fn add(&self, stats_type: StatsType, count: u64) {
         self.entries[stats_type as usize].0.fetch_add(count, Ordering::AcqRel);
     }
 
     //TODO: Confirm ordering
-    fn get(&self, stats_type: StatsType) -> u64 {
-        self.entries[stats_type as usize].0.load(Ordering::Acquire)
+    fn get(&self, stats_type: &StatsType) -> u64 {
+        self.entries[*stats_type as usize].0.load(Ordering::Acquire)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::cache::stats::{ConcurrentStatsCounter, StatsType};
 
     #[test]
@@ -221,5 +266,76 @@ mod tests {
 
         stats_counter.clear();
         assert_eq!(0, stats_counter.keys_added());
+    }
+
+    #[test]
+    fn stats_summary_with_all_stats_as_one() {
+        let stats_counter = ConcurrentStatsCounter::new();
+        stats_counter.found_a_hit();
+        stats_counter.found_a_miss();
+        stats_counter.add_key();
+        stats_counter.delete_key();
+        stats_counter.reject_key();
+        stats_counter.add_weight(1);
+        stats_counter.remove_weight(1);
+        stats_counter.add_access(1);
+        stats_counter.drop_access(1);
+
+        let summary = stats_counter.summary();
+        let mut stats_by_type = HashMap::new();
+        for stats_type in StatsType::VALUES.iter().copied() {
+            stats_by_type.insert(stats_type, 1);
+        }
+
+        assert_eq!(0.5, summary.hit_ratio);
+        assert_eq!(stats_by_type, summary.stats_by_type);
+    }
+
+    #[test]
+    fn stats_summary() {
+        let stats_counter = ConcurrentStatsCounter::new();
+        stats_counter.found_a_hit();
+        stats_counter.found_a_miss();
+        stats_counter.delete_key();
+        stats_counter.remove_weight(1);
+        stats_counter.add_access(1);
+        stats_counter.drop_access(2);
+
+        let summary = stats_counter.summary();
+        let mut stats_by_type = HashMap::new();
+        stats_by_type.insert(StatsType::CacheHits, 1);
+        stats_by_type.insert(StatsType::CacheMisses, 1);
+        stats_by_type.insert(StatsType::KeysAdded, 0);
+        stats_by_type.insert(StatsType::KeysDeleted, 1);
+        stats_by_type.insert(StatsType::KeysRejected, 0);
+        stats_by_type.insert(StatsType::WeightAdded, 0);
+        stats_by_type.insert(StatsType::WeightRemoved, 1);
+        stats_by_type.insert(StatsType::AccessAdded, 1);
+        stats_by_type.insert(StatsType::AccessDropped, 2);
+
+        assert_eq!(0.5, summary.hit_ratio);
+        assert_eq!(stats_by_type, summary.stats_by_type);
+    }
+}
+
+mod stats_summary_tests {
+    use std::collections::HashMap;
+    use crate::cache::stats::{StatsSummary, StatsType};
+
+    #[test]
+    fn missing_stats() {
+        let summary = StatsSummary::new(HashMap::new(), 0.0);
+        assert_eq!(None, summary.get(&StatsType::CacheHits));
+    }
+
+    #[test]
+    fn stats_value_by_its_type() {
+        let mut stats_by_type = HashMap::new();
+        stats_by_type.insert(StatsType::CacheHits, 1);
+        stats_by_type.insert(StatsType::KeysAdded, 5);
+
+        let summary = StatsSummary::new(stats_by_type, 1.0);
+        assert_eq!(1, summary.get(&StatsType::CacheHits).unwrap());
+        assert_eq!(5, summary.get(&StatsType::KeysAdded).unwrap());
     }
 }

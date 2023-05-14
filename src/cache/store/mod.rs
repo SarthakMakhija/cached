@@ -139,6 +139,10 @@ impl<Key, Value> Store<Key, Value>
         self.store.clear();
     }
 
+    pub(crate) fn stats_counter(&self) -> &Arc<ConcurrentStatsCounter> {
+        &self.stats_counter
+    }
+
     fn contains(&self, key: &Key) -> Option<KeyValueRef<Key, StoredValue<Value>>> {
         let maybe_value = self.store.get(key);
         maybe_value

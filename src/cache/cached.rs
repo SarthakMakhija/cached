@@ -11,7 +11,7 @@ use crate::cache::expiration::TTLTicker;
 use crate::cache::key_description::KeyDescription;
 use crate::cache::policy::admission_policy::AdmissionPolicy;
 use crate::cache::pool::Pool;
-use crate::cache::stats::ConcurrentStatsCounter;
+use crate::cache::stats::{ConcurrentStatsCounter, StatsSummary};
 use crate::cache::store::{Store, TypeOfExpiryUpdate};
 use crate::cache::store::key_value_ref::KeyValueRef;
 use crate::cache::store::stored_value::StoredValue;
@@ -148,6 +148,10 @@ impl<Key, Value> CacheD<Key, Value>
         self.admission_policy.weight_used()
     }
 
+    pub fn stats_summary(&self) -> StatsSummary {
+        self.store.stats_counter().summary()
+    }
+
     pub fn shutdown(&self) {
         let _ = self.command_executor.shutdown();
         self.admission_policy.shutdown();
@@ -280,6 +284,7 @@ mod tests {
     use crate::cache::cached::tests::setup::UnixEpochClock;
     use crate::cache::clock::ClockType;
     use crate::cache::config::ConfigBuilder;
+    use crate::cache::stats::StatsType;
     use crate::cache::upsert::UpsertRequestBuilder;
 
     #[derive(Eq, PartialEq, Debug)]
@@ -752,5 +757,29 @@ mod tests {
         assert_eq!(0, cached.total_weight_used());
         assert_eq!(None, cached.get(&"topic"));
         assert_eq!(None, cached.get(&"cache"));
+    }
+
+    #[tokio::test]
+    async fn stats_summary() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+
+        cached.put_with_weight("topic", "microservices", 50).unwrap().handle().await;
+        cached.put_with_weight("cache", "cached", 10).unwrap().handle().await;
+        cached.delete("cache").unwrap().handle().await;
+
+        let _ = cached.get(&"topic");
+        let _ = cached.get(&"cache");
+
+        let summary = cached.stats_summary();
+        assert_eq!(1, summary.get(&StatsType::CacheMisses).unwrap());
+        assert_eq!(1, summary.get(&StatsType::CacheHits).unwrap());
+        assert_eq!(60, summary.get(&StatsType::WeightAdded).unwrap());
+        assert_eq!(10, summary.get(&StatsType::WeightRemoved).unwrap());
+        assert_eq!(2, summary.get(&StatsType::KeysAdded).unwrap());
+        assert_eq!(1, summary.get(&StatsType::KeysDeleted).unwrap());
+
+        assert_eq!(0, summary.get(&StatsType::KeysRejected).unwrap());
+        assert_eq!(0, summary.get(&StatsType::AccessAdded).unwrap());
+        assert_eq!(0, summary.get(&StatsType::AccessDropped).unwrap());
     }
 }
