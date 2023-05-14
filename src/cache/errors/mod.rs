@@ -1,0 +1,11 @@
+pub(crate) const ERROR_MESSAGE_TOTAL_COUNTERS_GT_ZERO: &str = "Total number of counters must be greater than zero";
+pub(crate) const ERROR_MESSAGE_TOTAL_CACHE_WEIGHT_GT_ZERO: &str = "Total cache weight must be greater than zero";
+pub(crate) const ERROR_MESSAGE_TOTAL_SHARDS_GT_ZERO: &str = "Total number of shards must be greater than zero";
+pub(crate) const ERROR_MESSAGE_POOL_SIZE_GT_ZERO: &str = "Pool size must be greater than zero";
+pub(crate) const ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO: &str = "Buffer size must be greater than zero";
+pub(crate) const ERROR_MESSAGE_COMMAND_BUFFER_SIZE_GT_ZERO: &str = "Command buffer size must be greater than zero";
+pub(crate) const ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO: &str = "Weight of the input key/value must be greater than zero";
+pub(crate) const ERROR_MESSAGE_WEIGHT_CALCULATION_GT_ZERO: &str = "Weight of the input key/value calculated by the weight calculation function must be greater than zero";
+pub(crate) const ERROR_MESSAGE_UPSERT_VALUE_MISSING: &str = "Upsert has resulted in a put request, value must be specified";
+pub(crate) const ERROR_MESSAGE_INVALID_UPSERT: &str = "Upsert request is invalid, either 'value', 'weight', 'time_to_live' or 'remove_time_to_live' must be specified";
+pub(crate) const ERROR_MESSAGE_INVALID_UPSERT_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE: &str = "Upsert request is invalid, only one of 'time_to_live' or 'remove_time_to_live' must be specified";

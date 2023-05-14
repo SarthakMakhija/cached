@@ -7,6 +7,9 @@ use crate::cache::command::acknowledgement::CommandAcknowledgement;
 use crate::cache::command::command_executor::{CommandExecutor, CommandSendResult};
 use crate::cache::command::CommandType;
 use crate::cache::config::Config;
+use crate::cache::errors::ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO;
+use crate::cache::errors::ERROR_MESSAGE_UPSERT_VALUE_MISSING;
+use crate::cache::errors::ERROR_MESSAGE_WEIGHT_CALCULATION_GT_ZERO;
 use crate::cache::expiration::TTLTicker;
 use crate::cache::key_description::KeyDescription;
 use crate::cache::policy::admission_policy::AdmissionPolicy;
@@ -58,11 +61,12 @@ impl<Key, Value> CacheD<Key, Value>
 
     pub fn put(&self, key: Key, value: Value) -> CommandSendResult {
         let weight = (self.config.weight_calculation_fn)(&key, &value);
+        assert!(weight > 0, "{}", ERROR_MESSAGE_WEIGHT_CALCULATION_GT_ZERO);
         self.put_with_weight(key, value, weight)
     }
 
     pub fn put_with_weight(&self, key: Key, value: Value, weight: Weight) -> CommandSendResult {
-        assert!(weight > 0);
+        assert!(weight > 0, "{}", ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO);
         self.command_executor.send(CommandType::Put(
             self.key_description(key, weight),
             value,
@@ -71,13 +75,14 @@ impl<Key, Value> CacheD<Key, Value>
 
     pub fn put_with_ttl(&self, key: Key, value: Value, time_to_live: Duration) -> CommandSendResult {
         let weight = (self.config.weight_calculation_fn)(&key, &value);
+        assert!(weight > 0, "{}", ERROR_MESSAGE_WEIGHT_CALCULATION_GT_ZERO);
         self.command_executor.send(CommandType::PutWithTTL(
             self.key_description(key, weight), value, time_to_live)
         )
     }
 
     pub fn put_with_weight_and_ttl(&self, key: Key, value: Value, weight: Weight, time_to_live: Duration) -> CommandSendResult {
-        assert!(weight > 0);
+        assert!(weight > 0, "{}", ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO);
         self.command_executor.send(CommandType::PutWithTTL(
             self.key_description(key, weight), value, time_to_live,
         ))
@@ -93,11 +98,12 @@ impl<Key, Value> CacheD<Key, Value>
 
         if !update_response.did_update_happen() {
             let value = update_response.value();
-            assert!(value.is_some());
+            assert!(value.is_some(), "{}", ERROR_MESSAGE_UPSERT_VALUE_MISSING);
             assert!(updated_weight.is_some());
 
             let value = value.unwrap();
             let weight = updated_weight.unwrap();
+            assert!(weight > 0, "{}", ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO);
 
             return if let Some(time_to_live) = time_to_live {
                 self.put_with_weight_and_ttl(key, value, weight, time_to_live)
@@ -118,6 +124,7 @@ impl<Key, Value> CacheD<Key, Value>
 
         let key_id = update_response.key_id_or_panic();
         if let Some(weight) = updated_weight {
+            assert!(weight > 0, "{}", ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO);
             return self.command_executor.send(CommandType::UpdateWeight(key_id, weight));
         }
         Ok(CommandAcknowledgement::accepted())
@@ -283,9 +290,9 @@ mod tests {
     use crate::cache::cached::CacheD;
     use crate::cache::cached::tests::setup::UnixEpochClock;
     use crate::cache::clock::ClockType;
-    use crate::cache::config::ConfigBuilder;
+    use crate::cache::config::{ConfigBuilder, WeightCalculationFn};
     use crate::cache::stats::StatsType;
-    use crate::cache::upsert::UpsertRequestBuilder;
+    use crate::cache::upsert::{UpsertRequest, UpsertRequestBuilder};
 
     #[derive(Eq, PartialEq, Debug)]
     struct Name {
@@ -306,6 +313,80 @@ mod tests {
                 SystemTime::UNIX_EPOCH
             }
         }
+    }
+
+    #[test]
+    #[should_panic]
+    fn weight_must_be_greater_than_zero_1() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let _ =
+            cached.put_with_weight("topic", "microservices", 0).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn weight_must_be_greater_than_zero_2() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let _ =
+            cached.put_with_weight_and_ttl("topic", "microservices", 0, Duration::from_secs(5)).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn weight_calculation_fn_must_return_weight_greater_than_zero_1() {
+        let weight_calculation: Box<WeightCalculationFn<&str, &str>> = Box::new(|_key, _value| 0);
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).weight_calculation_fn(weight_calculation).build());
+        let _ =
+            cached.put("topic", "microservices").unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn weight_calculation_fn_must_return_weight_greater_than_zero_2() {
+        let weight_calculation: Box<WeightCalculationFn<&str, &str>> = Box::new(|_key, _value| 0);
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).weight_calculation_fn(weight_calculation).build());
+        let _ =
+            cached.put_with_ttl("topic", "microservices", Duration::from_secs(5)).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn upsert_results_in_put_value_must_be_present() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let upsert: UpsertRequest<&str, &str> = UpsertRequestBuilder::new("store").build();
+        let _ = cached.upsert(upsert);
+    }
+
+    #[test]
+    #[should_panic]
+    fn upsert_results_in_put_weight_calculation_fn_must_return_weight_greater_than_zero() {
+        let weight_calculation: Box<WeightCalculationFn<&str, &str>> = Box::new(|_key, _value| 0);
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).weight_calculation_fn(weight_calculation).build());
+
+        let upsert = UpsertRequestBuilder::new("store").value("cached").build();
+        let _ = cached.upsert(upsert);
+    }
+
+    #[tokio::test]
+    #[should_panic]
+    async fn upsert_results_in_update_weight_calculation_fn_must_return_weight_greater_than_zero() {
+        let weight_calculation: Box<WeightCalculationFn<&str, &str>> = Box::new(|_key, _value| 0);
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).weight_calculation_fn(weight_calculation).build());
+        cached.put("topic", "microservices").unwrap().handle().await;
+
+        let upsert = UpsertRequestBuilder::new("topic").value("cached").build();
+        let _ = cached.upsert(upsert);
+    }
+
+
+    #[tokio::test]
+    #[should_panic]
+    async fn upsert_results_in_update_weight_must_be_greater_than_zero() {
+        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        cached.put("topic", "microservices").unwrap().handle().await;
+
+        let upsert = UpsertRequestBuilder::new("topic").value("cached").weight(0).build();
+        let _ = cached.upsert(upsert);
     }
 
     #[tokio::test]

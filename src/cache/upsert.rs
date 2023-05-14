@@ -1,6 +1,9 @@
 use std::hash::Hash;
 use std::time::Duration;
 use crate::cache::config::WeightCalculationFn;
+use crate::cache::errors::ERROR_MESSAGE_INVALID_UPSERT;
+use crate::cache::errors::ERROR_MESSAGE_INVALID_UPSERT_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE;
+use crate::cache::errors::ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO;
 
 use crate::cache::types::Weight;
 
@@ -52,6 +55,7 @@ impl<Key, Value> UpsertRequestBuilder<Key, Value>
     }
 
     pub fn weight(mut self, weight: Weight) -> UpsertRequestBuilder<Key, Value> {
+        assert!(weight > 0, "{}", ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO);
         self.weight = Some(weight);
         self
     }
@@ -67,6 +71,12 @@ impl<Key, Value> UpsertRequestBuilder<Key, Value>
     }
 
     pub fn build(self) -> UpsertRequest<Key, Value> {
+        let valid_upsert = self.value.is_some() || self.weight.is_some()  || self.time_to_live.is_some() || self.remove_time_to_live;
+        assert!(valid_upsert, "{}", ERROR_MESSAGE_INVALID_UPSERT);
+
+        let both_time_to_live_and_remove_time_to_live = self.time_to_live.is_some() && self.remove_time_to_live;
+        assert!(!both_time_to_live_and_remove_time_to_live, "{}", ERROR_MESSAGE_INVALID_UPSERT_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE);
+
         UpsertRequest {
             key: self.key,
             value: self.value,
@@ -81,7 +91,25 @@ impl<Key, Value> UpsertRequestBuilder<Key, Value>
 mod tests {
     use std::time::Duration;
 
-    use crate::cache::upsert::UpsertRequestBuilder;
+    use crate::cache::upsert::{UpsertRequest, UpsertRequestBuilder};
+
+    #[test]
+    #[should_panic]
+    fn invalid_upsert_with_weight_as_zero() {
+        let _: UpsertRequest<&str, &str> = UpsertRequestBuilder::new("topic").weight(0).build();
+    }
+
+    #[test]
+    #[should_panic]
+    fn invalid_upsert_with_only_key_specified() {
+        let _: UpsertRequest<&str, &str> = UpsertRequestBuilder::new("topic").build();
+    }
+
+    #[test]
+    #[should_panic]
+    fn invalid_upsert_with_both_time_to_live_and_remove_time_to_live_specified() {
+        let _: UpsertRequest<&str, &str> = UpsertRequestBuilder::new("topic").weight(10).remove_time_to_live().time_to_live(Duration::from_secs(9)).build();
+    }
 
     #[test]
     fn upsert_request_with_key_value() {
