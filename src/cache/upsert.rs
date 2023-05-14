@@ -1,10 +1,7 @@
 use std::hash::Hash;
 use std::time::Duration;
 use crate::cache::config::WeightCalculationFn;
-use crate::cache::errors::ERROR_MESSAGE_INVALID_UPSERT;
-use crate::cache::errors::ERROR_MESSAGE_INVALID_UPSERT_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE;
-use crate::cache::errors::ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO;
-
+use crate::cache::errors::Errors;
 use crate::cache::types::Weight;
 
 pub struct UpsertRequest<Key, Value>
@@ -55,7 +52,7 @@ impl<Key, Value> UpsertRequestBuilder<Key, Value>
     }
 
     pub fn weight(mut self, weight: Weight) -> UpsertRequestBuilder<Key, Value> {
-        assert!(weight > 0, "{}", ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO);
+        assert!(weight > 0, "{}", Errors::KeyWeightGtZero("upsert request builder"));
         self.weight = Some(weight);
         self
     }
@@ -72,10 +69,10 @@ impl<Key, Value> UpsertRequestBuilder<Key, Value>
 
     pub fn build(self) -> UpsertRequest<Key, Value> {
         let valid_upsert = self.value.is_some() || self.weight.is_some()  || self.time_to_live.is_some() || self.remove_time_to_live;
-        assert!(valid_upsert, "{}", ERROR_MESSAGE_INVALID_UPSERT);
+        assert!(valid_upsert, "{}", Errors::InvalidUpsert);
 
         let both_time_to_live_and_remove_time_to_live = self.time_to_live.is_some() && self.remove_time_to_live;
-        assert!(!both_time_to_live_and_remove_time_to_live, "{}", ERROR_MESSAGE_INVALID_UPSERT_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE);
+        assert!(!both_time_to_live_and_remove_time_to_live, "{}", Errors::InvalidUpsertEitherTimeToLiveOrRemoveTimeToLive);
 
         UpsertRequest {
             key: self.key,

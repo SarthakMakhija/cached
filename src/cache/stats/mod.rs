@@ -318,6 +318,7 @@ mod tests {
     }
 }
 
+#[cfg(test)]
 mod stats_summary_tests {
     use std::collections::HashMap;
     use crate::cache::stats::{StatsSummary, StatsType};

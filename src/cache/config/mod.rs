@@ -4,12 +4,7 @@ use std::time::Duration;
 
 use crate::cache::clock::{ClockType, SystemClock};
 use crate::cache::config::weight_calculation::Calculation;
-use crate::cache::errors::ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO;
-use crate::cache::errors::ERROR_MESSAGE_COMMAND_BUFFER_SIZE_GT_ZERO;
-use crate::cache::errors::ERROR_MESSAGE_POOL_SIZE_GT_ZERO;
-use crate::cache::errors::ERROR_MESSAGE_TOTAL_CACHE_WEIGHT_GT_ZERO;
-use crate::cache::errors::ERROR_MESSAGE_TOTAL_COUNTERS_GT_ZERO;
-use crate::cache::errors::ERROR_MESSAGE_TOTAL_SHARDS_GT_ZERO;
+use crate::cache::errors::Errors;
 use crate::cache::expiration::config::TTLConfig;
 use crate::cache::pool::{BufferSize, PoolSize};
 use crate::cache::types::{KeyHash, TotalCounters, Weight};
@@ -113,37 +108,37 @@ impl<Key, Value> ConfigBuilder<Key, Value>
     }
 
     pub fn access_pool_size(mut self, pool_size: usize) -> ConfigBuilder<Key, Value> {
-        assert!(pool_size > 0, "{}", ERROR_MESSAGE_POOL_SIZE_GT_ZERO);
+        assert!(pool_size > 0, "{}", Errors::PoolSizeGtZero);
         self.access_pool_size = PoolSize(pool_size);
         self
     }
 
     pub fn access_buffer_size(mut self, buffer_size: usize) -> ConfigBuilder<Key, Value> {
-        assert!(buffer_size > 0, "{}", ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO);
+        assert!(buffer_size > 0, "{}", Errors::BufferSizeGtZero);
         self.access_buffer_size = BufferSize(buffer_size);
         self
     }
 
     pub fn command_buffer_size(mut self, command_buffer_size: usize) -> ConfigBuilder<Key, Value> {
-        assert!(command_buffer_size > 0, "{}", ERROR_MESSAGE_COMMAND_BUFFER_SIZE_GT_ZERO);
+        assert!(command_buffer_size > 0, "{}", Errors::CommandBufferSizeGtZero);
         self.command_buffer_size = command_buffer_size;
         self
     }
 
     pub fn counters(mut self, counters: TotalCounters) -> ConfigBuilder<Key, Value> {
-        assert!(counters > 0, "{}", ERROR_MESSAGE_TOTAL_COUNTERS_GT_ZERO);
+        assert!(counters > 0, "{}", Errors::TotalCountersGtZero);
         self.counters = counters;
         self
     }
 
     pub fn total_cache_weight(mut self, weight: Weight) -> ConfigBuilder<Key, Value> {
-        assert!(weight > 0, "{}", ERROR_MESSAGE_TOTAL_CACHE_WEIGHT_GT_ZERO);
+        assert!(weight > 0, "{}", Errors::TotalCacheWeightGtZero);
         self.total_cache_weight = weight;
         self
     }
 
     pub fn shards(mut self, shards: usize) -> ConfigBuilder<Key, Value> {
-        assert!(shards > 0, "{}", ERROR_MESSAGE_TOTAL_SHARDS_GT_ZERO);
+        assert!(shards > 0, "{}", Errors::TotalShardsGtZero);
         self.shards = shards;
         self
     }

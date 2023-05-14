@@ -7,9 +7,7 @@ use crate::cache::command::acknowledgement::CommandAcknowledgement;
 use crate::cache::command::command_executor::{CommandExecutor, CommandSendResult};
 use crate::cache::command::CommandType;
 use crate::cache::config::Config;
-use crate::cache::errors::ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO;
-use crate::cache::errors::ERROR_MESSAGE_UPSERT_VALUE_MISSING;
-use crate::cache::errors::ERROR_MESSAGE_WEIGHT_CALCULATION_GT_ZERO;
+use crate::cache::errors::Errors;
 use crate::cache::expiration::TTLTicker;
 use crate::cache::key_description::KeyDescription;
 use crate::cache::policy::admission_policy::AdmissionPolicy;
@@ -61,12 +59,12 @@ impl<Key, Value> CacheD<Key, Value>
 
     pub fn put(&self, key: Key, value: Value) -> CommandSendResult {
         let weight = (self.config.weight_calculation_fn)(&key, &value);
-        assert!(weight > 0, "{}", ERROR_MESSAGE_WEIGHT_CALCULATION_GT_ZERO);
+        assert!(weight > 0, "{}", Errors::WeightCalculationGtZero);
         self.put_with_weight(key, value, weight)
     }
 
     pub fn put_with_weight(&self, key: Key, value: Value, weight: Weight) -> CommandSendResult {
-        assert!(weight > 0, "{}", ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO);
+        assert!(weight > 0, "{}", Errors::KeyWeightGtZero("put_with_weight"));
         self.command_executor.send(CommandType::Put(
             self.key_description(key, weight),
             value,
@@ -75,14 +73,14 @@ impl<Key, Value> CacheD<Key, Value>
 
     pub fn put_with_ttl(&self, key: Key, value: Value, time_to_live: Duration) -> CommandSendResult {
         let weight = (self.config.weight_calculation_fn)(&key, &value);
-        assert!(weight > 0, "{}", ERROR_MESSAGE_WEIGHT_CALCULATION_GT_ZERO);
+        assert!(weight > 0, "{}", Errors::WeightCalculationGtZero);
         self.command_executor.send(CommandType::PutWithTTL(
             self.key_description(key, weight), value, time_to_live)
         )
     }
 
     pub fn put_with_weight_and_ttl(&self, key: Key, value: Value, weight: Weight, time_to_live: Duration) -> CommandSendResult {
-        assert!(weight > 0, "{}", ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO);
+        assert!(weight > 0, "{}", Errors::KeyWeightGtZero("put_with_weight_and_ttl"));
         self.command_executor.send(CommandType::PutWithTTL(
             self.key_description(key, weight), value, time_to_live,
         ))
@@ -98,12 +96,12 @@ impl<Key, Value> CacheD<Key, Value>
 
         if !update_response.did_update_happen() {
             let value = update_response.value();
-            assert!(value.is_some(), "{}", ERROR_MESSAGE_UPSERT_VALUE_MISSING);
+            assert!(value.is_some(), "{}", Errors::UpsertValueMissing);
             assert!(updated_weight.is_some());
 
             let value = value.unwrap();
             let weight = updated_weight.unwrap();
-            assert!(weight > 0, "{}", ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO);
+            assert!(weight > 0, "{}", Errors::KeyWeightGtZero("upsert"));
 
             return if let Some(time_to_live) = time_to_live {
                 self.put_with_weight_and_ttl(key, value, weight, time_to_live)
@@ -124,7 +122,7 @@ impl<Key, Value> CacheD<Key, Value>
 
         let key_id = update_response.key_id_or_panic();
         if let Some(weight) = updated_weight {
-            assert!(weight > 0, "{}", ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO);
+            assert!(weight > 0, "{}", Errors::KeyWeightGtZero("upsert"));
             return self.command_executor.send(CommandType::UpdateWeight(key_id, weight));
         }
         Ok(CommandAcknowledgement::accepted())
