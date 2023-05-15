@@ -582,6 +582,8 @@ mod tests {
         cached.get(&"topic");
         cached.get(&"disk");
         cached.get(&"topic");
+        cached.get(&"disk"); //will cause the drain of the buffer which will have 2 accesses of topic and one for disk
+
         thread::sleep(Duration::from_secs(2));
 
         let hasher = &(cached.config.key_hash_fn);

@@ -107,6 +107,7 @@ async fn weight_of_the_cache_does_not_exceed_the_maximum_weight_100() {
         cached.get(&index);
         cached.get(&index);
     }
+    cached.get(&1); //will cause the buffer drain
 
     thread::sleep(Duration::from_secs(3));
 
