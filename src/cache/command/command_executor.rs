@@ -208,7 +208,7 @@ mod tests {
     use std::thread;
     use std::time::Duration;
 
-    use crate::cache::clock::SystemClock;
+    use crate::cache::clock::{ClockType, SystemClock};
     use crate::cache::command::{CommandStatus, CommandType};
     use crate::cache::command::command_executor::CommandExecutor;
     use crate::cache::expiration::config::TTLConfig;
@@ -220,6 +220,10 @@ mod tests {
 
     fn no_action_ttl_ticker() -> Arc<TTLTicker> {
         TTLTicker::new(TTLConfig::new(4, Duration::from_secs(300), SystemClock::boxed()), |_key_id| {})
+    }
+
+    fn test_store(clock: ClockType, stats_counter: Arc<ConcurrentStatsCounter>) -> Arc<Store<&'static str, &'static str>> {
+        Store::new(clock, stats_counter.clone(), 16, 4)
     }
 
     mod setup {
@@ -240,7 +244,7 @@ mod tests {
     #[tokio::test]
     async fn puts_a_key_value_and_shutdown() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
+        let store = test_store(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
@@ -265,7 +269,7 @@ mod tests {
     #[tokio::test]
     async fn puts_a_key_value() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
+        let store = test_store(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
@@ -289,7 +293,7 @@ mod tests {
     #[tokio::test]
     async fn key_value_gets_rejected_given_its_weight_is_more_than_the_cache_weight() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
+        let store = test_store(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
@@ -314,7 +318,7 @@ mod tests {
     #[tokio::test]
     async fn rejects_a_key_value_and_increase_stats() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
+        let store = test_store(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
@@ -339,7 +343,7 @@ mod tests {
     #[tokio::test]
     async fn puts_a_couple_of_key_values() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
+        let store = test_store(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
@@ -369,7 +373,7 @@ mod tests {
     #[tokio::test]
     async fn puts_a_key_value_with_ttl() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
+        let store = test_store(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let ttl_ticker = no_action_ttl_ticker();
@@ -400,7 +404,7 @@ mod tests {
     #[tokio::test]
     async fn rejects_a_key_value_with_ttl_and_increase_stats() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
+        let store = test_store(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
@@ -425,7 +429,7 @@ mod tests {
     #[tokio::test]
     async fn deletes_a_key() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
+        let store = test_store(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
         let ttl_ticker = no_action_ttl_ticker();
 
@@ -462,7 +466,7 @@ mod tests {
     #[tokio::test]
     async fn deletion_of_a_non_existing_key_value_gets_rejected() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let store: Arc<Store<&str, &str>> = Store::new(SystemClock::boxed(), stats_counter.clone());
+        let store= test_store(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
@@ -489,7 +493,7 @@ mod sociable_tests {
     use std::time::Duration;
 
     use crate::cache::buffer_event::BufferEvent;
-    use crate::cache::clock::SystemClock;
+    use crate::cache::clock::{ClockType, SystemClock};
     use crate::cache::command::{CommandStatus, CommandType};
     use crate::cache::command::command_executor::CommandExecutor;
     use crate::cache::command::command_executor::Store;
@@ -504,10 +508,14 @@ mod sociable_tests {
         TTLTicker::new(TTLConfig::new(4, Duration::from_secs(300), SystemClock::boxed()), |_key_id| {})
     }
 
+    fn test_store(clock: ClockType, stats_counter: Arc<ConcurrentStatsCounter>) -> Arc<Store<&'static str, &'static str>> {
+        Store::new(clock, stats_counter.clone(), 16, 4)
+    }
+
     #[tokio::test]
     async fn puts_a_key_value() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
+        let store = test_store(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
@@ -534,7 +542,7 @@ mod sociable_tests {
     #[tokio::test]
     async fn puts_a_key_value_by_eliminating_victims() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
+        let store = test_store(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 10, stats_counter.clone()));
 
         let key_hashes = vec![10, 14, 116];
@@ -575,7 +583,7 @@ mod sociable_tests {
     #[tokio::test]
     async fn deletes_a_key() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
+        let store = test_store(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
         let command_executor = CommandExecutor::new(
             store.clone(),
@@ -603,7 +611,7 @@ mod sociable_tests {
     #[tokio::test]
     async fn updates_the_weight_of_the_key() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let store = Store::new(SystemClock::boxed(), stats_counter.clone());
+        let store = test_store(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(

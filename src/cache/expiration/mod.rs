@@ -25,7 +25,7 @@ impl TTLTicker {
         let ticker = Arc::new(
             TTLTicker {
                 shards: (0..config.shards())
-                    .map(|_| RwLock::new(HashMap::new())).collect(), //TODO: Capacity
+                    .map(|_| RwLock::new(HashMap::new())).collect(),
                 keep_running: Arc::new(AtomicBool::new(true)),
             }
         );

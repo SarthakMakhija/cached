@@ -40,7 +40,7 @@ impl<Key, Value> CacheD<Key, Value>
         assert!(config.counters > 0);
 
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
-        let store = Store::new(config.clock.clone_box(), stats_counter.clone());
+        let store = Store::new(config.clock.clone_box(), stats_counter.clone(), config.capacity, config.shards);
         let admission_policy = Arc::new(AdmissionPolicy::new(config.counters, config.total_cache_weight, stats_counter.clone()));
         let pool = Pool::new(config.access_pool_size, config.access_buffer_size, admission_policy.clone());
         let ttl_ticker = Self::ttl_ticker(&config, store.clone(), admission_policy.clone());
@@ -422,7 +422,7 @@ mod tests {
 
     #[tokio::test]
     async fn put_a_key_value_with_ttl_and_ttl_ticker_evicts_it() {
-        let cached = CacheD::new(test_config_builder().shards(1).ttl_tick_duration(Duration::from_millis(10)).build());
+        let cached = CacheD::new(test_config_builder().shards(2).ttl_tick_duration(Duration::from_millis(10)).build());
 
         let acknowledgement =
             cached.put_with_ttl("topic", "microservices", Duration::from_millis(20)).unwrap();

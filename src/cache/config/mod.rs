@@ -7,7 +7,7 @@ use crate::cache::config::weight_calculation::Calculation;
 use crate::cache::errors::Errors;
 use crate::cache::expiration::config::TTLConfig;
 use crate::cache::pool::{BufferSize, PoolSize};
-use crate::cache::types::{KeyHash, TotalCapacity, TotalCounters, Weight};
+use crate::cache::types::{KeyHash, TotalCapacity, TotalCounters, TotalShards, Weight};
 
 pub(crate) mod weight_calculation;
 
@@ -28,11 +28,13 @@ pub struct Config<Key, Value>
     pub clock: ClockType,
     pub counters: TotalCounters,
     pub command_buffer_size: usize,
+    pub total_cache_weight: Weight,
+
     pub(crate) access_pool_size: PoolSize,
     pub(crate) access_buffer_size: BufferSize,
     pub(crate) capacity: TotalCapacity,
-    pub total_cache_weight: Weight,
-    shards: usize,
+    pub(crate) shards: TotalShards,
+
     ttl_tick_duration: Duration,
 }
 
@@ -56,7 +58,7 @@ pub struct ConfigBuilder<Key, Value>
     access_pool_size: PoolSize,
     access_buffer_size: BufferSize,
     total_cache_weight: Weight,
-    shards: usize,
+    shards: TotalShards,
     ttl_tick_duration: Duration,
 }
 
@@ -122,7 +124,7 @@ impl<Key, Value> ConfigBuilder<Key, Value>
         self
     }
 
-    pub fn shards(mut self, shards: usize) -> ConfigBuilder<Key, Value> {
+    pub fn shards(mut self, shards: TotalShards) -> ConfigBuilder<Key, Value> {
         assert!(shards > 0, "{}", Errors::TotalShardsGtZero);
         self.shards = shards;
         self

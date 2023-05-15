@@ -8,7 +8,7 @@ use crate::cache::clock::ClockType;
 use crate::cache::stats::ConcurrentStatsCounter;
 use crate::cache::store::key_value_ref::KeyValueRef;
 use crate::cache::store::stored_value::StoredValue;
-use crate::cache::types::{ExpireAfter, KeyId};
+use crate::cache::types::{ExpireAfter, KeyId, TotalCapacity, TotalShards};
 
 pub mod stored_value;
 pub mod key_value_ref;
@@ -76,9 +76,9 @@ pub(crate) struct Store<Key, Value>
 
 impl<Key, Value> Store<Key, Value>
     where Key: Hash + Eq, {
-    pub(crate) fn new(clock: ClockType, stats_counter: Arc<ConcurrentStatsCounter>) -> Arc<Store<Key, Value>> {
+    pub(crate) fn new(clock: ClockType, stats_counter: Arc<ConcurrentStatsCounter>, capacity: TotalCapacity, shards: TotalShards) -> Arc<Store<Key, Value>> {
         Arc::new(Store {
-            store: DashMap::new(), //TODO: define capacity
+            store: DashMap::with_capacity_and_shard_amount(capacity, shards),
             clock,
             stats_counter,
         })
@@ -178,6 +178,7 @@ mod tests {
     use crate::cache::store::Store;
     use crate::cache::store::stored_value::StoredValue;
     use crate::cache::store::tests::setup::{Name, UnixEpochClock};
+    use crate::cache::types::{TotalCapacity, TotalShards};
 
     mod setup {
         use std::ops::Add;
@@ -210,10 +211,13 @@ mod tests {
         }
     }
 
+    const DEFAULT_CAPACITY: TotalCapacity = 16;
+    const DEFAULT_SHARDS: TotalShards = 4;
+
     #[test]
     fn get_value_for_an_existing_key() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         store.put("topic", "microservices", 1);
 
@@ -224,7 +228,7 @@ mod tests {
     #[test]
     fn get_value_for_an_existing_key_and_increase_stats() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         store.put("topic", "microservices", 1);
 
@@ -235,7 +239,7 @@ mod tests {
     #[test]
     fn put_a_key_value_and_increase_stats() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         store.put("topic", "microservices", 1);
         assert_eq!(1, store.stats_counter.keys_added());
@@ -244,7 +248,7 @@ mod tests {
     #[test]
     fn put_with_ttl() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         store.put_with_ttl("topic", "microservices", 1, Duration::from_millis(5));
 
@@ -255,7 +259,7 @@ mod tests {
     #[test]
     fn put_with_ttl_and_get_expire_after() {
         let clock = Box::new(UnixEpochClock {});
-        let store = Store::new(clock.clone(), Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock.clone(), Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         let expire_after = store.put_with_ttl("topic", "microservices", 1, Duration::from_secs(5));
         assert_eq!(clock.now().add(Duration::from_secs(5)), expire_after);
@@ -264,7 +268,7 @@ mod tests {
     #[test]
     fn put_with_ttl_and_increase_stats() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         store.put_with_ttl("topic", "microservices", 1, Duration::from_millis(5));
         assert_eq!(1, store.stats_counter.keys_added());
@@ -273,7 +277,7 @@ mod tests {
     #[test]
     fn put_with_ttl_and_get_the_value_of_an_expired_key() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         store.put_with_ttl("topic", "microservices", 1, Duration::from_nanos(1));
 
@@ -284,7 +288,7 @@ mod tests {
     #[test]
     fn get_value_ref_for_an_existing_key_if_value_is_not_cloneable() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         store.put("name", Name { first: "John".to_string(), last: "Mcnamara".to_string() }, 1);
 
@@ -295,7 +299,7 @@ mod tests {
     #[test]
     fn get_value_ref_for_an_existing_key_and_increase_stats() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         store.put("name", Name { first: "John".to_string(), last: "Mcnamara".to_string() }, 1);
 
@@ -306,7 +310,7 @@ mod tests {
     #[test]
     fn get_value_for_a_non_existing_key() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         let value: Option<&str> = store.get(&"non-existing");
         assert_eq!(None, value);
@@ -315,7 +319,7 @@ mod tests {
     #[test]
     fn get_value_for_a_non_existing_key_and_increase_stats() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         let _value: Option<&str> = store.get(&"non-existing");
         assert_eq!(1, store.stats_counter.misses());
@@ -323,7 +327,7 @@ mod tests {
 
     #[test]
     fn get_value_for_an_expired_key() {
-        let store = Store::new(Box::new(FutureClock {}), Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(Box::new(FutureClock {}), Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
         {
             let clock = SystemClock::boxed();
             store.store.insert("topic", StoredValue::expiring("microservices", 1, Duration::from_secs(5), &clock));
@@ -335,7 +339,7 @@ mod tests {
 
     #[test]
     fn get_value_for_an_expired_key_and_increase_stats() {
-        let store = Store::new(Box::new(FutureClock {}), Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(Box::new(FutureClock {}), Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
         {
             let clock = SystemClock::boxed();
             store.store.insert("topic", StoredValue::expiring("microservices", 1, Duration::from_secs(5), &clock));
@@ -347,7 +351,7 @@ mod tests {
 
     #[test]
     fn get_value_for_an_unexpired_key() {
-        let store = Store::new(Box::new(FutureClock {}), Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(Box::new(FutureClock {}), Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
         {
             let clock = SystemClock::boxed();
             store.store.insert("topic", StoredValue::expiring("microservices", 1, Duration::from_secs(15), &clock));
@@ -359,7 +363,7 @@ mod tests {
 
     #[test]
     fn get_value_for_an_unexpired_key_and_increase_stats() {
-        let store = Store::new(Box::new(FutureClock {}), Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(Box::new(FutureClock {}), Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
         {
             let clock = SystemClock::boxed();
             store.store.insert("topic", StoredValue::expiring("microservices", 1, Duration::from_secs(15), &clock));
@@ -372,7 +376,7 @@ mod tests {
     #[test]
     fn delete_a_key() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         store.put("topic", "microservices", 10);
         let key_id_expiry = store.delete(&"topic");
@@ -385,7 +389,7 @@ mod tests {
     #[test]
     fn delete_a_key_and_increase_stats() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         store.put("topic", "microservices", 10);
 
@@ -396,7 +400,7 @@ mod tests {
     #[test]
     fn delete_a_non_existing_key() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         let key_id_expiry = store.delete(&"non-existing");
 
@@ -408,7 +412,7 @@ mod tests {
     #[test]
     fn delete_a_non_existing_key_and_do_not_increase_stats() {
         let clock = SystemClock::boxed();
-        let store = Store::<&str, &str>::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::<&str, &str>::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         let _ = store.delete(&"non-existing");
         assert_eq!(0, store.stats_counter.keys_deleted());
@@ -417,7 +421,7 @@ mod tests {
     #[test]
     fn marks_a_key_deleted() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         store.put("topic", "microservices", 10);
         store.mark_deleted(&"topic");
@@ -429,7 +433,7 @@ mod tests {
     #[test]
     fn update_time_to_live_for_non_existing_key() {
         let clock = SystemClock::boxed();
-        let store: Arc<Store<&str, &str>> = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store: Arc<Store<&str, &str>> = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
         let response = store.update(&"topic", None, Some(Duration::from_secs(5)), false);
 
         assert!(!response.did_update_happen());
@@ -438,7 +442,7 @@ mod tests {
     #[test]
     fn update_time_to_live_for_an_existing_key() {
         let clock = Box::new(UnixEpochClock {});
-        let store = Store::new(clock.clone(), Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock.clone(), Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         store.put("topic", "microservices", 10);
         let update_response = store.update(&"topic", None, Some(Duration::from_secs(5)), false);
@@ -452,7 +456,7 @@ mod tests {
     #[test]
     fn update_time_to_live_for_an_existing_key_that_has_an_expiry() {
         let clock = Box::new(UnixEpochClock {});
-        let store = Store::new(clock.clone(), Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock.clone(), Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         store.put_with_ttl("topic", "microservices", 10, Duration::from_secs(300));
         store.update(&"topic", None, Some(Duration::from_secs(15)), false);
@@ -465,7 +469,7 @@ mod tests {
     #[test]
     fn remove_time_to_live_for_an_existing_key_that_has_an_expiry() {
         let clock = Box::new(UnixEpochClock {});
-        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         store.put_with_ttl("topic", "microservices", 10, Duration::from_secs(300));
         store.update(&"topic", None, None, true);
@@ -478,7 +482,7 @@ mod tests {
     #[test]
     fn update_value_for_an_existing() {
         let clock = Box::new(UnixEpochClock {});
-        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         store.put("topic", "microservices", 10);
         store.update(&"topic", Some("cache"), None, false);
@@ -491,7 +495,7 @@ mod tests {
     #[test]
     fn clear() {
         let clock = SystemClock::boxed();
-        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()));
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
 
         store.put("topic", "microservices", 1);
 
