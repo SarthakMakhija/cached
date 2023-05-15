@@ -13,7 +13,7 @@ LFU-based in-memory cache in Rust. (**WIP**)
 - Metrics - optional performance metrics for throughput, hit ratios, and other stats.
 - Simple API - just figure out your ideal Config values and you're off and running.
 
-**Usage**
+**Examples**
 ```rust
 
 #[tokio::test]
