@@ -1,6 +1,7 @@
 use std::cell::UnsafeCell;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicIsize, Ordering};
+use crossbeam_utils::Backoff;
 use log::debug;
 
 use parking_lot::Mutex;
@@ -48,9 +49,11 @@ impl<Consumer> Buffer<Consumer>
 
     //TODO: Validate memory ordering
     pub(crate) fn add(&self, key_hash: KeyHash) {
+        let backoff = Backoff::new();
         loop {
             let local_tail = self.used_tail.load(Ordering::Acquire);
             if local_tail >= (self.capacity.0 - 1) as isize && !self.drain() {
+                backoff.spin();
                 continue;
             }
             let result = self.used_tail.compare_exchange_weak(local_tail, local_tail + 1, Ordering::Release, Ordering::Relaxed);
@@ -59,7 +62,7 @@ impl<Consumer> Buffer<Consumer>
                 hashes.push(key_hash);
                 return;
             } else {
-                //TODO: maybe backoff
+                backoff.spin()
             }
         }
     }
@@ -78,7 +81,6 @@ impl<Consumer> Buffer<Consumer>
             }
             true
         } else {
-            //TODO: maybe backoff
             false
         };
     }
