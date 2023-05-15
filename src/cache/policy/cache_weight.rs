@@ -192,7 +192,9 @@ impl<Key> CacheWeight<Key>
                 let mut guard = self.weight_used.write();
                 *guard += weight - existing.weight;
             }
-            self.update_stats(weight, existing.weight);
+
+            self.stats_counter.update_key();
+            self.update_weight_stats(weight, existing.weight);
 
             let weighted_key = existing.value_mut();
             weighted_key.weight = weight;
@@ -233,7 +235,7 @@ impl<Key> CacheWeight<Key>
         *guard = 0;
     }
 
-    fn update_stats(&self, new_weight: Weight, existing_weight: Weight) {
+    fn update_weight_stats(&self, new_weight: Weight, existing_weight: Weight) {
         if new_weight > existing_weight {
             let difference = new_weight - existing_weight;
             self.stats_counter.add_weight(difference as u64);
@@ -334,6 +336,7 @@ mod tests {
 
         cache_weight.update(&1, 2);
         assert_eq!(2, cache_weight.stats_counter.weight_added());
+        assert_eq!(1, cache_weight.stats_counter.keys_updated());
     }
 
     #[test]

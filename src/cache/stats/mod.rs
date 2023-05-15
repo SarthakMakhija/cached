@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crossbeam_utils::CachePadded;
 
-const TOTAL_STATS: usize = 9;
+const TOTAL_STATS: usize = 10;
 
 #[repr(usize)]
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
@@ -12,11 +12,12 @@ pub enum StatsType {
     CacheMisses = 1,
     KeysAdded = 2,
     KeysDeleted = 3,
-    KeysRejected = 4,
-    WeightAdded = 5,
-    WeightRemoved = 6,
-    AccessAdded = 7,
-    AccessDropped = 8,
+    KeysUpdated = 4,
+    KeysRejected = 5,
+    WeightAdded = 6,
+    WeightRemoved = 7,
+    AccessAdded = 8,
+    AccessDropped = 9,
 }
 
 impl StatsType {
@@ -25,6 +26,7 @@ impl StatsType {
         Self::CacheMisses,
         Self::KeysAdded,
         Self::KeysDeleted,
+        Self::KeysUpdated,
         Self::KeysRejected,
         Self::WeightAdded,
         Self::WeightRemoved,
@@ -88,6 +90,8 @@ impl ConcurrentStatsCounter {
 
     pub(crate) fn delete_key(&self) { self.add(StatsType::KeysDeleted, 1); }
 
+    pub(crate) fn update_key(&self) { self.add(StatsType::KeysUpdated, 1); }
+
     pub(crate) fn hits(&self) -> u64 {
         self.get(&StatsType::CacheHits)
     }
@@ -105,6 +109,8 @@ impl ConcurrentStatsCounter {
     }
 
     pub(crate) fn keys_rejected(&self) -> u64 { self.get(&StatsType::KeysRejected) }
+
+    pub(crate) fn keys_updated(&self) -> u64 { self.get(&StatsType::KeysUpdated) }
 
     pub(crate) fn weight_added(&self) -> u64 {
         self.get(&StatsType::WeightAdded)
@@ -202,6 +208,15 @@ mod tests {
     }
 
     #[test]
+    fn increase_keys_updated() {
+        let stats_counter = ConcurrentStatsCounter::new();
+        stats_counter.update_key();
+        stats_counter.update_key();
+
+        assert_eq!(2, stats_counter.keys_updated());
+    }
+
+    #[test]
     fn hit_ratio_as_zero() {
         let stats_counter = ConcurrentStatsCounter::new();
         stats_counter.add(StatsType::CacheMisses, 1);
@@ -275,6 +290,7 @@ mod tests {
         stats_counter.found_a_miss();
         stats_counter.add_key();
         stats_counter.delete_key();
+        stats_counter.update_key();
         stats_counter.reject_key();
         stats_counter.add_weight(1);
         stats_counter.remove_weight(1);
@@ -297,6 +313,7 @@ mod tests {
         stats_counter.found_a_hit();
         stats_counter.found_a_miss();
         stats_counter.delete_key();
+        stats_counter.update_key();
         stats_counter.remove_weight(1);
         stats_counter.add_access(1);
         stats_counter.drop_access(2);
@@ -307,6 +324,7 @@ mod tests {
         stats_by_type.insert(StatsType::CacheMisses, 1);
         stats_by_type.insert(StatsType::KeysAdded, 0);
         stats_by_type.insert(StatsType::KeysDeleted, 1);
+        stats_by_type.insert(StatsType::KeysUpdated, 1);
         stats_by_type.insert(StatsType::KeysRejected, 0);
         stats_by_type.insert(StatsType::WeightAdded, 0);
         stats_by_type.insert(StatsType::WeightRemoved, 1);
