@@ -223,7 +223,7 @@ mod tests {
     }
 
     fn test_store(clock: ClockType, stats_counter: Arc<ConcurrentStatsCounter>) -> Arc<Store<&'static str, &'static str>> {
-        Store::new(clock, stats_counter.clone(), 16, 4)
+        Store::new(clock, stats_counter, 16, 4)
     }
 
     mod setup {
@@ -509,7 +509,7 @@ mod sociable_tests {
     }
 
     fn test_store(clock: ClockType, stats_counter: Arc<ConcurrentStatsCounter>) -> Arc<Store<&'static str, &'static str>> {
-        Store::new(clock, stats_counter.clone(), 16, 4)
+        Store::new(clock, stats_counter, 16, 4)
     }
 
     #[tokio::test]

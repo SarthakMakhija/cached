@@ -3,7 +3,8 @@ use std::fmt::{Display, Formatter};
 const ERROR_MESSAGE_TOTAL_COUNTERS_GT_ZERO: &str = "Total number of counters must be greater than zero";
 const ERROR_MESSAGE_TOTAL_CACHE_WEIGHT_GT_ZERO: &str = "Total cache weight must be greater than zero";
 const ERROR_MESSAGE_TOTAL_CAPACITY_GT_ZERO: &str = "Total capacity must be greater than zero";
-const ERROR_MESSAGE_TOTAL_SHARDS_GT_ZERO: &str = "Total number of shards must be greater than zero";
+const ERROR_MESSAGE_TOTAL_SHARDS_GT_ONE: &str = "Total number of shards must be greater than one";
+const ERROR_MESSAGE_TOTAL_SHARDS_POWER_OF_2: &str = "Total number of shards must be a power of 2";
 const ERROR_MESSAGE_POOL_SIZE_GT_ZERO: &str = "Pool size must be greater than zero";
 const ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO: &str = "Buffer size must be greater than zero";
 const ERROR_MESSAGE_COMMAND_BUFFER_SIZE_GT_ZERO: &str = "Command buffer size must be greater than zero";
@@ -18,7 +19,8 @@ pub(crate) enum Errors {
     TotalCountersGtZero,
     TotalCacheWeightGtZero,
     TotalCapacityGtZero,
-    TotalShardsGtZero,
+    TotalShardsGtOne,
+    TotalShardsPowerOf2,
     PoolSizeGtZero,
     BufferSizeGtZero,
     CommandBufferSizeGtZero,
@@ -54,8 +56,10 @@ impl Display for Errors {
                 write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_CACHE_WEIGHT_GT_ZERO),
             Errors::TotalCapacityGtZero =>
                 write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_CAPACITY_GT_ZERO),
-            Errors::TotalShardsGtZero =>
-                write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_SHARDS_GT_ZERO),
+            Errors::TotalShardsGtOne =>
+                write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_SHARDS_GT_ONE),
+            Errors::TotalShardsPowerOf2 =>
+                write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_SHARDS_POWER_OF_2),
             Errors::PoolSizeGtZero =>
                 write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_POOL_SIZE_GT_ZERO),
             Errors::BufferSizeGtZero =>
@@ -78,7 +82,7 @@ impl Display for Errors {
 
 #[cfg(test)]
 mod tests {
-    use crate::cache::errors::{ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO, ERROR_MESSAGE_TOTAL_CAPACITY_GT_ZERO};
+    use crate::cache::errors::{ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO, ERROR_MESSAGE_TOTAL_CAPACITY_GT_ZERO, ERROR_MESSAGE_TOTAL_SHARDS_POWER_OF_2};
     use crate::cache::errors::ERROR_MESSAGE_COMMAND_BUFFER_SIZE_GT_ZERO;
     use crate::cache::errors::ERROR_MESSAGE_INVALID_UPSERT;
     use crate::cache::errors::ERROR_MESSAGE_INVALID_UPSERT_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE;
@@ -86,7 +90,7 @@ mod tests {
     use crate::cache::errors::ERROR_MESSAGE_POOL_SIZE_GT_ZERO;
     use crate::cache::errors::ERROR_MESSAGE_TOTAL_CACHE_WEIGHT_GT_ZERO;
     use crate::cache::errors::ERROR_MESSAGE_TOTAL_COUNTERS_GT_ZERO;
-    use crate::cache::errors::ERROR_MESSAGE_TOTAL_SHARDS_GT_ZERO;
+    use crate::cache::errors::ERROR_MESSAGE_TOTAL_SHARDS_GT_ONE;
     use crate::cache::errors::ERROR_MESSAGE_UPSERT_VALUE_MISSING;
     use crate::cache::errors::ERROR_MESSAGE_WEIGHT_CALCULATION_GT_ZERO;
     use crate::cache::errors::Errors;
@@ -112,8 +116,14 @@ mod tests {
 
     #[test]
     fn error_total_shards() {
-        let error = Errors::TotalShardsGtZero;
-        assert_eq!(format!("[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_SHARDS_GT_ZERO), error.to_string());
+        let error = Errors::TotalShardsGtOne;
+        assert_eq!(format!("[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_SHARDS_GT_ONE), error.to_string());
+    }
+
+    #[test]
+    fn error_total_shards_power_of_2() {
+        let error = Errors::TotalShardsPowerOf2;
+        assert_eq!(format!("[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_SHARDS_POWER_OF_2), error.to_string());
     }
 
     #[test]

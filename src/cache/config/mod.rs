@@ -125,7 +125,8 @@ impl<Key, Value> ConfigBuilder<Key, Value>
     }
 
     pub fn shards(mut self, shards: TotalShards) -> ConfigBuilder<Key, Value> {
-        assert!(shards > 0, "{}", Errors::TotalShardsGtZero);
+        assert!(shards > 1, "{}", Errors::TotalShardsGtOne);
+        assert!(shards.is_power_of_two(), "{}", Errors::TotalShardsPowerOf2);
         self.shards = shards;
         self
     }
@@ -258,9 +259,9 @@ mod tests {
     #[test]
     fn shards() {
         let builder: ConfigBuilder<&str, &str> = test_config_builder();
-        let config = builder.shards(10).build();
+        let config = builder.shards(16).build();
 
-        assert_eq!(10, config.shards);
+        assert_eq!(16, config.shards);
     }
 
     #[test]
@@ -319,7 +320,13 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn shards_must_be_greater_than_zero() {
-        let _: Config<&str, &str> = test_config_builder().shards(0).build();
+    fn shards_must_be_greater_than_one() {
+        let _: Config<&str, &str> = test_config_builder().shards(1).build();
+    }
+
+    #[test]
+    #[should_panic]
+    fn shards_must_be_power_of_2() {
+        let _: Config<&str, &str> = test_config_builder().shards(3).build();
     }
 }

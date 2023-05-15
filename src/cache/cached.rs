@@ -319,6 +319,12 @@ mod tests {
 
     #[test]
     #[should_panic]
+    fn shards_mut_be_power_of_2_and_greater_than_1() {
+        let _: CacheD<&str, &str> = CacheD::new(test_config_builder().shards(1).build());
+    }
+
+    #[test]
+    #[should_panic]
     fn weight_must_be_greater_than_zero_1() {
         let cached = CacheD::new(test_config_builder().build());
         let _ =
