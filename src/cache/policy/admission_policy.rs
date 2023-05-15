@@ -12,6 +12,7 @@ use crate::cache::command::CommandStatus;
 use crate::cache::key_description::KeyDescription;
 use crate::cache::lfu::tiny_lfu::TinyLFU;
 use crate::cache::policy::cache_weight::CacheWeight;
+use crate::cache::policy::config::CacheWeightConfig;
 use crate::cache::pool::BufferConsumer;
 use crate::cache::stats::ConcurrentStatsCounter;
 use crate::cache::types::{FrequencyEstimate, KeyHash, KeyId, TotalCounters, Weight};
@@ -30,19 +31,19 @@ pub(crate) struct AdmissionPolicy<Key>
 
 impl<Key> AdmissionPolicy<Key>
     where Key: Hash + Eq + Send + Sync + Clone + 'static, {
-    pub(crate) fn new(counters: TotalCounters, total_cache_weight: Weight, stats_counter: Arc<ConcurrentStatsCounter>) -> Self {
-        Self::with_channel_capacity(counters, total_cache_weight, CHANNEL_CAPACITY, stats_counter)
+    pub(crate) fn new(counters: TotalCounters, cache_weight_config: CacheWeightConfig, stats_counter: Arc<ConcurrentStatsCounter>) -> Self {
+        Self::with_channel_capacity(counters, cache_weight_config, CHANNEL_CAPACITY, stats_counter)
     }
 
     fn with_channel_capacity(
         counters: TotalCounters,
-        total_cache_weight: Weight,
-        capacity: usize,
+        cache_weight_config: CacheWeightConfig,
+        channel_capacity: usize,
         stats_counter: Arc<ConcurrentStatsCounter>) -> Self {
-        let (sender, receiver) = crossbeam_channel::bounded(capacity);
+        let (sender, receiver) = crossbeam_channel::bounded(channel_capacity);
         let policy = AdmissionPolicy {
             access_frequency: Arc::new(RwLock::new(TinyLFU::new(counters))),
-            cache_weight: CacheWeight::new(total_cache_weight, stats_counter.clone()),
+            cache_weight: CacheWeight::new(cache_weight_config, stats_counter.clone()),
             sender,
             keep_running: Arc::new(AtomicBool::new(true)),
             stats_counter,
@@ -211,6 +212,7 @@ mod tests {
     use crate::cache::command::CommandStatus;
     use crate::cache::key_description::KeyDescription;
     use crate::cache::policy::admission_policy::AdmissionPolicy;
+    use crate::cache::policy::config::CacheWeightConfig;
     use crate::cache::pool::BufferConsumer;
     use crate::cache::stats::ConcurrentStatsCounter;
 
@@ -218,9 +220,13 @@ mod tests {
         keys: RwLock<Vec<Key>>,
     }
 
+    fn test_cache_weight_config() -> CacheWeightConfig {
+        CacheWeightConfig::new(100, 4, 10)
+    }
+
     #[test]
     fn increase_access_and_shutdown() {
-        let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let key_hashes = vec![10, 14];
 
         policy.accept(BufferEvent::Full(key_hashes));
@@ -244,7 +250,7 @@ mod tests {
 
     #[test]
     fn increase_access_frequency_and_increase_stats() {
-        let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let key_hashes = vec![10, 14, 116, 19, 19, 10];
 
         policy.accept(BufferEvent::Full(key_hashes));
@@ -264,7 +270,7 @@ mod tests {
 
     #[test]
     fn drop_access() {
-        let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let key_hashes = vec![10, 14];
 
         policy.accept(BufferEvent::Full(key_hashes));
@@ -292,7 +298,7 @@ mod tests {
 
     #[test]
     fn does_not_add_key_if_its_weight_is_more_than_the_total_cache_weight() {
-        let policy = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let policy = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let no_operation_delete_hook = |_key| {};
 
         assert_eq!(CommandStatus::Rejected,
@@ -302,7 +308,7 @@ mod tests {
 
     #[test]
     fn adds_a_key_given_space_is_available() {
-        let policy = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let policy = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let no_operation_delete_hook = |_key| {};
 
         let addition_status = policy.maybe_add(
@@ -313,7 +319,7 @@ mod tests {
 
     #[test]
     fn adds_a_key_even_if_the_space_is_not_available() {
-        let policy = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let policy = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let key_hashes = vec![10, 14, 116];
         policy.access_frequency.write().add(key_hashes);
 
@@ -335,7 +341,7 @@ mod tests {
 
     #[test]
     fn rejects_the_incoming_key_and_has_victims() {
-        let policy = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let policy = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let key_hashes = vec![14];
         policy.access_frequency.write().add(key_hashes);
 
@@ -362,7 +368,7 @@ mod tests {
 
     #[test]
     fn updates_the_weight_of_a_key() {
-        let policy = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let policy = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let no_operation_delete_hook = |_key| {};
 
         let addition_status = policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 5), &no_operation_delete_hook);
@@ -375,7 +381,7 @@ mod tests {
 
     #[test]
     fn deletes_a_key() {
-        let policy = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let policy = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let no_operation_delete_hook = |_key| {};
 
         let addition_status = policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 5), &no_operation_delete_hook);
@@ -387,7 +393,7 @@ mod tests {
 
     #[test]
     fn deletes_a_key_with_hook() {
-        let policy = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let policy = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let deleted_keys = DeletedKeys { keys: RwLock::new(Vec::new()) };
         let delete_hook = |key| { deleted_keys.keys.write().push(key) };
 
@@ -401,7 +407,7 @@ mod tests {
 
     #[test]
     fn contains_a_key() {
-        let policy = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let policy = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let no_operation_delete_hook = |_key| {};
 
         let addition_status = policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 5), &no_operation_delete_hook);
@@ -412,14 +418,14 @@ mod tests {
 
     #[test]
     fn does_not_contain_a_key() {
-        let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
 
         assert!(!policy.contains(&1));
     }
 
     #[test]
     fn weight_of_an_existing_key() {
-        let policy = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let policy = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let no_operation_delete_hook = |_key| {};
 
         let addition_status = policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 5), &no_operation_delete_hook);
@@ -430,14 +436,14 @@ mod tests {
 
     #[test]
     fn weight_of_a_non_existing_key() {
-        let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let policy: AdmissionPolicy<&str> = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
 
         assert_eq!(None, policy.weight_of(&1));
     }
 
     #[test]
     fn gets_the_weight_used() {
-        let policy = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let policy = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let key_hashes = vec![10, 14, 116];
         policy.access_frequency.write().add(key_hashes);
 
@@ -455,7 +461,7 @@ mod tests {
 
     #[test]
     fn gets_the_weight_used_after_rejection() {
-        let policy = AdmissionPolicy::new(10, 10, Arc::new(ConcurrentStatsCounter::new()));
+        let policy = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let key_hashes = vec![14, 116];
         policy.access_frequency.write().add(key_hashes);
 
@@ -473,7 +479,8 @@ mod tests {
 
     #[test]
     fn clear() {
-        let policy = AdmissionPolicy::new(10, 20, Arc::new(ConcurrentStatsCounter::new()));
+        let cache_weight_config = CacheWeightConfig::new(100, 4, 20);
+        let policy = AdmissionPolicy::new(10, cache_weight_config, Arc::new(ConcurrentStatsCounter::new()));
         let no_operation_delete_hook = |_key| {};
 
         let status = policy.maybe_add(&KeyDescription::new("topic", 1, 10, 5), &no_operation_delete_hook);

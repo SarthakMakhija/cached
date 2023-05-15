@@ -215,6 +215,7 @@ mod tests {
     use crate::cache::expiration::TTLTicker;
     use crate::cache::key_description::KeyDescription;
     use crate::cache::policy::admission_policy::AdmissionPolicy;
+    use crate::cache::policy::config::CacheWeightConfig;
     use crate::cache::stats::ConcurrentStatsCounter;
     use crate::cache::store::Store;
 
@@ -224,6 +225,10 @@ mod tests {
 
     fn test_store(clock: ClockType, stats_counter: Arc<ConcurrentStatsCounter>) -> Arc<Store<&'static str, &'static str>> {
         Store::new(clock, stats_counter, 16, 4)
+    }
+
+    fn test_cache_weight_config() -> CacheWeightConfig {
+        CacheWeightConfig::new(100, 4, 100)
     }
 
     mod setup {
@@ -245,7 +250,7 @@ mod tests {
     async fn puts_a_key_value_and_shutdown() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
         let store = test_store(SystemClock::boxed(), stats_counter.clone());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, test_cache_weight_config(), stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
             store.clone(),
@@ -270,7 +275,7 @@ mod tests {
     async fn puts_a_key_value() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
         let store = test_store(SystemClock::boxed(), stats_counter.clone());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, test_cache_weight_config(), stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
             store.clone(),
@@ -294,7 +299,7 @@ mod tests {
     async fn key_value_gets_rejected_given_its_weight_is_more_than_the_cache_weight() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
         let store = test_store(SystemClock::boxed(), stats_counter.clone());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, test_cache_weight_config(), stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
             store.clone(),
@@ -319,7 +324,7 @@ mod tests {
     async fn rejects_a_key_value_and_increase_stats() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
         let store = test_store(SystemClock::boxed(), stats_counter.clone());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, test_cache_weight_config(), stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
             store.clone(),
@@ -344,7 +349,7 @@ mod tests {
     async fn puts_a_couple_of_key_values() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
         let store = test_store(SystemClock::boxed(), stats_counter.clone());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, test_cache_weight_config(), stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
             store.clone(),
@@ -374,7 +379,7 @@ mod tests {
     async fn puts_a_key_value_with_ttl() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
         let store = test_store(SystemClock::boxed(), stats_counter.clone());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, test_cache_weight_config(), stats_counter.clone()));
 
         let ttl_ticker = no_action_ttl_ticker();
         let command_executor = CommandExecutor::new(
@@ -405,7 +410,7 @@ mod tests {
     async fn rejects_a_key_value_with_ttl_and_increase_stats() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
         let store = test_store(SystemClock::boxed(), stats_counter.clone());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, test_cache_weight_config(), stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
             store.clone(),
@@ -430,7 +435,7 @@ mod tests {
     async fn deletes_a_key() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
         let store = test_store(SystemClock::boxed(), stats_counter.clone());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, test_cache_weight_config(), stats_counter.clone()));
         let ttl_ticker = no_action_ttl_ticker();
 
         let command_executor = CommandExecutor::new(
@@ -467,7 +472,7 @@ mod tests {
     async fn deletion_of_a_non_existing_key_value_gets_rejected() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
         let store= test_store(SystemClock::boxed(), stats_counter.clone());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, test_cache_weight_config(), stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
             store.clone(),
@@ -501,6 +506,7 @@ mod sociable_tests {
     use crate::cache::expiration::TTLTicker;
     use crate::cache::key_description::KeyDescription;
     use crate::cache::policy::admission_policy::AdmissionPolicy;
+    use crate::cache::policy::config::CacheWeightConfig;
     use crate::cache::pool::BufferConsumer;
     use crate::cache::stats::ConcurrentStatsCounter;
 
@@ -512,11 +518,15 @@ mod sociable_tests {
         Store::new(clock, stats_counter, 16, 4)
     }
 
+    fn test_cache_weight_config() -> CacheWeightConfig {
+        CacheWeightConfig::new(100, 4, 100)
+    }
+
     #[tokio::test]
     async fn puts_a_key_value() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
         let store = test_store(SystemClock::boxed(), stats_counter.clone());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, test_cache_weight_config(), stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
             store.clone(),
@@ -543,7 +553,8 @@ mod sociable_tests {
     async fn puts_a_key_value_by_eliminating_victims() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
         let store = test_store(SystemClock::boxed(), stats_counter.clone());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 10, stats_counter.clone()));
+        let cache_weight_config = CacheWeightConfig::new(100, 4, 10);
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, cache_weight_config, stats_counter.clone()));
 
         let key_hashes = vec![10, 14, 116];
         admission_policy.accept(BufferEvent::Full(key_hashes));
@@ -584,7 +595,7 @@ mod sociable_tests {
     async fn deletes_a_key() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
         let store = test_store(SystemClock::boxed(), stats_counter.clone());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, test_cache_weight_config(), stats_counter.clone()));
         let command_executor = CommandExecutor::new(
             store.clone(),
             admission_policy.clone(),
@@ -612,7 +623,7 @@ mod sociable_tests {
     async fn updates_the_weight_of_the_key() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
         let store = test_store(SystemClock::boxed(), stats_counter.clone());
-        let admission_policy = Arc::new(AdmissionPolicy::new(10, 100, stats_counter.clone()));
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, test_cache_weight_config(), stats_counter.clone()));
 
         let command_executor = CommandExecutor::new(
             store.clone(),

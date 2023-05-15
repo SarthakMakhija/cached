@@ -1,14 +1,15 @@
 use std::time::Duration;
 use crate::cache::clock::ClockType;
+use crate::cache::types::TotalShards;
 
 pub(crate) struct TTLConfig {
-    shards: usize,
+    shards: TotalShards,
     tick_duration: Duration,
     clock: ClockType,
 }
 
 impl TTLConfig {
-    pub(crate) fn new(shards: usize, tick_duration: Duration, clock: ClockType) -> Self {
+    pub(crate) fn new(shards: TotalShards, tick_duration: Duration, clock: ClockType) -> Self {
         TTLConfig {
             shards,
             tick_duration,
@@ -16,7 +17,7 @@ impl TTLConfig {
         }
     }
 
-    pub(crate) fn shards(&self) -> usize { self.shards }
+    pub(crate) fn shards(&self) -> TotalShards { self.shards }
 
     pub(crate) fn tick_duration(&self) -> Duration { self.tick_duration }
 

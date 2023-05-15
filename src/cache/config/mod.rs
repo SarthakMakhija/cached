@@ -6,6 +6,7 @@ use crate::cache::clock::{ClockType, SystemClock};
 use crate::cache::config::weight_calculation::Calculation;
 use crate::cache::errors::Errors;
 use crate::cache::expiration::config::TTLConfig;
+use crate::cache::policy::config::CacheWeightConfig;
 use crate::cache::pool::{BufferSize, PoolSize};
 use crate::cache::types::{KeyHash, TotalCapacity, TotalCounters, TotalShards, Weight};
 
@@ -43,6 +44,10 @@ impl<Key, Value> Config<Key, Value>
           Value: 'static {
     pub(crate) fn ttl_config(&self) -> TTLConfig {
         TTLConfig::new(self.shards, self.ttl_tick_duration, self.clock.clone_box())
+    }
+
+    pub(crate) fn cache_weight_config(&self) -> CacheWeightConfig {
+        CacheWeightConfig::new(self.capacity, self.shards, self.total_cache_weight)
     }
 }
 
@@ -280,6 +285,17 @@ mod tests {
         let ttl_config = config.ttl_config();
         assert_eq!(16, ttl_config.shards());
         assert_eq!(Duration::from_secs(5), ttl_config.tick_duration());
+    }
+
+    #[test]
+    fn cache_weight_config() {
+        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::new(100, 10, 200).shards(4);
+        let config = builder.build();
+
+        let cache_weight_config = config.cache_weight_config();
+        assert_eq!(10, cache_weight_config.capacity());
+        assert_eq!(4, cache_weight_config.shards());
+        assert_eq!(200, cache_weight_config.total_cache_weight());
     }
 
     #[test]
