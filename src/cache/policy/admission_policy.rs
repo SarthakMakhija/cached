@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 
 use crossbeam_channel::{Receiver, select};
+use log::{debug, info, warn};
 use parking_lot::RwLock;
 
 use crate::cache::buffer_event::BufferEvent;
@@ -61,11 +62,13 @@ impl<Key> AdmissionPolicy<Key>
                         { access_frequency.write().add(key_hashes); }
                     }
                     BufferEvent::Shutdown => {
+                        info!("Received Shutdown event in AdmissionPolicy, shutting it down");
                         drop(receiver);
                         break;
                     }
                 }
                 if !keep_running.load(Ordering::Acquire) {
+                    info!("Shutting down AdmissionPolicy");
                     drop(receiver);
                     break;
                 }
@@ -82,6 +85,10 @@ impl<Key> AdmissionPolicy<Key>
                                         delete_hook: &DeleteHook) -> CommandStatus
         where DeleteHook: Fn(Key) {
         if key_description.weight > self.cache_weight.get_max_weight() {
+            debug!(
+                "Rejecting key with id {} and weight {}, given its weight is greater than the max cache weight {}",
+                key_description.id, key_description.weight, self.cache_weight.get_max_weight()
+            );
             return CommandStatus::Rejected;
         }
         let (space_left, is_enough_space_available) = self.cache_weight.is_space_available_for(key_description.weight);
@@ -145,10 +152,13 @@ impl<Key> AdmissionPolicy<Key>
         let mut space_available = space_left;
 
         let mut sample = self.cache_weight.sample(EVICTION_SAMPLE_SIZE, frequency_counter);
-
         while space_available < key_description.weight {
             let sampled_key = sample.min_frequency_key();
             if incoming_key_access_frequency < sampled_key.estimated_frequency {
+                debug!(
+                    "Rejecting key with id {} and estimated frequency {}, given its frequency is less than the sampled key with frequency {}",
+                    key_description.id, incoming_key_access_frequency, sampled_key.estimated_frequency
+                );
                 return CommandStatus::Rejected;
             }
             self.cache_weight.delete(&sampled_key.id, delete_hook);
@@ -180,8 +190,10 @@ impl<Key> BufferConsumer for AdmissionPolicy<Key>
                 }
             },
             default => {
-                println!("dropping accesses that represent key access");
-                if size > 0 {self.stats_counter.drop_access(size as u64);}
+                if size > 0 {
+                    warn!("Dropping key accesses of size {}", size as u64);
+                    self.stats_counter.drop_access(size as u64);
+                }
             }
         }
     }
@@ -194,8 +206,8 @@ mod tests {
     use std::time::Duration;
 
     use parking_lot::RwLock;
-    use crate::cache::buffer_event::BufferEvent;
 
+    use crate::cache::buffer_event::BufferEvent;
     use crate::cache::command::CommandStatus;
     use crate::cache::key_description::KeyDescription;
     use crate::cache::policy::admission_policy::AdmissionPolicy;

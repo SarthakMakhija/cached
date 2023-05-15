@@ -1,3 +1,4 @@
+use log::{debug, info};
 use rand::Rng;
 use crate::cache::types::{FrequencyEstimate, KeyHash, TotalCounters};
 
@@ -53,6 +54,7 @@ pub(crate) struct FrequencyCounter {
 impl FrequencyCounter {
     pub(crate) fn new(counters: TotalCounters) -> FrequencyCounter {
         let total_counters = Self::next_power_2(counters);
+        info!("Initializing FrequencyCounter with total counters {}", counters);
         FrequencyCounter {
             matrix: Self::matrix(total_counters),
             seeds: Self::seeds(),
@@ -83,6 +85,7 @@ impl FrequencyCounter {
     }
 
     pub(crate) fn reset(&mut self) {
+        debug!("Resetting the counters");
         (0..ROWS).for_each(|index| {
             let row = &mut self.matrix[index];
             row.half_counters();

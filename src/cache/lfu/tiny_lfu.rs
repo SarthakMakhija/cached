@@ -1,3 +1,5 @@
+use log::{debug, info};
+
 use crate::cache::lfu::doorkeeper::DoorKeeper;
 use crate::cache::lfu::frequency_counter::FrequencyCounter;
 use crate::cache::types::{DoorKeeperCapacity, FrequencyEstimate, KeyHash, TotalCounters};
@@ -11,12 +13,17 @@ pub(crate) struct TinyLFU {
 
 impl TinyLFU {
     pub(crate) fn new(counters: TotalCounters) -> TinyLFU {
-        TinyLFU {
+        let tiny_lfu = TinyLFU {
             key_access_frequency: FrequencyCounter::new(counters),
             door_keeper: DoorKeeper::new(counters as DoorKeeperCapacity, 0.01),
             total_increments: 0,
             reset_counters_at: counters,
-        }
+        };
+        info!(
+            "Initialized TinyLFU with total counters {} ,bloom filter capacity {} and reset_counters_at {}",
+            counters, counters, counters);
+
+        tiny_lfu
     }
 
     //TODO: probably need a better name
@@ -50,6 +57,7 @@ impl TinyLFU {
     }
 
     fn reset(&mut self) {
+        debug!("Resetting tinyLFU");
         self.total_increments = 0;
         self.key_access_frequency.reset();
         self.door_keeper.clear();

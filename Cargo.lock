@@ -57,6 +57,7 @@ dependencies = [
  "crossbeam-utils",
  "dashmap",
  "hashbrown 0.13.2",
+ "log",
  "parking_lot",
  "rand",
  "tokio",

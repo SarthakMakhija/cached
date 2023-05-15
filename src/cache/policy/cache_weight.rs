@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use dashmap::DashMap;
 use dashmap::mapref::multiple::RefMulti;
+use log::info;
 use parking_lot::RwLock;
 
 use crate::cache::key_description::KeyDescription;
@@ -157,6 +158,7 @@ impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
 impl<Key> CacheWeight<Key>
     where Key: Hash + Eq + Send + Sync + Clone + 'static, {
     pub(crate) fn new(max_weight: Weight, stats_counter: Arc<ConcurrentStatsCounter>) -> Self <> {
+        info!("Initializing CacheWeight with a total weight {}", max_weight);
         CacheWeight {
             max_weight,
             weight_used: RwLock::new(0),

@@ -1,4 +1,5 @@
 use bloomfilter::Bloom;
+use log::debug;
 
 use crate::cache::types::{DoorKeeperCapacity, DoorKeeperFalsePositiveRate, KeyHash};
 
@@ -15,6 +16,7 @@ impl DoorKeeper {
 
     pub(crate) fn add_if_missing(&mut self, key: &KeyHash) -> bool {
         if !self.has(key) {
+            debug!("Adding key with hash {} to the doorkeeper", key);
             self.bloom.set(key);
             return true;
         }

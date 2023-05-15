@@ -5,6 +5,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crossbeam_channel::tick;
 use hashbrown::HashMap;
+use log::{debug, info};
 use parking_lot::RwLock;
 
 use crate::cache::clock::ClockType;
@@ -86,14 +87,14 @@ impl TTLTicker {
                 self.shards[shard_index].write().retain(|key, expire_after| {
                     let has_not_expired = now.le(expire_after);
                     if !has_not_expired {
-                        println!("key {} has expired", key);
+                        debug!("Key with id {} has expired", key);
                         (evict_hook)(key);
                     }
                     has_not_expired
                 });
 
                 if !keep_running.load(Ordering::Acquire) {
-                    println!("shutting down TTLTicker");
+                    info!("Shutting down TTLTicker");
                     drop(receiver);
                     break;
                 }
