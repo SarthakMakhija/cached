@@ -2,6 +2,7 @@ use std::fmt::{Display, Formatter};
 
 const ERROR_MESSAGE_TOTAL_COUNTERS_GT_ZERO: &str = "Total number of counters must be greater than zero";
 const ERROR_MESSAGE_TOTAL_CACHE_WEIGHT_GT_ZERO: &str = "Total cache weight must be greater than zero";
+const ERROR_MESSAGE_TOTAL_CAPACITY_GT_ZERO: &str = "Total capacity must be greater than zero";
 const ERROR_MESSAGE_TOTAL_SHARDS_GT_ZERO: &str = "Total number of shards must be greater than zero";
 const ERROR_MESSAGE_POOL_SIZE_GT_ZERO: &str = "Pool size must be greater than zero";
 const ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO: &str = "Buffer size must be greater than zero";
@@ -16,6 +17,7 @@ const ERROR_MESSAGE_INVALID_UPSERT_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE: &
 pub(crate) enum Errors {
     TotalCountersGtZero,
     TotalCacheWeightGtZero,
+    TotalCapacityGtZero,
     TotalShardsGtZero,
     PoolSizeGtZero,
     BufferSizeGtZero,
@@ -50,6 +52,8 @@ impl Display for Errors {
                 write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_COUNTERS_GT_ZERO),
             Errors::TotalCacheWeightGtZero =>
                 write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_CACHE_WEIGHT_GT_ZERO),
+            Errors::TotalCapacityGtZero =>
+                write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_CAPACITY_GT_ZERO),
             Errors::TotalShardsGtZero =>
                 write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_SHARDS_GT_ZERO),
             Errors::PoolSizeGtZero =>
@@ -74,7 +78,7 @@ impl Display for Errors {
 
 #[cfg(test)]
 mod tests {
-    use crate::cache::errors::ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO;
+    use crate::cache::errors::{ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO, ERROR_MESSAGE_TOTAL_CAPACITY_GT_ZERO};
     use crate::cache::errors::ERROR_MESSAGE_COMMAND_BUFFER_SIZE_GT_ZERO;
     use crate::cache::errors::ERROR_MESSAGE_INVALID_UPSERT;
     use crate::cache::errors::ERROR_MESSAGE_INVALID_UPSERT_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE;
@@ -98,6 +102,12 @@ mod tests {
     fn error_total_cache_weight() {
         let error = Errors::TotalCacheWeightGtZero;
         assert_eq!(format!("[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_CACHE_WEIGHT_GT_ZERO), error.to_string());
+    }
+
+    #[test]
+    fn error_total_capacity() {
+        let error = Errors::TotalCapacityGtZero;
+        assert_eq!(format!("[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_CAPACITY_GT_ZERO), error.to_string());
     }
 
     #[test]

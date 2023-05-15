@@ -5,7 +5,7 @@ use cached::cache::config::ConfigBuilder;
 
 #[tokio::test]
 async fn get_values_for_an_existing_keys() {
-    let cached = CacheD::new(ConfigBuilder::new().total_cache_weight(1000).counters(10).build());
+    let cached = CacheD::new(ConfigBuilder::new(1000, 100, 1000).build());
     let cached = Arc::new(cached);
 
     let mut handles = Vec::new();
@@ -37,7 +37,7 @@ async fn get_values_for_an_existing_keys() {
 
 #[tokio::test]
 async fn put_key_values_given_cache_weight_is_reached() {
-    let cached = CacheD::new(ConfigBuilder::new().total_cache_weight(980).counters(10).build());
+    let cached = CacheD::new(ConfigBuilder::new(1000, 100, 980).build());
     let cached = Arc::new(cached);
 
     let mut handles = Vec::new();

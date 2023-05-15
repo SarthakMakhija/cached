@@ -7,7 +7,7 @@ use crate::cache::config::weight_calculation::Calculation;
 use crate::cache::errors::Errors;
 use crate::cache::expiration::config::TTLConfig;
 use crate::cache::pool::{BufferSize, PoolSize};
-use crate::cache::types::{KeyHash, TotalCounters, Weight};
+use crate::cache::types::{KeyHash, TotalCapacity, TotalCounters, Weight};
 
 pub(crate) mod weight_calculation;
 
@@ -17,10 +17,8 @@ pub type WeightCalculationFn<Key, Value> = dyn Fn(&Key, &Value) -> Weight + Send
 const COMMAND_BUFFER_SIZE: usize = 32 * 1024;
 const ACCESS_POOL_SIZE: PoolSize = PoolSize(30);
 const ACCESS_BUFFER_SIZE: BufferSize = BufferSize(64);
-const COUNTERS: TotalCounters = 1_000_000;
-const TOTAL_CACHE_WEIGHT: Weight = 100_000_000;
 const SHARDS: usize = 64;
-const TTL_TICK_DURATION: Duration = Duration::from_secs(1);
+const TTL_TICK_DURATION: Duration = Duration::from_secs(5);
 
 pub struct Config<Key, Value>
     where Key: Hash + 'static,
@@ -32,6 +30,7 @@ pub struct Config<Key, Value>
     pub command_buffer_size: usize,
     pub(crate) access_pool_size: PoolSize,
     pub(crate) access_buffer_size: BufferSize,
+    pub(crate) capacity: TotalCapacity,
     pub total_cache_weight: Weight,
     shards: usize,
     ttl_tick_duration: Duration,
@@ -52,6 +51,7 @@ pub struct ConfigBuilder<Key, Value>
     weight_calculation_fn: Box<WeightCalculationFn<Key, Value>>,
     clock: ClockType,
     counters: TotalCounters,
+    capacity: TotalCapacity,
     command_buffer_size: usize,
     access_pool_size: PoolSize,
     access_buffer_size: BufferSize,
@@ -60,18 +60,14 @@ pub struct ConfigBuilder<Key, Value>
     ttl_tick_duration: Duration,
 }
 
-impl<Key, Value> Default for ConfigBuilder<Key, Value>
-    where Key: Hash + 'static,
-          Value: 'static {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl<Key, Value> ConfigBuilder<Key, Value>
     where Key: Hash + 'static,
           Value: 'static {
-    pub fn new() -> Self {
+    pub fn new(counters: TotalCounters, capacity: TotalCapacity, cache_weight: Weight) -> Self {
+        assert!(counters > 0, "{}", Errors::TotalCountersGtZero);
+        assert!(capacity > 0, "{}", Errors::TotalCapacityGtZero);
+        assert!(cache_weight > 0, "{}", Errors::TotalCacheWeightGtZero);
+
         let key_hash_fn = |key: &Key| -> KeyHash {
             let mut hasher = DefaultHasher::new();
             key.hash(&mut hasher);
@@ -85,8 +81,9 @@ impl<Key, Value> ConfigBuilder<Key, Value>
             access_pool_size: ACCESS_POOL_SIZE,
             access_buffer_size: ACCESS_BUFFER_SIZE,
             command_buffer_size: COMMAND_BUFFER_SIZE,
-            counters: COUNTERS,
-            total_cache_weight: TOTAL_CACHE_WEIGHT,
+            counters,
+            capacity,
+            total_cache_weight: cache_weight,
             shards: SHARDS,
             ttl_tick_duration: TTL_TICK_DURATION,
         }
@@ -125,18 +122,6 @@ impl<Key, Value> ConfigBuilder<Key, Value>
         self
     }
 
-    pub fn counters(mut self, counters: TotalCounters) -> ConfigBuilder<Key, Value> {
-        assert!(counters > 0, "{}", Errors::TotalCountersGtZero);
-        self.counters = counters;
-        self
-    }
-
-    pub fn total_cache_weight(mut self, weight: Weight) -> ConfigBuilder<Key, Value> {
-        assert!(weight > 0, "{}", Errors::TotalCacheWeightGtZero);
-        self.total_cache_weight = weight;
-        self
-    }
-
     pub fn shards(mut self, shards: usize) -> ConfigBuilder<Key, Value> {
         assert!(shards > 0, "{}", Errors::TotalShardsGtZero);
         self.shards = shards;
@@ -157,6 +142,7 @@ impl<Key, Value> ConfigBuilder<Key, Value>
             access_buffer_size: self.access_buffer_size,
             command_buffer_size: self.command_buffer_size,
             counters: self.counters,
+            capacity: self.capacity,
             total_cache_weight: self.total_cache_weight,
             shards: self.shards,
             ttl_tick_duration: self.ttl_tick_duration,
@@ -188,9 +174,13 @@ mod tests {
         }
     }
 
+    fn test_config_builder() -> ConfigBuilder<&'static str, &'static str>{
+        ConfigBuilder::new(100, 10, 100)
+    }
+
     #[test]
     fn key_hash_function() {
-        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+        let builder: ConfigBuilder<&str, &str> = test_config_builder();
 
         let key_hash_fn = Box::new(|_key: &&str| 1);
         let config = builder.key_hash_fn(key_hash_fn).build();
@@ -203,7 +193,7 @@ mod tests {
 
     #[test]
     fn weight_calculation_function() {
-        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::new();
+        let builder: ConfigBuilder<&str, &str> = test_config_builder();
 
         let weight_calculation_fn = Box::new(|_key: &&str, _value: &&str| 10);
         let config = builder.weight_calculation_fn(weight_calculation_fn).build();
@@ -217,7 +207,7 @@ mod tests {
 
     #[test]
     fn clock() {
-        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+        let builder: ConfigBuilder<&str, &str> = test_config_builder();
         let clock: ClockType = Box::new(UnixEpochClock {});
 
         let config = builder.clock(clock).build();
@@ -226,7 +216,7 @@ mod tests {
 
     #[test]
     fn access_pool_size() {
-        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+        let builder: ConfigBuilder<&str, &str> = test_config_builder();
         let config = builder.access_pool_size(32).build();
 
         assert_eq!(PoolSize(32), config.access_pool_size);
@@ -234,7 +224,7 @@ mod tests {
 
     #[test]
     fn access_buffer_size() {
-        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+        let builder: ConfigBuilder<&str, &str> = test_config_builder();
         let config = builder.access_buffer_size(64).build();
 
         assert_eq!(BufferSize(64), config.access_buffer_size);
@@ -242,7 +232,7 @@ mod tests {
 
     #[test]
     fn command_buffer_size() {
-        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+        let builder: ConfigBuilder<&str, &str> = test_config_builder();
         let config = builder.command_buffer_size(1024).build();
 
         assert_eq!(1024, config.command_buffer_size);
@@ -250,23 +240,22 @@ mod tests {
 
     #[test]
     fn counters() {
-        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
-        let config = builder.counters(4096).build();
+        let config: Config<&str, &str> = ConfigBuilder::new(4096, 400, 100).build();
 
         assert_eq!(4096, config.counters);
     }
 
     #[test]
     fn total_cache_weight() {
-        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
-        let config = builder.total_cache_weight(1048576).build();
+        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::new(100, 10, 1048576);
+        let config = builder.build();
 
         assert_eq!(1048576, config.total_cache_weight);
     }
 
     #[test]
     fn shards() {
-        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+        let builder: ConfigBuilder<&str, &str> = test_config_builder();
         let config = builder.shards(10).build();
 
         assert_eq!(10, config.shards);
@@ -274,7 +263,7 @@ mod tests {
 
     #[test]
     fn ttl_tick_duration() {
-        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+        let builder: ConfigBuilder<&str, &str> = test_config_builder();
         let config = builder.ttl_tick_duration(Duration::from_secs(5)).build();
 
         assert_eq!(Duration::from_secs(5), config.ttl_tick_duration);
@@ -282,7 +271,7 @@ mod tests {
 
     #[test]
     fn ttl_config() {
-        let builder: ConfigBuilder<&str, &str> = ConfigBuilder::default();
+        let builder: ConfigBuilder<&str, &str> = test_config_builder();
         let config = builder.ttl_tick_duration(Duration::from_secs(5)).shards(16).build();
 
         let ttl_config = config.ttl_config();
@@ -293,36 +282,42 @@ mod tests {
     #[test]
     #[should_panic]
     fn access_pool_size_must_be_greater_than_zero() {
-        let _: Config<&str, &str> = ConfigBuilder::new().access_pool_size(0).build();
+        let _: Config<&str, &str> = test_config_builder().access_pool_size(0).build();
     }
 
     #[test]
     #[should_panic]
     fn access_buffer_size_must_be_greater_than_zero() {
-        let _: Config<&str, &str> = ConfigBuilder::new().access_buffer_size(0).build();
+        let _: Config<&str, &str> = test_config_builder().access_buffer_size(0).build();
     }
 
     #[test]
     #[should_panic]
     fn command_buffer_size_must_be_greater_than_zero() {
-        let _: Config<&str, &str> = ConfigBuilder::new().command_buffer_size(0).build();
+        let _: Config<&str, &str> = test_config_builder().command_buffer_size(0).build();
     }
 
     #[test]
     #[should_panic]
     fn total_counters_must_be_greater_than_zero() {
-        let _: Config<&str, &str> = ConfigBuilder::new().counters(0).build();
+        let _: Config<&str, &str> = ConfigBuilder::new(0, 10, 10).build();
+    }
+
+    #[test]
+    #[should_panic]
+    fn total_capacity_must_be_greater_than_zero() {
+        let _: Config<&str, &str> = ConfigBuilder::new(10, 0, 10).build();
     }
 
     #[test]
     #[should_panic]
     fn total_cache_weight_must_be_greater_than_zero() {
-        let _: Config<&str, &str> = ConfigBuilder::new().total_cache_weight(0).build();
+        let _: Config<&str, &str> = ConfigBuilder::new(100, 100, 0).build();
     }
 
     #[test]
     #[should_panic]
     fn shards_must_be_greater_than_zero() {
-        let _: Config<&str, &str> = ConfigBuilder::new().shards(0).build();
+        let _: Config<&str, &str> = test_config_builder().shards(0).build();
     }
 }

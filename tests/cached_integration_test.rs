@@ -14,7 +14,7 @@ mod r#macro;
 
 #[tokio::test]
 async fn get_values_for_an_existing_keys() {
-    let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+    let cached = CacheD::new(ConfigBuilder::new(100, 10, 1000).build());
     let key_value_pairs = hash_map!("topic" => "microservices", "cache" => "cached", "disk" => "SSD");
 
     let acknowledgements = put(&cached, key_value_pairs.clone());
@@ -30,7 +30,7 @@ async fn get_values_for_an_existing_keys() {
 
 #[tokio::test]
 async fn update_values_for_an_existing_keys() {
-    let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+    let cached = CacheD::new(ConfigBuilder::new(1000, 100, 10000).build());
 
     let key_value_pairs = (1..10).map(|index| (index, index * 10)).collect::<HashMap<i32, i32>>();
     let acknowledgements = put(&cached, key_value_pairs);
@@ -52,7 +52,7 @@ async fn update_values_for_an_existing_keys() {
 
 #[tokio::test]
 async fn delete_values_for_some_existing_keys() {
-    let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+    let cached = CacheD::new(ConfigBuilder::new(1000, 100, 10000).build());
 
     let key_value_pairs = (1..10).map(|index| (index, index * 10)).collect::<HashMap<i32, i32>>();
     let acknowledgements = put(&cached, key_value_pairs.clone());
@@ -77,7 +77,7 @@ async fn delete_values_for_some_existing_keys() {
 
 #[tokio::test]
 async fn weight_of_the_cache_does_not_exceed_the_maximum_weight() {
-    let cached = CacheD::new(ConfigBuilder::new().total_cache_weight(100).counters(10).build());
+    let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
 
     for index in 1..=10 {
         let status = cached.put_with_weight(index, index*10, 10).unwrap().handle().await;
@@ -93,9 +93,7 @@ async fn weight_of_the_cache_does_not_exceed_the_maximum_weight() {
 async fn weight_of_the_cache_does_not_exceed_the_maximum_weight_100() {
     const TOTAL_KEYS: usize = 10;
     let cached = CacheD::new(
-        ConfigBuilder::new()
-            .total_cache_weight(100)
-            .counters(100)
+        ConfigBuilder::new(100, 10, 100)
             .access_pool_size(1)
             .access_buffer_size(TOTAL_KEYS)
             .build()

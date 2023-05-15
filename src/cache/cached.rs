@@ -313,10 +313,14 @@ mod tests {
         }
     }
 
+    fn test_config_builder() -> ConfigBuilder<&'static str, &'static str>{
+        ConfigBuilder::new(100, 10, 100)
+    }
+
     #[test]
     #[should_panic]
     fn weight_must_be_greater_than_zero_1() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
         let _ =
             cached.put_with_weight("topic", "microservices", 0).unwrap();
     }
@@ -324,7 +328,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn weight_must_be_greater_than_zero_2() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
         let _ =
             cached.put_with_weight_and_ttl("topic", "microservices", 0, Duration::from_secs(5)).unwrap();
     }
@@ -333,7 +337,7 @@ mod tests {
     #[should_panic]
     fn weight_calculation_fn_must_return_weight_greater_than_zero_1() {
         let weight_calculation: Box<WeightCalculationFn<&str, &str>> = Box::new(|_key, _value| 0);
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).weight_calculation_fn(weight_calculation).build());
+        let cached = CacheD::new(test_config_builder().weight_calculation_fn(weight_calculation).build());
         let _ =
             cached.put("topic", "microservices").unwrap();
     }
@@ -342,7 +346,7 @@ mod tests {
     #[should_panic]
     fn weight_calculation_fn_must_return_weight_greater_than_zero_2() {
         let weight_calculation: Box<WeightCalculationFn<&str, &str>> = Box::new(|_key, _value| 0);
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).weight_calculation_fn(weight_calculation).build());
+        let cached = CacheD::new(test_config_builder().weight_calculation_fn(weight_calculation).build());
         let _ =
             cached.put_with_ttl("topic", "microservices", Duration::from_secs(5)).unwrap();
     }
@@ -350,7 +354,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn upsert_results_in_put_value_must_be_present() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
         let upsert: UpsertRequest<&str, &str> = UpsertRequestBuilder::new("store").build();
         let _ = cached.upsert(upsert);
     }
@@ -359,7 +363,7 @@ mod tests {
     #[should_panic]
     fn upsert_results_in_put_weight_calculation_fn_must_return_weight_greater_than_zero() {
         let weight_calculation: Box<WeightCalculationFn<&str, &str>> = Box::new(|_key, _value| 0);
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).weight_calculation_fn(weight_calculation).build());
+        let cached = CacheD::new(test_config_builder().weight_calculation_fn(weight_calculation).build());
 
         let upsert = UpsertRequestBuilder::new("store").value("cached").build();
         let _ = cached.upsert(upsert);
@@ -369,7 +373,7 @@ mod tests {
     #[should_panic]
     async fn upsert_results_in_update_weight_calculation_fn_must_return_weight_greater_than_zero() {
         let weight_calculation: Box<WeightCalculationFn<&str, &str>> = Box::new(|_key, _value| 0);
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).weight_calculation_fn(weight_calculation).build());
+        let cached = CacheD::new(test_config_builder().weight_calculation_fn(weight_calculation).build());
         cached.put("topic", "microservices").unwrap().handle().await;
 
         let upsert = UpsertRequestBuilder::new("topic").value("cached").build();
@@ -380,7 +384,7 @@ mod tests {
     #[tokio::test]
     #[should_panic]
     async fn upsert_results_in_update_weight_must_be_greater_than_zero() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
         cached.put("topic", "microservices").unwrap().handle().await;
 
         let upsert = UpsertRequestBuilder::new("topic").value("cached").weight(0).build();
@@ -389,7 +393,7 @@ mod tests {
 
     #[tokio::test]
     async fn put_a_key_value_with_weight() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
 
         let acknowledgement =
             cached.put_with_weight("topic", "microservices", 50).unwrap();
@@ -406,7 +410,7 @@ mod tests {
 
     #[tokio::test]
     async fn put_a_key_value_with_ttl() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
 
         let acknowledgement =
             cached.put_with_ttl("topic", "microservices", Duration::from_secs(120)).unwrap();
@@ -418,7 +422,7 @@ mod tests {
 
     #[tokio::test]
     async fn put_a_key_value_with_ttl_and_ttl_ticker_evicts_it() {
-        let cached = CacheD::new(ConfigBuilder::new().shards(1).ttl_tick_duration(Duration::from_millis(10)).build());
+        let cached = CacheD::new(test_config_builder().shards(1).ttl_tick_duration(Duration::from_millis(10)).build());
 
         let acknowledgement =
             cached.put_with_ttl("topic", "microservices", Duration::from_millis(20)).unwrap();
@@ -433,7 +437,7 @@ mod tests {
 
     #[tokio::test]
     async fn put_a_key_value_with_weight_and_ttl() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
 
         let acknowledgement =
             cached.put_with_weight_and_ttl("topic", "microservices", 10, Duration::from_secs(120)).unwrap();
@@ -445,7 +449,7 @@ mod tests {
 
     #[test]
     fn get_value_ref_for_a_non_existing_key() {
-        let cached: CacheD<&str, &str> = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached: CacheD<&str, &str> = CacheD::new(test_config_builder().build());
 
         let value = cached.get_ref(&"non-existing");
         assert!(value.is_none());
@@ -453,7 +457,7 @@ mod tests {
 
     #[test]
     fn get_value_ref_for_a_non_existing_key_and_attempt_to_map_it() {
-        let cached: CacheD<&str, &str> = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached: CacheD<&str, &str> = CacheD::new(test_config_builder().build());
 
         let value = cached.map_get_ref(&"non_existing", |stored_value| stored_value.value_ref().to_uppercase());
         assert!(value.is_none());
@@ -461,7 +465,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_value_ref_for_an_existing_key() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
 
         let acknowledgement =
             cached.put("topic", "microservices").unwrap();
@@ -473,7 +477,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_value_ref_for_an_existing_key_and_map_it() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
 
         let acknowledgement =
             cached.put("topic", "microservices").unwrap();
@@ -485,7 +489,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_value_for_an_existing_key() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
 
         let acknowledgement =
             cached.put("topic", "microservices").unwrap();
@@ -497,7 +501,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_value_for_an_existing_key_and_map_it() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
 
         let acknowledgement =
             cached.put("topic", "microservices").unwrap();
@@ -509,7 +513,7 @@ mod tests {
 
     #[test]
     fn get_value_for_a_non_existing_key() {
-        let cached: CacheD<&str, &str> = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached: CacheD<&str, &str> = CacheD::new(test_config_builder().build());
 
         let value = cached.get(&"non-existing");
         assert_eq!(None, value);
@@ -517,7 +521,7 @@ mod tests {
 
     #[test]
     fn get_value_for_a_non_existing_key_and_attempt_to_map_it() {
-        let cached: CacheD<&str, &str> = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached: CacheD<&str, &str> = CacheD::new(test_config_builder().build());
 
         let value = cached.map_get(&"topic", |value| value.to_uppercase());
         assert_eq!(None, value);
@@ -525,7 +529,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_value_ref_for_an_existing_key_if_value_is_not_cloneable() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(ConfigBuilder::new(100, 10, 1000).build());
 
         let acknowledgement =
             cached.put("name", Name { first: "John".to_string(), last: "Mcnamara".to_string() }).unwrap();
@@ -537,7 +541,7 @@ mod tests {
 
     #[tokio::test]
     async fn delete_a_key() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
 
         let acknowledgement =
             cached.put("topic", "microservices").unwrap();
@@ -559,7 +563,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_access_frequency() {
-        let cached = CacheD::new(ConfigBuilder::new().access_pool_size(1).access_buffer_size(3).counters(10).build());
+        let cached = CacheD::new(ConfigBuilder::new(10, 10, 1000).access_pool_size(1).access_buffer_size(3).build());
 
         let acknowledgement_topic =
             cached.put("topic", "microservices").unwrap();
@@ -583,7 +587,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_multiple_keys() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(ConfigBuilder::new(100, 10, 1000).build());
 
         let acknowledgement =
             cached.put("topic", "microservices").unwrap();
@@ -607,7 +611,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_multiple_keys_via_an_iterator() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(ConfigBuilder::new(100, 10, 1000).build());
 
         let acknowledgement =
             cached.put("topic", "microservices").unwrap();
@@ -631,7 +635,7 @@ mod tests {
 
     #[tokio::test]
     async fn map_multiple_keys_via_an_iterator() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(ConfigBuilder::new(100, 10, 1000).build());
 
         let acknowledgement =
             cached.put("topic", "microservices").unwrap();
@@ -655,7 +659,7 @@ mod tests {
 
     #[tokio::test]
     async fn upsert_a_non_existing_key_value() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
 
         let acknowledgement =
             cached.upsert(UpsertRequestBuilder::new("topic").value("microservices").build()).unwrap();
@@ -670,7 +674,7 @@ mod tests {
 
     #[tokio::test]
     async fn upsert_a_non_existing_key_value_with_weight() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
 
         let acknowledgement =
             cached.upsert(UpsertRequestBuilder::new("topic").value("microservices").weight(33).build()).unwrap();
@@ -688,7 +692,7 @@ mod tests {
     #[tokio::test]
     async fn upsert_a_non_existing_key_value_with_time_to_live() {
         let clock: ClockType = Box::new(UnixEpochClock {});
-        let cached = CacheD::new(ConfigBuilder::new().clock(clock.clone_box()).counters(10).build());
+        let cached = CacheD::new(test_config_builder().clock(clock.clone_box()).build());
 
         let acknowledgement =
             cached.upsert(UpsertRequestBuilder::new("topic").value("microservices").time_to_live(Duration::from_secs(10)).build()).unwrap();
@@ -704,7 +708,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_the_value_of_an_existing_key() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
 
         let acknowledgement =
             cached.put("topic", "microservices").unwrap();
@@ -723,7 +727,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_the_weight_of_an_existing_key() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
 
         let acknowledgement =
             cached.put("topic", "microservices").unwrap();
@@ -745,7 +749,7 @@ mod tests {
     #[tokio::test]
     async fn update_the_time_to_live_of_an_existing_key() {
         let clock: ClockType = Box::new(UnixEpochClock {});
-        let cached = CacheD::new(ConfigBuilder::new().clock(clock.clone_box()).counters(10).build());
+        let cached = CacheD::new(test_config_builder().clock(clock.clone_box()).build());
 
         let acknowledgement =
             cached.put("topic", "microservices").unwrap();
@@ -768,7 +772,7 @@ mod tests {
     #[tokio::test]
     async fn remove_the_time_to_live_of_an_existing_key() {
         let clock: ClockType = Box::new(UnixEpochClock {});
-        let cached = CacheD::new(ConfigBuilder::new().clock(clock.clone_box()).counters(10).build());
+        let cached = CacheD::new(test_config_builder().clock(clock.clone_box()).build());
 
         let acknowledgement =
             cached.put_with_ttl("topic", "microservices", Duration::from_secs(10)).unwrap();
@@ -789,7 +793,7 @@ mod tests {
     #[tokio::test]
     async fn add_the_time_to_live_of_an_existing_key() {
         let clock: ClockType = Box::new(UnixEpochClock {});
-        let cached = CacheD::new(ConfigBuilder::new().clock(clock.clone_box()).counters(10).build());
+        let cached = CacheD::new(test_config_builder().clock(clock.clone_box()).build());
 
         let acknowledgement =
             cached.put("topic", "microservices").unwrap();
@@ -811,7 +815,7 @@ mod tests {
 
     #[tokio::test]
     async fn total_weight_used() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
 
         let acknowledgement =
             cached.put_with_weight("topic", "microservices", 50).unwrap();
@@ -822,7 +826,7 @@ mod tests {
 
     #[tokio::test]
     async fn shutdown() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
 
         cached.put_with_weight("topic", "microservices", 50).unwrap().handle().await;
         cached.put("cache", "cached").unwrap().handle().await;
@@ -840,7 +844,7 @@ mod tests {
 
     #[tokio::test]
     async fn stats_summary() {
-        let cached = CacheD::new(ConfigBuilder::new().counters(10).build());
+        let cached = CacheD::new(test_config_builder().build());
 
         cached.put_with_weight("topic", "microservices", 50).unwrap().handle().await;
         cached.put_with_weight("cache", "cached", 10).unwrap().handle().await;
