@@ -16,9 +16,9 @@ pub type HashFn<Key> = dyn Fn(&Key) -> KeyHash + Send + Sync;
 pub type WeightCalculationFn<Key, Value> = dyn Fn(&Key, &Value) -> Weight + Send + Sync;
 
 const COMMAND_BUFFER_SIZE: usize = 32 * 1024;
-const ACCESS_POOL_SIZE: PoolSize = PoolSize(30);
+const ACCESS_POOL_SIZE: PoolSize = PoolSize(32);
 const ACCESS_BUFFER_SIZE: BufferSize = BufferSize(64);
-const SHARDS: usize = 64;
+const SHARDS: usize = 256;
 const TTL_TICK_DURATION: Duration = Duration::from_secs(5);
 
 pub struct Config<Key, Value>
