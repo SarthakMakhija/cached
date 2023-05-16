@@ -4,6 +4,7 @@ use std::thread;
 use std::time::Duration;
 
 use crossbeam_channel::Receiver;
+use log::info;
 
 use crate::cache::command::{CommandStatus, CommandType};
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
@@ -124,7 +125,11 @@ impl<Key, Value> CommandExecutor<Key, Value>
                             ttl_ticker: &ttl_ticker,
                         }),
                     CommandType::Shutdown => {
+                        info!("Received Shutdown command");
                         pair.acknowledgement.done(CommandStatus::Accepted);
+                        for command_acknowledgement_pair in receiver.iter() {
+                            command_acknowledgement_pair.acknowledgement.done(CommandStatus::ShuttingDown);
+                        }
                         drop(receiver);
                         break;
                     }
@@ -257,7 +262,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn puts_a_key_value_and_shutdown() {
+    async fn puts_a_key_value_after_shutdown_with_delay() {
         let stats_counter = Arc::new(ConcurrentStatsCounter::new());
         let store = test_store(SystemClock::boxed(), stats_counter.clone());
         let admission_policy = Arc::new(AdmissionPolicy::new(10, test_cache_weight_config(), stats_counter.clone()));
@@ -278,7 +283,29 @@ mod tests {
             "microservices",
         ));
 
-        assert!(send_result.is_err())
+        assert!(send_result.is_err() || send_result.unwrap().handle().await == CommandStatus::ShuttingDown);
+    }
+
+    #[tokio::test]
+    async fn puts_a_key_value_after_shutdown() {
+        let stats_counter = Arc::new(ConcurrentStatsCounter::new());
+        let store = test_store(SystemClock::boxed(), stats_counter.clone());
+        let admission_policy = Arc::new(AdmissionPolicy::new(10, test_cache_weight_config(), stats_counter.clone()));
+
+        let command_executor = CommandExecutor::new(
+            store.clone(),
+            admission_policy,
+            stats_counter,
+            no_action_ttl_ticker(),
+            10,
+        );
+        command_executor.shutdown().unwrap().handle().await;
+
+        let send_result = command_executor.send(CommandType::Put(
+            KeyDescription::new("topic", 1, 1029, 10),
+            "microservices",
+        ));
+        assert!(send_result.is_err() || send_result.unwrap().handle().await == CommandStatus::ShuttingDown);
     }
 
     #[tokio::test]

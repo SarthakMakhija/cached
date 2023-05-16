@@ -64,8 +64,6 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn put(&self, key: Key, value: Value) -> CommandSendResult {
-        if self.is_shutting_down() { return shutdown_result(); }
-
         let weight = (self.config.weight_calculation_fn)(&key, &value);
         assert!(weight > 0, "{}", Errors::WeightCalculationGtZero);
         self.put_with_weight(key, value, weight)
@@ -152,7 +150,7 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn get_ref(&self, key: &Key) -> Option<KeyValueRef<'_, Key, StoredValue<Value>>> {
-        if self.is_shutting_down() { return None }
+        if self.is_shutting_down() { return None; }
 
         if let Some(value_ref) = self.store.get_ref(key) {
             self.mark_key_accessed(key);
@@ -163,7 +161,7 @@ impl<Key, Value> CacheD<Key, Value>
 
     pub fn map_get_ref<MapFn, MappedValue>(&self, key: &Key, map_fn: MapFn) -> Option<MappedValue>
         where MapFn: Fn(&StoredValue<Value>) -> MappedValue {
-        if self.is_shutting_down() { return None }
+        if self.is_shutting_down() { return None; }
 
         if let Some(value_ref) = self.get_ref(key) {
             return Some(map_fn(value_ref.value()));
@@ -221,7 +219,7 @@ impl<Key, Value> CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + Clone + 'static {
     pub fn get(&self, key: &Key) -> Option<Value> {
-        if self.is_shutting_down() { return None }
+        if self.is_shutting_down() { return None; }
 
         if let Some(value) = self.store.get(key) {
             self.mark_key_accessed(key);
@@ -232,7 +230,7 @@ impl<Key, Value> CacheD<Key, Value>
 
     pub fn map_get<MapFn, MappedValue>(&self, key: &Key, map_fn: MapFn) -> Option<MappedValue>
         where MapFn: Fn(Value) -> MappedValue {
-        if self.is_shutting_down() { return None }
+        if self.is_shutting_down() { return None; }
 
         if let Some(value) = self.get(key) {
             return Some(map_fn(value));
@@ -898,6 +896,10 @@ mod shutdown_tests {
     use std::sync::atomic::Ordering;
     use std::thread;
     use std::time::Duration;
+    use async_std::future::timeout;
+
+    use tokio::time::sleep;
+
     use crate::cache::cached::CacheD;
     use crate::cache::config::ConfigBuilder;
     use crate::cache::upsert::UpsertRequestBuilder;
@@ -1032,7 +1034,7 @@ mod shutdown_tests {
 
         cached.shutdown();
 
-        let mut iterator = cached.multi_get_map_iterator(vec![&"storage", &"topic"], |value| {value.to_uppercase()});
+        let mut iterator = cached.multi_get_map_iterator(vec![&"storage", &"topic"], |value| { value.to_uppercase() });
         assert!(iterator.next().is_none());
     }
 
@@ -1076,5 +1078,41 @@ mod shutdown_tests {
 
         let put_result = cached.put("storage", "cached");
         assert!(put_result.is_err());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn should_not_block_on_shutdown() {
+        let config_builder = ConfigBuilder::new(1000, 100, 1_000_000);
+        let cached = Arc::new(CacheD::new(config_builder.build()));
+
+        let task_handles = (1..=50).map(|index| {
+            let cached_clone = cached.clone();
+            tokio::spawn(
+                async move {
+                    let start_index = index * 10;
+                    let end_index = start_index + 10;
+
+                    for count in start_index..end_index {
+                        let put_result = cached_clone.put(count, count * 10);
+                        if let Ok(result) = put_result {
+                            timeout(Duration::from_secs(1), result.handle()).await.unwrap();
+                        }
+                        sleep(Duration::from_millis(2)).await;
+                    }
+                }
+            )
+        }).collect::<Vec<_>>();
+
+        let cached_clone = cached.clone();
+        let shutdown_handle = tokio::spawn(
+            async move {
+                sleep(Duration::from_millis(8)).await;
+                cached_clone.shutdown();
+            }
+        );
+        for handle in task_handles {
+            handle.await.unwrap()
+        }
+        shutdown_handle.await.unwrap();
     }
 }

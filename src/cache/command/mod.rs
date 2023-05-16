@@ -35,6 +35,7 @@ pub enum CommandStatus {
     Pending,
     Accepted,
     Rejected,
+    ShuttingDown,
 }
 
 #[cfg(test)]
