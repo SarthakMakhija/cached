@@ -4,8 +4,9 @@ pub mod command;
 pub mod types;
 pub mod upsert;
 pub mod stats;
-pub(crate) mod clock;
-pub(crate) mod store;
+pub mod clock;
+pub mod store;
+
 pub(crate) mod lfu;
 pub(crate) mod pool;
 pub(crate) mod policy;

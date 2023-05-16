@@ -5,6 +5,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::atomic::Ordering::Acquire;
 use std::time::Duration;
 
+use log::info;
+
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
 use crate::cache::command::command_executor::{CommandExecutor, CommandSendResult, shutdown_result};
 use crate::cache::command::CommandType;
@@ -150,6 +152,8 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn get_ref(&self, key: &Key) -> Option<KeyValueRef<'_, Key, StoredValue<Value>>> {
+        if self.is_shutting_down() { return None }
+
         if let Some(value_ref) = self.store.get_ref(key) {
             self.mark_key_accessed(key);
             return Some(value_ref);
@@ -159,6 +163,8 @@ impl<Key, Value> CacheD<Key, Value>
 
     pub fn map_get_ref<MapFn, MappedValue>(&self, key: &Key, map_fn: MapFn) -> Option<MappedValue>
         where MapFn: Fn(&StoredValue<Value>) -> MappedValue {
+        if self.is_shutting_down() { return None }
+
         if let Some(value_ref) = self.get_ref(key) {
             return Some(map_fn(value_ref.value()));
         }
@@ -175,6 +181,7 @@ impl<Key, Value> CacheD<Key, Value>
 
     pub fn shutdown(&self) {
         if self.is_shutting_down.compare_exchange(false, true, Ordering::Release, Ordering::Relaxed).is_ok() {
+            info!("Starting to shutdown cached");
             let _ = self.command_executor.shutdown();
             self.admission_policy.shutdown();
             self.ttl_ticker.shutdown();
@@ -214,6 +221,8 @@ impl<Key, Value> CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + Clone + 'static {
     pub fn get(&self, key: &Key) -> Option<Value> {
+        if self.is_shutting_down() { return None }
+
         if let Some(value) = self.store.get(key) {
             self.mark_key_accessed(key);
             return Some(value);
@@ -223,6 +232,8 @@ impl<Key, Value> CacheD<Key, Value>
 
     pub fn map_get<MapFn, MappedValue>(&self, key: &Key, map_fn: MapFn) -> Option<MappedValue>
         where MapFn: Fn(Value) -> MappedValue {
+        if self.is_shutting_down() { return None }
+
         if let Some(value) = self.get(key) {
             return Some(map_fn(value));
         }
@@ -230,6 +241,8 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn multi_get<'a>(&self, keys: Vec<&'a Key>) -> HashMap<&'a Key, Option<Value>> {
+        if self.is_shutting_down() { return HashMap::new(); }
+
         keys.into_iter().map(|key| (key, self.get(key))).collect::<HashMap<_, _>>()
     }
 
@@ -265,7 +278,7 @@ impl<'a, Key, Value> Iterator for MultiGetIterator<'a, Key, Value>
     type Item = Option<Value>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.keys.is_empty() {
+        if self.keys.is_empty() || self.cache.is_shutting_down() {
             return None;
         }
         let key = self.keys.get(0).unwrap();
@@ -304,7 +317,6 @@ impl<'a, Key, Value, MapFn, MappedValue> Iterator for MultiGetMapIterator<'a, Ke
 #[cfg(test)]
 mod tests {
     use std::ops::Add;
-    use std::sync::atomic::Ordering;
     use std::thread;
     use std::time::Duration;
 
@@ -856,24 +868,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn shutdown() {
-        let cached = CacheD::new(test_config_builder().build());
-
-        cached.put_with_weight("topic", "microservices", 50).unwrap().handle().await;
-        cached.put("cache", "cached").unwrap().handle().await;
-
-        cached.shutdown();
-        assert!(cached.is_shutting_down.load(Ordering::Acquire));
-
-        let put_result = cached.put("storage", "cached");
-        assert!(put_result.is_err());
-
-        assert_eq!(0, cached.total_weight_used());
-        assert_eq!(None, cached.get(&"topic"));
-        assert_eq!(None, cached.get(&"cache"));
-    }
-
-    #[tokio::test]
     async fn stats_summary() {
         let cached = CacheD::new(test_config_builder().build());
 
@@ -895,5 +889,192 @@ mod tests {
         assert_eq!(0, summary.get(&StatsType::KeysRejected).unwrap());
         assert_eq!(0, summary.get(&StatsType::AccessAdded).unwrap());
         assert_eq!(0, summary.get(&StatsType::AccessDropped).unwrap());
+    }
+}
+
+#[cfg(test)]
+mod shutdown_tests {
+    use std::sync::Arc;
+    use std::sync::atomic::Ordering;
+    use std::thread;
+    use std::time::Duration;
+    use crate::cache::cached::CacheD;
+    use crate::cache::config::ConfigBuilder;
+    use crate::cache::upsert::UpsertRequestBuilder;
+
+    fn test_config_builder() -> ConfigBuilder<&'static str, &'static str> {
+        ConfigBuilder::new(100, 10, 100)
+    }
+
+    #[test]
+    fn put_after_shutdown() {
+        let cached = CacheD::new(test_config_builder().build());
+        cached.shutdown();
+
+        let put_result = cached.put("storage", "cached");
+        assert!(put_result.is_err());
+    }
+
+    #[test]
+    fn put_with_weight_after_shutdown() {
+        let cached = CacheD::new(test_config_builder().build());
+        cached.shutdown();
+
+        let put_result = cached.put_with_weight("storage", "cached", 10);
+        assert!(put_result.is_err());
+    }
+
+    #[test]
+    fn put_with_ttl_after_shutdown() {
+        let cached = CacheD::new(test_config_builder().build());
+        cached.shutdown();
+
+        let put_result = cached.put_with_ttl("storage", "cached", Duration::from_secs(5));
+        assert!(put_result.is_err());
+    }
+
+    #[test]
+    fn put_with_weight_and_ttl_after_shutdown() {
+        let cached = CacheD::new(test_config_builder().build());
+        cached.shutdown();
+
+        let put_result = cached.put_with_weight_and_ttl("storage", "cached", 10, Duration::from_secs(5));
+        assert!(put_result.is_err());
+    }
+
+    #[test]
+    fn delete_after_shutdown() {
+        let cached = CacheD::new(test_config_builder().build());
+        cached.shutdown();
+
+        let delete_result = cached.delete("storage");
+        assert!(delete_result.is_err());
+    }
+
+    #[test]
+    fn upsert_after_shutdown() {
+        let cached = CacheD::new(test_config_builder().build());
+        cached.shutdown();
+
+        let upsert_result = cached.upsert(UpsertRequestBuilder::new("storage").weight(10).build());
+        assert!(upsert_result.is_err());
+    }
+
+    #[tokio::test]
+    async fn get_after_shutdown() {
+        let cached = CacheD::new(test_config_builder().build());
+        cached.put("storage", "cached").unwrap().handle().await;
+        cached.shutdown();
+
+        let get_result = cached.get(&"storage");
+        assert_eq!(None, get_result);
+    }
+
+    #[tokio::test]
+    async fn get_ref_after_shutdown() {
+        let cached = CacheD::new(test_config_builder().build());
+        cached.put("storage", "cached").unwrap().handle().await;
+        cached.shutdown();
+
+        let get_result = cached.get_ref(&"storage");
+        assert!(get_result.is_none());
+    }
+
+    #[tokio::test]
+    async fn map_get_after_shutdown() {
+        let cached = CacheD::new(test_config_builder().build());
+        cached.put("storage", "cached").unwrap().handle().await;
+        cached.shutdown();
+
+        let get_result = cached.map_get(&"storage", |value| value.to_uppercase());
+        assert!(get_result.is_none());
+    }
+
+    #[tokio::test]
+    async fn map_get_ref_after_shutdown() {
+        let cached = CacheD::new(test_config_builder().build());
+        cached.put("storage", "cached").unwrap().handle().await;
+        cached.shutdown();
+
+        let get_result = cached.map_get_ref(&"storage", |stored_value| stored_value.value_ref().to_uppercase());
+        assert!(get_result.is_none());
+    }
+
+    #[tokio::test]
+    async fn multi_get_after_shutdown() {
+        let cached = CacheD::new(test_config_builder().build());
+        cached.put("storage", "cached").unwrap().handle().await;
+        cached.put("topic", "microservices").unwrap().handle().await;
+
+        cached.shutdown();
+
+        let multi_get_result = cached.multi_get(vec![&"storage", &"topic"]);
+        assert!(multi_get_result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn multi_get_iterator_after_shutdown() {
+        let cached = CacheD::new(test_config_builder().build());
+        cached.put("storage", "cached").unwrap().handle().await;
+        cached.put("topic", "microservices").unwrap().handle().await;
+
+        cached.shutdown();
+
+        let mut iterator = cached.multi_get_iterator(vec![&"storage", &"topic"]);
+        assert!(iterator.next().is_none());
+    }
+
+    #[tokio::test]
+    async fn multi_get_map_iterator_after_shutdown() {
+        let cached = CacheD::new(test_config_builder().build());
+        cached.put("storage", "cached").unwrap().handle().await;
+        cached.put("topic", "microservices").unwrap().handle().await;
+
+        cached.shutdown();
+
+        let mut iterator = cached.multi_get_map_iterator(vec![&"storage", &"topic"], |value| {value.to_uppercase()});
+        assert!(iterator.next().is_none());
+    }
+
+    #[tokio::test]
+    async fn shutdown() {
+        let cached = CacheD::new(test_config_builder().build());
+
+        cached.put_with_weight("topic", "microservices", 50).unwrap().handle().await;
+        cached.put("cache", "cached").unwrap().handle().await;
+
+        cached.shutdown();
+        assert!(cached.is_shutting_down.load(Ordering::Acquire));
+
+        let put_result = cached.put("storage", "cached");
+        assert!(put_result.is_err());
+
+        assert_eq!(0, cached.total_weight_used());
+        assert_eq!(None, cached.get(&"topic"));
+        assert_eq!(None, cached.get(&"cache"));
+    }
+
+    #[tokio::test]
+    async fn concurrent_shutdown() {
+        let cached = Arc::new(CacheD::new(test_config_builder().build()));
+        cached.put_with_weight("topic", "microservices", 50).unwrap().handle().await;
+        cached.put("cache", "cached").unwrap().handle().await;
+
+        let thread_handles = (1..=10).map(|_| {
+            thread::spawn({
+                let cached = cached.clone();
+                move || {
+                    cached.shutdown();
+                }
+            })
+        }).collect::<Vec<_>>();
+        for handle in thread_handles {
+            handle.join().unwrap();
+        }
+
+        assert!(cached.is_shutting_down.load(Ordering::Acquire));
+
+        let put_result = cached.put("storage", "cached");
+        assert!(put_result.is_err());
     }
 }
