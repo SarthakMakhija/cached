@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering::Acquire;
 use std::time::Duration;
 
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
-use crate::cache::command::command_executor::{CommandExecutor, CommandSendResult};
+use crate::cache::command::command_executor::{CommandExecutor, CommandSendResult, shutdown_result};
 use crate::cache::command::CommandType;
 use crate::cache::config::Config;
 use crate::cache::errors::Errors;
@@ -31,6 +33,7 @@ pub struct CacheD<Key, Value>
     pool: Pool<AdmissionPolicy<Key>>,
     ttl_ticker: Arc<TTLTicker>,
     id_generator: IncreasingIdGenerator,
+    is_shutting_down: AtomicBool,
 }
 
 impl<Key, Value> CacheD<Key, Value>
@@ -54,16 +57,21 @@ impl<Key, Value> CacheD<Key, Value>
             pool,
             ttl_ticker,
             id_generator: IncreasingIdGenerator::new(),
+            is_shutting_down: AtomicBool::new(false),
         }
     }
 
     pub fn put(&self, key: Key, value: Value) -> CommandSendResult {
+        if self.is_shutting_down() { return shutdown_result(); }
+
         let weight = (self.config.weight_calculation_fn)(&key, &value);
         assert!(weight > 0, "{}", Errors::WeightCalculationGtZero);
         self.put_with_weight(key, value, weight)
     }
 
     pub fn put_with_weight(&self, key: Key, value: Value, weight: Weight) -> CommandSendResult {
+        if self.is_shutting_down() { return shutdown_result(); }
+
         assert!(weight > 0, "{}", Errors::KeyWeightGtZero("put_with_weight"));
         self.command_executor.send(CommandType::Put(
             self.key_description(key, weight),
@@ -72,6 +80,8 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn put_with_ttl(&self, key: Key, value: Value, time_to_live: Duration) -> CommandSendResult {
+        if self.is_shutting_down() { return shutdown_result(); }
+
         let weight = (self.config.weight_calculation_fn)(&key, &value);
         assert!(weight > 0, "{}", Errors::WeightCalculationGtZero);
         self.command_executor.send(CommandType::PutWithTTL(
@@ -80,6 +90,8 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn put_with_weight_and_ttl(&self, key: Key, value: Value, weight: Weight, time_to_live: Duration) -> CommandSendResult {
+        if self.is_shutting_down() { return shutdown_result(); }
+
         assert!(weight > 0, "{}", Errors::KeyWeightGtZero("put_with_weight_and_ttl"));
         self.command_executor.send(CommandType::PutWithTTL(
             self.key_description(key, weight), value, time_to_live,
@@ -87,6 +99,8 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn upsert(&self, request: UpsertRequest<Key, Value>) -> CommandSendResult {
+        if self.is_shutting_down() { return shutdown_result(); }
+
         let updated_weight = request.updated_weight(&self.config.weight_calculation_fn);
         let (key, value, time_to_live)
             = (request.key, request.value, request.time_to_live);
@@ -129,6 +143,8 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn delete(&self, key: Key) -> CommandSendResult {
+        if self.is_shutting_down() { return shutdown_result(); }
+
         self.store.mark_deleted(&key);
         self.command_executor.send(CommandType::Delete(key))
     }
@@ -158,13 +174,15 @@ impl<Key, Value> CacheD<Key, Value>
     }
 
     pub fn shutdown(&self) {
-        let _ = self.command_executor.shutdown();
-        self.admission_policy.shutdown();
-        self.ttl_ticker.shutdown();
+        if self.is_shutting_down.compare_exchange(false, true, Ordering::Release, Ordering::Relaxed).is_ok() {
+            let _ = self.command_executor.shutdown();
+            self.admission_policy.shutdown();
+            self.ttl_ticker.shutdown();
 
-        self.store.clear();
-        self.admission_policy.clear();
-        self.ttl_ticker.clear();
+            self.store.clear();
+            self.admission_policy.clear();
+            self.ttl_ticker.clear();
+        }
     }
 
     fn mark_key_accessed(&self, key: &Key) {
@@ -185,6 +203,10 @@ impl<Key, Value> CacheD<Key, Value>
         };
 
         TTLTicker::new(config.ttl_config(), cache_weight_evict_hook)
+    }
+
+    fn is_shutting_down(&self) -> bool {
+        self.is_shutting_down.load(Acquire)
     }
 }
 
@@ -282,6 +304,7 @@ impl<'a, Key, Value, MapFn, MappedValue> Iterator for MultiGetMapIterator<'a, Ke
 #[cfg(test)]
 mod tests {
     use std::ops::Add;
+    use std::sync::atomic::Ordering;
     use std::thread;
     use std::time::Duration;
 
@@ -313,7 +336,7 @@ mod tests {
         }
     }
 
-    fn test_config_builder() -> ConfigBuilder<&'static str, &'static str>{
+    fn test_config_builder() -> ConfigBuilder<&'static str, &'static str> {
         ConfigBuilder::new(100, 10, 100)
     }
 
@@ -840,7 +863,7 @@ mod tests {
         cached.put("cache", "cached").unwrap().handle().await;
 
         cached.shutdown();
-        thread::sleep(Duration::from_secs(1));
+        assert!(cached.is_shutting_down.load(Ordering::Acquire));
 
         let put_result = cached.put("storage", "cached");
         assert!(put_result.is_err());

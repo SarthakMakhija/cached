@@ -16,6 +16,10 @@ use crate::cache::store::Store;
 
 pub type CommandSendResult = Result<Arc<CommandAcknowledgement>, CommandSendError>;
 
+pub(crate) fn shutdown_result() -> CommandSendResult {
+    Err(CommandSendError::shutdown())
+}
+
 pub(crate) struct CommandExecutor<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + 'static {
@@ -210,7 +214,7 @@ mod tests {
 
     use crate::cache::clock::{ClockType, SystemClock};
     use crate::cache::command::{CommandStatus, CommandType};
-    use crate::cache::command::command_executor::CommandExecutor;
+    use crate::cache::command::command_executor::{CommandExecutor, shutdown_result};
     use crate::cache::expiration::config::TTLConfig;
     use crate::cache::expiration::TTLTicker;
     use crate::cache::key_description::KeyDescription;
@@ -244,6 +248,12 @@ mod tests {
                 SystemTime::UNIX_EPOCH
             }
         }
+    }
+
+    #[test]
+    fn result_on_shutdown() {
+        let result = shutdown_result();
+        assert!(result.is_err());
     }
 
     #[tokio::test]
