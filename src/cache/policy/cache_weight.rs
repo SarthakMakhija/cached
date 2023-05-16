@@ -103,10 +103,12 @@ impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
         }
     }
 
-    pub(crate) fn min_frequency_key(&mut self) -> SampledKey {
-        let sampled_key = self.sample.pop().unwrap();
-        self.current_sample_key_ids.remove(&sampled_key.id);
-        sampled_key
+    pub(crate) fn min_frequency_key(&mut self) -> Option<SampledKey> {
+        if let Some(key) = self.sample.pop() {
+            self.current_sample_key_ids.remove(&key.id);
+            return Some(key);
+        }
+        None
     }
 
     pub(crate) fn maybe_fill_in(&mut self) -> bool {
@@ -576,9 +578,9 @@ mod frequency_counter_based_min_heap_samples_tests {
             },
         );
 
-        assert_eq!(1, sample.min_frequency_key().estimated_frequency);
-        assert_eq!(2, sample.min_frequency_key().estimated_frequency);
-        assert_eq!(3, sample.min_frequency_key().estimated_frequency);
+        assert_eq!(1, sample.min_frequency_key().unwrap().estimated_frequency);
+        assert_eq!(2, sample.min_frequency_key().unwrap().estimated_frequency);
+        assert_eq!(3, sample.min_frequency_key().unwrap().estimated_frequency);
     }
 
     #[test]
@@ -601,17 +603,17 @@ mod frequency_counter_based_min_heap_samples_tests {
             },
         );
 
-        let sampled_key = sample.min_frequency_key();
+        let sampled_key = sample.min_frequency_key().unwrap();
         assert_eq!(1, sampled_key.estimated_frequency);
         assert_eq!(5, sampled_key.weight);
         assert_eq!(10, sampled_key.id);
 
-        let sampled_key = sample.min_frequency_key();
+        let sampled_key = sample.min_frequency_key().unwrap();
         assert_eq!(1, sampled_key.estimated_frequency);
         assert_eq!(3, sampled_key.weight);
         assert_eq!(30, sampled_key.id);
 
-        let sampled_key = sample.min_frequency_key();
+        let sampled_key = sample.min_frequency_key().unwrap();
         assert_eq!(2, sampled_key.estimated_frequency);
         assert_eq!(2, sampled_key.weight);
         assert_eq!(20, sampled_key.id);

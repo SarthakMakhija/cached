@@ -895,8 +895,8 @@ mod shutdown_tests {
     use std::sync::atomic::Ordering;
     use std::thread;
     use std::time::Duration;
-    use async_std::future::timeout;
 
+    use async_std::future::timeout;
     use tokio::time::sleep;
 
     use crate::cache::cached::CacheD;
@@ -1082,6 +1082,42 @@ mod shutdown_tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn should_not_block_on_shutdown() {
         let config_builder = ConfigBuilder::new(1000, 100, 1_000_000);
+        let cached = Arc::new(CacheD::new(config_builder.build()));
+
+        let task_handles = (1..=50).map(|index| {
+            let cached_clone = cached.clone();
+            tokio::spawn(
+                async move {
+                    let start_index = index * 10;
+                    let end_index = start_index + 10;
+
+                    for count in start_index..end_index {
+                        let put_result = cached_clone.put(count, count * 10);
+                        if let Ok(result) = put_result {
+                            timeout(Duration::from_secs(1), result.handle()).await.unwrap();
+                        }
+                        sleep(Duration::from_millis(2)).await;
+                    }
+                }
+            )
+        }).collect::<Vec<_>>();
+
+        let cached_clone = cached.clone();
+        let shutdown_handle = tokio::spawn(
+            async move {
+                sleep(Duration::from_millis(8)).await;
+                cached_clone.shutdown();
+            }
+        );
+        for handle in task_handles {
+            handle.await.unwrap()
+        }
+        shutdown_handle.await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn should_not_block_on_shutdown_with_limited_space() {
+        let config_builder = ConfigBuilder::new(1000, 100, 1000);
         let cached = Arc::new(CacheD::new(config_builder.build()));
 
         let task_handles = (1..=50).map(|index| {

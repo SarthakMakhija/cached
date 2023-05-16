@@ -153,20 +153,27 @@ impl<Key> AdmissionPolicy<Key>
 
         let mut sample = self.cache_weight.sample(EVICTION_SAMPLE_SIZE, frequency_counter);
         while space_available < key_description.weight {
-            let sampled_key = sample.min_frequency_key();
-            if incoming_key_access_frequency < sampled_key.estimated_frequency {
-                debug!(
-                    "Rejecting key with id {} and estimated frequency {}, given its frequency is less than the sampled key with frequency {}",
-                    key_description.id, incoming_key_access_frequency, sampled_key.estimated_frequency
-                );
+            if let Some(sampled_key) = sample.min_frequency_key() {
+                if incoming_key_access_frequency < sampled_key.estimated_frequency {
+                    debug!(
+                        "Rejecting key with id {} and estimated frequency {}, given its frequency is less than the sampled key with frequency {}",
+                        key_description.id, incoming_key_access_frequency, sampled_key.estimated_frequency
+                    );
+                    return CommandStatus::Rejected;
+                }
+
+                self.cache_weight.delete(&sampled_key.id, delete_hook);
+                let (fresh_space_available, _) = self.cache_weight.is_space_available_for(key_description.weight);
+
+                space_available = fresh_space_available;
+                let _ = sample.maybe_fill_in();
+            } else {
+                let (_, is_enough_space_available) = self.cache_weight.is_space_available_for(key_description.weight);
+                if is_enough_space_available {
+                    return CommandStatus::Accepted;
+                }
                 return CommandStatus::Rejected;
             }
-
-            self.cache_weight.delete(&sampled_key.id, delete_hook);
-            let (fresh_space_available, _)  = self.cache_weight.is_space_available_for(key_description.weight);
-
-            space_available = fresh_space_available;
-            let _ = sample.maybe_fill_in();
         }
         CommandStatus::Accepted
     }
@@ -338,6 +345,29 @@ mod tests {
 
         assert!(!policy.contains(&1));
         assert_eq!(vec!["topic"], *deleted_keys.keys.read());
+    }
+
+    #[test]
+    fn adds_a_key_even_is_space_was_not_available_but_clearing_cache_weight_makes_the_space_available() {
+        let policy = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
+        let key_hashes = vec![10, 14, 116];
+        policy.access_frequency.write().increment_access(key_hashes);
+
+        let deleted_keys = DeletedKeys { keys: RwLock::new(Vec::new()) };
+        let delete_hook = |key| { deleted_keys.keys.write().push(key) };
+
+        let status = policy.maybe_add(&KeyDescription::new("topic", 1, 10, 5), &delete_hook);
+        assert_eq!(CommandStatus::Accepted, status);
+
+        policy.cache_weight.clear();
+
+        let status = policy.maybe_add(&KeyDescription::new("SSD", 2, 14, 6), &delete_hook);
+        assert_eq!(CommandStatus::Accepted, status);
+
+        assert!(policy.contains(&2));
+        assert_eq!(6, policy.cache_weight.get_weight_used());
+
+        assert!(!policy.contains(&1));
     }
 
     #[test]
