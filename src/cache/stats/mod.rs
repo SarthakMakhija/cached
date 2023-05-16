@@ -145,12 +145,10 @@ impl ConcurrentStatsCounter {
         StatsSummary::new(stats_by_type, self.hit_ratio())
     }
 
-    //TODO: Confirm ordering
     fn add(&self, stats_type: StatsType, count: u64) {
         self.entries[stats_type as usize].0.fetch_add(count, Ordering::AcqRel);
     }
 
-    //TODO: Confirm ordering
     fn get(&self, stats_type: &StatsType) -> u64 {
         self.entries[*stats_type as usize].0.load(Ordering::Acquire)
     }

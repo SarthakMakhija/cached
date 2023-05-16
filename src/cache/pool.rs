@@ -47,7 +47,6 @@ impl<Consumer> Buffer<Consumer>
         }
     }
 
-    //TODO: Validate memory ordering
     pub(crate) fn add(&self, key_hash: KeyHash) {
         let backoff = Backoff::new();
         loop {
@@ -73,7 +72,7 @@ impl<Consumer> Buffer<Consumer>
         return if let Some(_guard) = optional_guard {
             let local_tail = self.used_tail.load(Ordering::Acquire);
             if local_tail >= (self.capacity.0 - 1) as isize {
-                debug!("draining the buffer");
+                debug!("Draining the buffer");
                 let key_hashes = unsafe { &mut *self.key_hashes.get() };
                 self.consumer.accept(BufferEvent::Full(key_hashes.clone()));
                 self.used_tail.store(-1, Ordering::Release);

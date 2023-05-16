@@ -12,7 +12,6 @@ impl IncreasingIdGenerator {
     }
 
     pub(crate) fn next(&self) -> u64 {
-        //TODO: Validate this ordering
         self.id.fetch_add(1, Ordering::AcqRel)
     }
 }
