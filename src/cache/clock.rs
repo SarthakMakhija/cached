@@ -42,7 +42,13 @@ impl SystemClock {
         SystemClock {}
     }
 
-    pub(crate) fn boxed() -> ClockType {
+    pub fn boxed() -> ClockType {
         Box::new(SystemClock::new())
+    }
+}
+
+impl Default for SystemClock {
+    fn default() -> Self {
+        SystemClock::new()
     }
 }
