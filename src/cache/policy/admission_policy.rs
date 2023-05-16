@@ -60,7 +60,7 @@ impl<Key> AdmissionPolicy<Key>
             while let Ok(event) = receiver.recv() {
                 match event {
                     BufferEvent::Full(key_hashes) => {
-                        { access_frequency.write().add(key_hashes); }
+                        { access_frequency.write().increment_access(key_hashes); }
                     }
                     BufferEvent::Shutdown => {
                         info!("Received Shutdown event in AdmissionPolicy, shutting it down");
@@ -321,7 +321,7 @@ mod tests {
     fn adds_a_key_even_if_the_space_is_not_available() {
         let policy = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let key_hashes = vec![10, 14, 116];
-        policy.access_frequency.write().add(key_hashes);
+        policy.access_frequency.write().increment_access(key_hashes);
 
         let deleted_keys = DeletedKeys { keys: RwLock::new(Vec::new()) };
         let delete_hook = |key| { deleted_keys.keys.write().push(key) };
@@ -343,7 +343,7 @@ mod tests {
     fn rejects_the_incoming_key_and_has_victims() {
         let policy = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let key_hashes = vec![14];
-        policy.access_frequency.write().add(key_hashes);
+        policy.access_frequency.write().increment_access(key_hashes);
 
         let deleted_keys = DeletedKeys { keys: RwLock::new(Vec::new()) };
         let delete_hook = |key| { deleted_keys.keys.write().push(key) };
@@ -445,7 +445,7 @@ mod tests {
     fn gets_the_weight_used() {
         let policy = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let key_hashes = vec![10, 14, 116];
-        policy.access_frequency.write().add(key_hashes);
+        policy.access_frequency.write().increment_access(key_hashes);
 
         let deleted_keys = DeletedKeys { keys: RwLock::new(Vec::new()) };
         let delete_hook = |key| { deleted_keys.keys.write().push(key) };
@@ -463,7 +463,7 @@ mod tests {
     fn gets_the_weight_used_after_rejection() {
         let policy = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let key_hashes = vec![14, 116];
-        policy.access_frequency.write().add(key_hashes);
+        policy.access_frequency.write().increment_access(key_hashes);
 
         let deleted_keys = DeletedKeys { keys: RwLock::new(Vec::new()) };
         let delete_hook = |key| { deleted_keys.keys.write().push(key) };

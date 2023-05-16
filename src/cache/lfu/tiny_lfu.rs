@@ -26,8 +26,7 @@ impl TinyLFU {
         tiny_lfu
     }
 
-    //TODO: probably need a better name
-    pub(crate) fn add(&mut self, key_hashes: Vec<KeyHash>) {
+    pub(crate) fn increment_access(&mut self, key_hashes: Vec<KeyHash>) {
         key_hashes.iter().for_each(|key_hash| self.increment_access_for(*key_hash));
     }
 
@@ -71,7 +70,7 @@ mod tests {
     #[test]
     fn increment_frequency_access_for_keys() {
         let mut tiny_lfu = TinyLFU::new(10);
-        tiny_lfu.add(vec![10, 10, 10, 20]);
+        tiny_lfu.increment_access(vec![10, 10, 10, 20]);
 
         assert_eq!(3, tiny_lfu.estimate(10));
         assert_eq!(1, tiny_lfu.estimate(20));
@@ -82,7 +81,7 @@ mod tests {
         let mut tiny_lfu = TinyLFU::new(10);
         tiny_lfu.door_keeper.add_if_missing(&10);
 
-        tiny_lfu.add(vec![10, 10, 10, 20]);
+        tiny_lfu.increment_access(vec![10, 10, 10, 20]);
 
         assert_eq!(4, tiny_lfu.estimate(10));
         assert_eq!(1, tiny_lfu.estimate(20));
@@ -91,7 +90,7 @@ mod tests {
     #[test]
     fn total_increments() {
         let mut tiny_lfu = TinyLFU::new(10);
-        tiny_lfu.add(vec![10, 10, 10, 20]);
+        tiny_lfu.increment_access(vec![10, 10, 10, 20]);
 
         assert_eq!(4, tiny_lfu.total_increments);
     }
@@ -99,7 +98,7 @@ mod tests {
     #[test]
     fn reset() {
         let mut tiny_lfu = TinyLFU::new(2);
-        tiny_lfu.add(vec![10, 10]);
+        tiny_lfu.increment_access(vec![10, 10]);
 
         assert_eq!(0, tiny_lfu.total_increments);
     }

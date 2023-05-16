@@ -24,7 +24,6 @@ use crate::cache::types::{KeyId, Weight};
 use crate::cache::unique_id::increasing_id_generator::IncreasingIdGenerator;
 use crate::cache::upsert::UpsertRequest;
 
-//TODO: Lifetime 'static?
 pub struct CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + 'static {
