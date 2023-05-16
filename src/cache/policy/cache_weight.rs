@@ -474,6 +474,19 @@ mod frequency_counter_based_min_heap_samples_tests {
     }
 
     #[test]
+    fn maybe_fill_in_with_empty_source() {
+        let cache: DashMap<KeyId, WeightedKey<&str>> = DashMap::new();
+        let mut sample = FrequencyCounterBasedMinHeapSamples::new(
+            &cache,
+            2,
+            |_hash| { 1 },
+        );
+
+        let sample_key = sample.min_frequency_key();
+        assert_eq!(None, sample_key);
+    }
+
+    #[test]
     fn maybe_fill_in_with_source_having_keys_to_fill() {
         let cache: DashMap<KeyId, WeightedKey<&str>> = DashMap::new();
         cache.insert(1, WeightedKey::new("disk", 3040, 3));
