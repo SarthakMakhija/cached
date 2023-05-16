@@ -141,7 +141,6 @@ impl<Key> AdmissionPolicy<Key>
         self.stats_counter.clear();
     }
 
-    //TODO: should we query the space_available from cache_weight?
     fn create_space<DeleteHook>(&self,
                                 space_left: Weight,
                                 key_description: &KeyDescription<Key>,
@@ -162,9 +161,11 @@ impl<Key> AdmissionPolicy<Key>
                 );
                 return CommandStatus::Rejected;
             }
-            self.cache_weight.delete(&sampled_key.id, delete_hook);
-            space_available += sampled_key.weight;
 
+            self.cache_weight.delete(&sampled_key.id, delete_hook);
+            let (fresh_space_available, _)  = self.cache_weight.is_space_available_for(key_description.weight);
+
+            space_available = fresh_space_available;
             let _ = sample.maybe_fill_in();
         }
         CommandStatus::Accepted
