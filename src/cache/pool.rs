@@ -1,13 +1,10 @@
-use std::cell::UnsafeCell;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicIsize, Ordering};
-use crossbeam_utils::Backoff;
-use log::debug;
 
-use parking_lot::Mutex;
+use log::debug;
+use parking_lot::RwLock;
 use rand::{Rng, thread_rng};
 
-use crate::cache::buffer_event::BufferEvent;
+use crate::cache::buffer_event::{BufferConsumer, BufferEvent};
 use crate::cache::types::KeyHash;
 
 #[repr(transparent)]
@@ -19,69 +16,33 @@ pub(crate) struct PoolSize(pub(crate) usize);
 pub(crate) struct BufferSize(pub(crate) usize);
 
 pub(crate) struct Pool<Consumer: BufferConsumer> {
-    buffers: Vec<Buffer<Consumer>>,
+    buffers: Vec<RwLock<Buffer<Consumer>>>,
     pool_size: PoolSize,
 }
 
 struct Buffer<Consumer: BufferConsumer> {
-    key_hashes: UnsafeCell<Vec<KeyHash>>,
+    key_hashes: Vec<KeyHash>,
     capacity: BufferSize,
     consumer: Arc<Consumer>,
-    used_tail: AtomicIsize,
-    drain_synchronization: Mutex<()>,
-}
-
-pub(crate) trait BufferConsumer {
-    fn accept(&self, event: BufferEvent);
 }
 
 impl<Consumer> Buffer<Consumer>
     where Consumer: BufferConsumer {
     pub(crate) fn new(capacity: BufferSize, consumer: Arc<Consumer>) -> Self {
         Buffer {
-            key_hashes: UnsafeCell::new(Vec::with_capacity(capacity.0)),
+            key_hashes: Vec::with_capacity(capacity.0),
             capacity,
             consumer,
-            used_tail: AtomicIsize::new(-1),
-            drain_synchronization: Mutex::new(()),
         }
     }
 
-    pub(crate) fn add(&self, key_hash: KeyHash) {
-        let backoff = Backoff::new();
-        loop {
-            let local_tail = self.used_tail.load(Ordering::Acquire);
-            if local_tail >= (self.capacity.0 - 1) as isize && !self.drain() {
-                backoff.spin();
-                continue;
-            }
-            let result = self.used_tail.compare_exchange_weak(local_tail, local_tail + 1, Ordering::Release, Ordering::Relaxed);
-            if result.is_ok() {
-                let hashes = unsafe { &mut *self.key_hashes.get() };
-                hashes.push(key_hash);
-                return;
-            } else {
-                backoff.spin()
-            }
+    pub(crate) fn add(&mut self, key_hash: KeyHash) {
+        if self.key_hashes.len() >= self.capacity.0 {
+            debug!("Draining the buffer");
+            self.consumer.accept(BufferEvent::Full(self.key_hashes.clone()));
+            self.key_hashes.clear();
         }
-    }
-
-    fn drain(&self) -> bool {
-        let optional_guard = self.drain_synchronization.try_lock();
-
-        return if let Some(_guard) = optional_guard {
-            let local_tail = self.used_tail.load(Ordering::Acquire);
-            if local_tail >= (self.capacity.0 - 1) as isize {
-                debug!("Draining the buffer");
-                let key_hashes = unsafe { &mut *self.key_hashes.get() };
-                self.consumer.accept(BufferEvent::Full(key_hashes.clone()));
-                self.used_tail.store(-1, Ordering::Release);
-                key_hashes.clear();
-            }
-            true
-        } else {
-            false
-        };
+        self.key_hashes.push(key_hash);
     }
 }
 
@@ -89,8 +50,8 @@ impl<Consumer> Pool<Consumer>
     where Consumer: BufferConsumer {
     pub(crate) fn new(pool_size: PoolSize, buffer_size: BufferSize, buffer_consumer: Arc<Consumer>) -> Self {
         let buffers = (0..pool_size.0)
-            .map(|_| Buffer::new(buffer_size, buffer_consumer.clone()))
-            .collect::<Vec<Buffer<Consumer>>>();
+            .map(|_| RwLock::new(Buffer::new(buffer_size, buffer_consumer.clone())))
+            .collect::<_>();
 
         Pool { buffers, pool_size }
     }
@@ -98,18 +59,14 @@ impl<Consumer> Pool<Consumer>
     pub(crate) fn add(&self, key_hash: KeyHash) {
         let pool_size = self.pool_size.0;
         let index = thread_rng().gen_range(0..pool_size);
-        self.buffers[index].add(key_hash);
+        self.buffers[index].write().add(key_hash);
     }
 
     #[cfg(test)]
     pub(crate) fn get_buffer_consumer(&self) -> Arc<Consumer> {
-        self.buffers[0].consumer.clone()
+        self.buffers[0].read().consumer.clone()
     }
 }
-
-unsafe impl<Consumer> Send for Pool<Consumer> where Consumer: BufferConsumer {}
-
-unsafe impl<Consumer> Sync for Pool<Consumer> where Consumer: BufferConsumer {}
 
 #[cfg(test)]
 mod tests {
@@ -123,8 +80,7 @@ mod tests {
     mod setup {
         use std::sync::atomic::{AtomicUsize, Ordering};
 
-        use crate::cache::buffer_event::BufferEvent;
-        use crate::cache::pool::BufferConsumer;
+        use crate::cache::buffer_event::{BufferConsumer, BufferEvent};
 
         pub(crate) struct TestBufferConsumer {
             pub(crate) total_keys: AtomicUsize,
@@ -201,7 +157,7 @@ mod tests {
 
         let total_keys = consumer.total_keys.load(Ordering::SeqCst);
         assert_eq!(8, total_keys);
-        assert_eq!(1, unsafe { &*pool.buffers[0].key_hashes.get() }.len());
+        assert_eq!(1, pool.buffers[0].read().key_hashes.len());
     }
 
     #[test]
@@ -235,6 +191,6 @@ mod tests {
 
         let total_keys = consumer.total_keys.load(Ordering::SeqCst);
         assert_eq!(8, total_keys);
-        assert_eq!(8, unsafe { &*pool.buffers[0].key_hashes.get() }.len());
+        assert_eq!(8, pool.buffers[0].read().key_hashes.len());
     }
 }

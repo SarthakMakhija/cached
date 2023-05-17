@@ -534,7 +534,7 @@ mod sociable_tests {
     use std::thread;
     use std::time::Duration;
 
-    use crate::cache::buffer_event::BufferEvent;
+    use crate::cache::buffer_event::{BufferConsumer, BufferEvent};
     use crate::cache::clock::{ClockType, SystemClock};
     use crate::cache::command::{CommandStatus, CommandType};
     use crate::cache::command::command_executor::CommandExecutor;
@@ -544,7 +544,6 @@ mod sociable_tests {
     use crate::cache::key_description::KeyDescription;
     use crate::cache::policy::admission_policy::AdmissionPolicy;
     use crate::cache::policy::config::CacheWeightConfig;
-    use crate::cache::pool::BufferConsumer;
     use crate::cache::stats::ConcurrentStatsCounter;
 
     fn no_action_ttl_ticker() -> Arc<TTLTicker> {
