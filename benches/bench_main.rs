@@ -4,5 +4,6 @@ mod benchmarks;
 
 criterion_main! {
     benchmarks::read_buffer::benches,
-    benchmarks::frequency_counter::benches
+    benchmarks::frequency_counter::benches,
+    benchmarks::put::benches
 }
