@@ -7,5 +7,6 @@ criterion_main! {
     benchmarks::frequency_counter::benches,
     benchmarks::put::benches,
     benchmarks::async_await_put::benches,
-    benchmarks::get::benches
+    benchmarks::get::benches,
+    benchmarks::put_get::benches,
 }
