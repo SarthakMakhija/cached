@@ -4,3 +4,4 @@ pub mod put;
 pub mod async_await_put;
 pub mod get;
 pub mod put_get;
+pub mod common;
