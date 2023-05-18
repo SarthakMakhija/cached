@@ -14,6 +14,7 @@ pub struct ProxyAdmissionPolicy<Key>
 
 impl<Key> ProxyAdmissionPolicy<Key>
     where Key: Hash + Eq + Send + Sync + Clone + 'static, {
+    #[cfg(not(tarpaulin_include))]
     pub fn new(counters: TotalCounters, capacity: TotalCapacity, shards: TotalShards, total_cache_weight: Weight) -> Self {
         ProxyAdmissionPolicy {
             admission_policy: Arc::new(
@@ -33,6 +34,7 @@ impl<Key> ProxyAdmissionPolicy<Key>
 
 impl<Key> BufferConsumer for ProxyAdmissionPolicy<Key>
     where Key: Hash + Eq + Send + Sync + Clone + 'static, {
+    #[cfg(not(tarpaulin_include))]
     fn accept(&self, event: BufferEvent) {
         self.admission_policy.accept(event);
     }

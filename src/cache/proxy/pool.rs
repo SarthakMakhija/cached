@@ -13,10 +13,12 @@ pub struct ProxyPool<Consumer: BufferConsumer> {
 #[cfg(feature = "bench_testable")]
 impl<Consumer> ProxyPool<Consumer>
     where Consumer: BufferConsumer {
+    #[cfg(not(tarpaulin_include))]
     pub fn new(pool_size: usize, buffer_size: usize, buffer_consumer: Arc<Consumer>) -> Self {
         ProxyPool { pool: Pool::new(PoolSize(pool_size), BufferSize(buffer_size), buffer_consumer) }
     }
 
+    #[cfg(not(tarpaulin_include))]
     pub fn add(&self, key_hash: KeyHash) {
         self.pool.add(key_hash)
     }
