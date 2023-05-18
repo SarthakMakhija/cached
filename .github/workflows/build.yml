@@ -24,7 +24,7 @@ jobs:
       run: cargo clippy --all-targets --all-features
 
     - name: Generate code coverage
-      run: cargo +nightly tarpaulin --verbose --all-features --workspace --timeout 120 --out Xml -- --show-output
+      run: cargo +nightly tarpaulin --verbose --workspace --timeout 120 --out Xml -- --show-output
 
     - name: Upload to codecov.io
       uses: codecov/codecov-action@v3
