@@ -5,19 +5,20 @@ use std::time::{Duration, Instant};
 
 use criterion::{Criterion, criterion_group, criterion_main};
 
-use cached::cache::buffer_event::{BufferConsumer, BufferEvent};
+use cached::cache::buffer_event::BufferConsumer;
+use cached::cache::proxy::admission_policy::ProxyAdmissionPolicy;
 use cached::cache::proxy::pool::ProxyPool;
+use cached::cache::types::{TotalCapacity, TotalCounters, TotalShards, Weight};
 
-struct NoOperationBufferConsumer {}
-
-impl BufferConsumer for NoOperationBufferConsumer {
-    fn accept(&self, _event: BufferEvent) {}
-}
+const COUNTERS: TotalCounters = 2 << 20;
+const CAPACITY: TotalCapacity = 1_000_000;
+const SHARDS: TotalShards = 256;
+const CACHE_WEIGHT: Weight = 10_000_000;
 
 #[cfg(feature = "bench_testable")]
 pub fn read_buffer_one_thread(criterion: &mut Criterion) {
     criterion.bench_function("Pool.add() | No contention", |bencher| bencher.iter_custom(|iterations| {
-        let consumer = Arc::new(NoOperationBufferConsumer {});
+        let consumer = Arc::new(ProxyAdmissionPolicy::<u64>::new(COUNTERS, CAPACITY, SHARDS, CACHE_WEIGHT));
         let pool = ProxyPool::new(32, 64, consumer);
 
         let start = Instant::now();
@@ -30,19 +31,22 @@ pub fn read_buffer_one_thread(criterion: &mut Criterion) {
 
 #[cfg(feature = "bench_testable")]
 pub fn read_buffer_8_threads(criterion: &mut Criterion) {
-    let pool = Arc::new(ProxyPool::new(32, 64, Arc::new(NoOperationBufferConsumer {})));
+    let consumer = Arc::new(ProxyAdmissionPolicy::<u64>::new(COUNTERS, CAPACITY, SHARDS, CACHE_WEIGHT));
+    let pool = Arc::new(ProxyPool::new(32, 64, consumer));
     read_buffer_parallel(criterion, "Pool.add() | 8 threads", pool, 8);
 }
 
 #[cfg(feature = "bench_testable")]
 pub fn read_buffer_16_threads(criterion: &mut Criterion) {
-    let pool = Arc::new(ProxyPool::new(32, 64, Arc::new(NoOperationBufferConsumer {})));
+    let consumer = Arc::new(ProxyAdmissionPolicy::<u64>::new(COUNTERS, CAPACITY, SHARDS, CACHE_WEIGHT));
+    let pool = Arc::new(ProxyPool::new(32, 64, consumer));
     read_buffer_parallel(criterion, "Pool.add() | 16 threads", pool, 16);
 }
 
 #[cfg(feature = "bench_testable")]
 pub fn read_buffer_32_threads(criterion: &mut Criterion) {
-    let pool = Arc::new(ProxyPool::new(32, 64, Arc::new(NoOperationBufferConsumer {})));
+    let consumer = Arc::new(ProxyAdmissionPolicy::<u64>::new(COUNTERS, CAPACITY, SHARDS, CACHE_WEIGHT));
+    let pool = Arc::new(ProxyPool::new(32, 64, consumer));
     read_buffer_parallel(criterion, "Pool.add() | 32 threads", pool, 32);
 }
 
