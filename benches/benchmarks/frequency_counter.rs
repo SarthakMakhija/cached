@@ -1,9 +1,9 @@
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{Bencher, Criterion, criterion_group, criterion_main};
 use rand::prelude::*;
 use rand_distr::Zipf;
 
 use cached::cache::proxy::frequency_counter::ProxyFrequencyCounter;
-use cached::cache::types::KeyHash;
+use cached::cache::types::{KeyHash, TotalCounters};
 
 const SIZE: usize = 2 << 20;
 const MASK: usize = SIZE - 1;
@@ -14,34 +14,14 @@ pub fn increase_frequency(criterion: &mut Criterion) {
     let distribution = distribution();
     let mut group = criterion.benchmark_group("increase frequency");
 
-    let mut index = 0;
     group.bench_function("counters = 2097152", |bencher| {
-        let mut counter = ProxyFrequencyCounter::new(2097152);
-        bencher.iter(|| {
-            let key_hash = distribution[index & MASK];
-            counter.increment(key_hash as u64);
-            index += 1;
-        })
+        increment(&distribution, bencher, 2097152);
     });
-
-    let mut index = 0;
     group.bench_function("counters = 2097152 * 2", |bencher| {
-        let mut counter = ProxyFrequencyCounter::new(2097152 * 2);
-        bencher.iter(|| {
-            let key_hash = distribution[index & MASK];
-            counter.increment(key_hash as u64);
-            index += 1;
-        })
+        increment(&distribution, bencher, 2097152 * 2);
     });
-
-    let mut index = 0;
     group.bench_function("counters = 2097152 * 10", |bencher| {
-        let mut counter = ProxyFrequencyCounter::new(2097152 * 10);
-        bencher.iter(|| {
-            let key_hash = distribution[index & MASK];
-            counter.increment(key_hash as u64);
-            index += 1;
-        })
+        increment(&distribution, bencher, 2097152 * 10);
     });
 
     group.finish();
@@ -50,43 +30,37 @@ pub fn increase_frequency(criterion: &mut Criterion) {
 #[cfg(feature = "bench_testable")]
 pub fn estimate_frequency(criterion: &mut Criterion) {
     let mut group = criterion.benchmark_group("estimate frequency");
+
     let mut counter = ProxyFrequencyCounter::new(2097152);
     let distribution = setup(&mut counter);
-
-    let mut index = 0;
     group.bench_function("counters = 2097152", |bencher| {
-        bencher.iter(|| {
-            let key_hash = distribution[index & MASK];
-            counter.estimate(key_hash as u64);
-            index += 1;
-        });
+        estimate(&counter, &distribution, bencher);
     });
 
     let mut counter = ProxyFrequencyCounter::new(2097152 * 2);
     let distribution = setup(&mut counter);
-
-    let mut index = 0;
     group.bench_function("counters = 2097152 * 2", |bencher| {
-        bencher.iter(|| {
-            let key_hash = distribution[index & MASK];
-            counter.estimate(key_hash as u64);
-            index += 1;
-        });
+        estimate(&counter, &distribution, bencher);
     });
 
     let mut counter = ProxyFrequencyCounter::new(2097152 * 10);
     let distribution = setup(&mut counter);
-
-    let mut index = 0;
     group.bench_function("counters = 2097152 * 10", |bencher| {
-        bencher.iter(|| {
-            let key_hash = distribution[index & MASK];
-            counter.estimate(key_hash as u64);
-            index += 1;
-        });
+        estimate(&counter, &distribution, bencher);
     });
 
     group.finish();
+}
+
+fn increment(distribution: &Vec<f64>, bencher: &mut Bencher, total_counters: TotalCounters) {
+    let mut index = 0;
+    let mut counter = ProxyFrequencyCounter::new(total_counters);
+
+    bencher.iter(|| {
+        let key_hash = distribution[index & MASK];
+        counter.increment(key_hash as u64);
+        index += 1;
+    })
 }
 
 fn setup(frequency_counter: &mut ProxyFrequencyCounter) -> Vec<f64> {
@@ -95,6 +69,16 @@ fn setup(frequency_counter: &mut ProxyFrequencyCounter) -> Vec<f64> {
         frequency_counter.increment(*item as KeyHash);
     }
     distribution
+}
+
+fn estimate(counter: &ProxyFrequencyCounter, distribution: &Vec<f64>, bencher: &mut Bencher) {
+    let mut index = 0;
+
+    bencher.iter(|| {
+        let key_hash = distribution[index & MASK];
+        counter.estimate(key_hash as u64);
+        index += 1;
+    });
 }
 
 fn distribution() -> Vec<f64> {
