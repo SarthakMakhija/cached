@@ -7,7 +7,7 @@ use cached::cache::cached::CacheD;
 use cached::cache::config::ConfigBuilder;
 use cached::cache::types::{TotalCounters, Weight};
 
-use crate::benchmarks::common::{distribution, execute_parallel};
+use crate::benchmarks::common::{distribution, execute_parallel, preload_cache};
 
 const CAPACITY: usize = 2 << 14;
 const COUNTERS: TotalCounters = (CAPACITY * 10) as TotalCounters;
@@ -63,27 +63,11 @@ pub fn get_32_threads(criterion: &mut Criterion) {
     execute_parallel(criterion, "Cached.get() | 32 threads", prepare_execution_block(cached, Arc::new(distribution)), 32);
 }
 
-fn preload_cache(cached: &CacheD<u64, u64>, distribution: &Vec<u64>) {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(async {
-            setup(cached, distribution).await;
-        });
-}
-
 fn prepare_execution_block(cached: CacheD<u64, u64>, distribution: Arc<Vec<u64>>) -> Arc<impl Fn(u64) + Send + Sync + 'static> {
     Arc::new(move |index| {
         let key_index = index as usize;
         let _ = cached.get(&distribution[key_index & MASK]);
     })
-}
-
-async fn setup(cached: &CacheD<u64, u64>, distribution: &Vec<u64>) {
-    for element in distribution {
-        cached.put(*element, *element).unwrap().handle().await;
-    }
 }
 
 criterion_group!(benches, get_single_threaded, get_8_threads, get_16_threads, get_32_threads);
