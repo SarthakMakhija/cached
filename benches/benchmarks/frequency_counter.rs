@@ -1,17 +1,16 @@
 use criterion::{Bencher, Criterion, criterion_group, criterion_main};
-use rand::prelude::*;
-use rand_distr::Zipf;
 
 use cached::cache::proxy::frequency_counter::ProxyFrequencyCounter;
-use cached::cache::types::{KeyHash, TotalCounters};
+use cached::cache::types::TotalCounters;
+use crate::benchmarks::common::distribution;
 
-const SIZE: usize = 2 << 20;
-const MASK: usize = SIZE - 1;
-const ITEMS: usize = SIZE / 3;
+const CAPACITY: usize = 2 << 20;
+const MASK: usize = CAPACITY - 1;
+const ITEMS: usize = CAPACITY / 3;
 
 #[cfg(feature = "bench_testable")]
 pub fn increase_frequency(criterion: &mut Criterion) {
-    let distribution = distribution();
+    let distribution = distribution(ITEMS as u64, CAPACITY);
     let mut group = criterion.benchmark_group("increase frequency");
 
     group.bench_function("counters = 2097152", |bencher| {
@@ -52,37 +51,33 @@ pub fn estimate_frequency(criterion: &mut Criterion) {
     group.finish();
 }
 
-fn increment(distribution: &Vec<f64>, bencher: &mut Bencher, total_counters: TotalCounters) {
+fn increment(distribution: &[u64], bencher: &mut Bencher, total_counters: TotalCounters) {
     let mut index = 0;
     let mut counter = ProxyFrequencyCounter::new(total_counters);
 
     bencher.iter(|| {
         let key_hash = distribution[index & MASK];
-        counter.increment(key_hash as u64);
+        counter.increment(key_hash);
         index += 1;
     })
 }
 
-fn setup(frequency_counter: &mut ProxyFrequencyCounter) -> Vec<f64> {
-    let distribution = distribution();
+fn setup(frequency_counter: &mut ProxyFrequencyCounter) -> Vec<u64> {
+    let distribution = distribution(ITEMS as u64, CAPACITY);
     for item in &distribution {
-        frequency_counter.increment(*item as KeyHash);
+        frequency_counter.increment(*item);
     }
     distribution
 }
 
-fn estimate(counter: &ProxyFrequencyCounter, distribution: &Vec<f64>, bencher: &mut Bencher) {
+fn estimate(counter: &ProxyFrequencyCounter, distribution: &[u64], bencher: &mut Bencher) {
     let mut index = 0;
 
     bencher.iter(|| {
         let key_hash = distribution[index & MASK];
-        counter.estimate(key_hash as u64);
+        counter.estimate(key_hash);
         index += 1;
     });
-}
-
-fn distribution() -> Vec<f64> {
-    thread_rng().sample_iter(Zipf::new(ITEMS as u64, 1.5).unwrap()).take(SIZE).collect::<Vec<_>>()
 }
 
 criterion_group!(benches, increase_frequency, estimate_frequency);

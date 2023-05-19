@@ -3,13 +3,12 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use rand::{Rng, thread_rng};
-use rand_distr::Zipf;
 use tokio::runtime::Builder;
 
 use cached::cache::cached::CacheD;
 use cached::cache::config::ConfigBuilder;
 use cached::cache::types::{TotalCounters, Weight};
+use crate::benchmarks::common::distribution;
 
 const CAPACITY: usize = 2 << 20;
 const COUNTERS: TotalCounters = (CAPACITY * 10) as TotalCounters;
@@ -31,7 +30,7 @@ pub fn async_put_single_task(criterion: &mut Criterion) {
             async move {
                 let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
 
-                let distribution = distribution();
+                let distribution = distribution(ITEMS as u64, CAPACITY);
                 let mut index = 0;
 
                 let start = Instant::now();
@@ -47,26 +46,27 @@ pub fn async_put_single_task(criterion: &mut Criterion) {
 
 pub fn async_put_8_tasks(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
-    put_parallel(criterion, "Async Cached.put() | 8 tasks", Arc::new(cached), 8, 8);
+    put_async(criterion, "Async Cached.put() | 8 tasks", Arc::new(cached), 8, 8);
 }
 
 pub fn async_put_16_tasks(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
-    put_parallel(criterion, "Async Cached.put() | 16 tasks", Arc::new(cached), 8, 16);
+    put_async(criterion, "Async Cached.put() | 16 tasks", Arc::new(cached), 8, 16);
 }
 
 pub fn async_put_32_tasks(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
-    put_parallel(criterion, "Async Cached.put() | 32 tasks", Arc::new(cached), 8, 32);
+    put_async(criterion, "Async Cached.put() | 32 tasks", Arc::new(cached), 8, 32);
 }
 
 #[cfg(feature = "bench_testable")]
-pub fn put_parallel(
+pub fn put_async(
     criterion: &mut Criterion,
     id: &'static str,
     cached: Arc<CacheD<u64, u64>>,
     thread_count: usize,
     task_count: usize) {
+
     criterion.bench_function(id, |bencher| {
         let runtime = Builder::new_multi_thread()
             .worker_threads(thread_count)
@@ -80,7 +80,7 @@ pub fn put_parallel(
                 let per_task_iterations = iterations / task_count as u64;
                 let mut current_start = 0;
                 let mut current_end = current_start + per_task_iterations;
-                let distribution = Arc::new(distribution());
+                let distribution = Arc::new(distribution(ITEMS as u64, CAPACITY));
 
                 let mut tasks = Vec::new();
                 for _task_id in 1..=task_count {
@@ -108,11 +108,6 @@ pub fn put_parallel(
             }
         });
     });
-}
-
-
-fn distribution() -> Vec<u64> {
-    thread_rng().sample_iter(Zipf::new(ITEMS as u64, 1.01).unwrap()).take(CAPACITY).map(|value| value as u64).collect::<Vec<_>>()
 }
 
 criterion_group!(benches, async_put_single_task, async_put_8_tasks, async_put_16_tasks, async_put_32_tasks);

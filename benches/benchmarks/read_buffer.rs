@@ -5,7 +5,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 
 use cached::cache::proxy::admission_policy::ProxyAdmissionPolicy;
 use cached::cache::proxy::pool::ProxyPool;
-use cached::cache::types::{KeyHash, TotalCapacity, TotalCounters, TotalShards, Weight};
+use cached::cache::types::{TotalCapacity, TotalCounters, TotalShards, Weight};
 
 use crate::benchmarks::common::execute_parallel;
 
@@ -43,7 +43,7 @@ pub fn read_buffer_32_threads(criterion: &mut Criterion) {
     execute_parallel(criterion, "Pool.add() | 32 threads", prepare_execution_block(), 32);
 }
 
-fn prepare_execution_block() -> Arc<impl Fn(u64) -> () + Send + Sync + 'static> {
+fn prepare_execution_block() -> Arc<impl Fn(u64) + Send + Sync + 'static> {
     let consumer = Arc::new(ProxyAdmissionPolicy::<u64>::new(COUNTERS, CAPACITY, SHARDS, CACHE_WEIGHT));
     let pool = Arc::new(ProxyPool::new(32, 64, consumer));
 

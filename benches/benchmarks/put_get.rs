@@ -2,14 +2,12 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use rand::{Rng, thread_rng};
-use rand_distr::Zipf;
 
 use cached::cache::cached::CacheD;
 use cached::cache::config::ConfigBuilder;
 use cached::cache::types::{TotalCounters, Weight};
 
-use crate::benchmarks::common::execute_parallel;
+use crate::benchmarks::common::{distribution, execute_parallel};
 
 const CAPACITY: usize = 2 << 14;
 const COUNTERS: TotalCounters = (CAPACITY * 10) as TotalCounters;
@@ -21,7 +19,7 @@ const MASK: usize = CAPACITY - 1;
 #[cfg(feature = "bench_testable")]
 pub fn put_get_single_threaded(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
-    let distribution = distribution();
+    let distribution = distribution(ITEMS as u64, CAPACITY);
 
     let mut index = 0;
     criterion.bench_function("Cached.put/Cached.get() | No contention", |bencher| {
@@ -55,23 +53,18 @@ pub fn put_get_32_threads(criterion: &mut Criterion) {
     execute_parallel(criterion, "Cached.put/Cached.get() | 32 threads", prepare_execution_block(), 32);
 }
 
-fn prepare_execution_block() -> Arc<impl Fn(u64) -> () + Send + Sync + 'static> {
+fn prepare_execution_block() -> Arc<impl Fn(u64) + Send + Sync + 'static> {
     let cached = Arc::new(CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build()));
-    let distribution = distribution();
+    let distribution = distribution(ITEMS as u64, CAPACITY);
 
-    let block = Arc::new(move |index| {
+    Arc::new(move |index| {
         let key_index = index as usize;
         if index & 0x01 == 0 {
             let _ = cached.get(&distribution[key_index & MASK]);
         } else {
             let _ = cached.put(distribution[key_index & MASK], distribution[key_index & MASK]).unwrap();
         }
-    });
-    block
-}
-
-fn distribution() -> Vec<u64> {
-    thread_rng().sample_iter(Zipf::new(ITEMS as u64, 1.01).unwrap()).take(CAPACITY).map(|value| value as u64).collect::<Vec<_>>()
+    })
 }
 
 criterion_group!(benches, put_get_single_threaded, put_get_8_threads, put_get_16_threads, put_get_32_threads);
