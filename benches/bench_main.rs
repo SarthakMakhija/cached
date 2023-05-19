@@ -10,4 +10,5 @@ criterion_main! {
     benchmarks::get::benches,
     benchmarks::put_get::benches,
     benchmarks::delete::benches,
+    benchmarks::upsert::benches,
 }
