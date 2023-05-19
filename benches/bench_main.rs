@@ -9,4 +9,5 @@ criterion_main! {
     benchmarks::async_await_put::benches,
     benchmarks::get::benches,
     benchmarks::put_get::benches,
+    benchmarks::delete::benches,
 }
