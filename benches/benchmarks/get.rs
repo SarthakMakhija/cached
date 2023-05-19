@@ -22,7 +22,7 @@ pub fn get_single_threaded(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
     let distribution = distribution(ITEMS as u64, CAPACITY);
 
-    preload_cache(&cached, &distribution);
+    preload_cache(&cached, &distribution, |key| key);
 
     let mut index = 0;
     criterion.bench_function("Cached.get() | No contention", |bencher| {
@@ -43,7 +43,7 @@ pub fn get_8_threads(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
     let distribution = distribution(ITEMS as u64, CAPACITY);
 
-    preload_cache(&cached, &distribution);
+    preload_cache(&cached, &distribution, |key| key);
     execute_parallel(criterion, "Cached.get() | 8 threads", prepare_execution_block(cached, Arc::new(distribution)), 8);
 }
 
@@ -53,7 +53,7 @@ pub fn get_16_threads(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
     let distribution = distribution(ITEMS as u64, CAPACITY);
 
-    preload_cache(&cached, &distribution);
+    preload_cache(&cached, &distribution, |key| key);
     execute_parallel(criterion, "Cached.get() | 16 threads", prepare_execution_block(cached, Arc::new(distribution)), 16);
 }
 
@@ -63,7 +63,7 @@ pub fn get_32_threads(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
     let distribution = distribution(ITEMS as u64, CAPACITY);
 
-    preload_cache(&cached, &distribution);
+    preload_cache(&cached, &distribution, |key| key);
     execute_parallel(criterion, "Cached.get() | 32 threads", prepare_execution_block(cached, Arc::new(distribution)), 32);
 }
 

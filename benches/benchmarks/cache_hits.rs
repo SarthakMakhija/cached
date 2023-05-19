@@ -48,7 +48,7 @@ pub fn cache_hits_single_threaded(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
     let distribution = distribution_with_exponent(ITEMS as u64, CAPACITY, 5.1);
 
-    preload_cache(&cached, &distribution);
+    preload_cache(&cached, &distribution, |key| key);
 
     let mut index = 0;
     let hit_miss_recorder = HitsMissRecorder::new();
@@ -77,7 +77,7 @@ pub fn cache_hits_8_threads(criterion: &mut Criterion) {
     let distribution = distribution_with_exponent(ITEMS as u64, CAPACITY, 5.1);
     let hit_miss_recorder = Arc::new(HitsMissRecorder::new());
 
-    preload_cache(&cached, &distribution);
+    preload_cache(&cached, &distribution, |key| key);
     execute_parallel(criterion, "Cached.get() | 8 threads", prepare_execution_block(cached, Arc::new(distribution), hit_miss_recorder.clone()), 8);
     println!("{:?} %", hit_miss_recorder.ratio());
 }
@@ -89,7 +89,7 @@ pub fn cache_hits_16_threads(criterion: &mut Criterion) {
     let distribution = distribution_with_exponent(ITEMS as u64, CAPACITY, 5.1);
     let hit_miss_recorder = Arc::new(HitsMissRecorder::new());
 
-    preload_cache(&cached, &distribution);
+    preload_cache(&cached, &distribution, |key| key);
     execute_parallel(criterion, "Cached.get() | 16 threads", prepare_execution_block(cached, Arc::new(distribution), hit_miss_recorder.clone()), 16);
     println!("{:?} %", hit_miss_recorder.ratio());
 }
@@ -101,7 +101,7 @@ pub fn cache_hits_32_threads(criterion: &mut Criterion) {
     let distribution = distribution_with_exponent(ITEMS as u64, CAPACITY, 5.1);
     let hit_miss_recorder = Arc::new(HitsMissRecorder::new());
 
-    preload_cache(&cached, &distribution);
+    preload_cache(&cached, &distribution, |key| key);
     execute_parallel(criterion, "Cached.get() | 32 threads", prepare_execution_block(cached, Arc::new(distribution), hit_miss_recorder.clone()), 32);
     println!("{:?} %", hit_miss_recorder.ratio());
 }

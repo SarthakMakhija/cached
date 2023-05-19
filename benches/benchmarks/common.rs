@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 use criterion::Criterion;
 use rand::{Rng, thread_rng};
 use rand_distr::Zipf;
+
 use cached::cache::cached::CacheD;
 
 #[cfg(feature = "bench_testable")]
@@ -17,7 +18,6 @@ pub fn execute_parallel<F>(
     block: Arc<F>,
     thread_count: u8)
     where F: Fn(u64) + Send + Sync + 'static {
-
     criterion.bench_function(id, |bencher| bencher.iter_custom(|iterations| {
         let threads = spawn_threads(block.clone(), thread_count, iterations);
 
@@ -44,20 +44,25 @@ pub fn distribution_with_exponent(items: u64, capacity: usize, exponent: f64) ->
 
 #[cfg(feature = "bench_testable")]
 #[cfg(not(tarpaulin_include))]
-pub fn preload_cache(cached: &CacheD<u64, u64>, distribution: &Vec<u64>) {
+pub fn preload_cache<Value, F>(cached: &CacheD<u64, Value>, distribution: &Vec<u64>, value_generation: F)
+    where Value: Send + Sync + 'static,
+          F: Fn(u64) -> Value {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap()
         .block_on(async {
-            setup(cached, distribution).await;
+            setup(cached, distribution, value_generation).await;
         });
 }
 
 #[cfg(not(tarpaulin_include))]
-async fn setup(cached: &CacheD<u64, u64>, distribution: &Vec<u64>) {
-    for element in distribution {
-        cached.put(*element, *element).unwrap().handle().await;
+async fn setup<Value, F>(cached: &CacheD<u64, Value>, distribution: &Vec<u64>, value_generation: F)
+    where Value: Send + Sync + 'static,
+          F: Fn(u64) -> Value {
+    for key in distribution {
+        let value = value_generation(*key);
+        cached.put(*key, value).unwrap().handle().await;
     }
 }
 

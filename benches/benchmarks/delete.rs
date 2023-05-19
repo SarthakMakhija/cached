@@ -22,7 +22,7 @@ pub fn delete_single_threaded(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
     let distribution = distribution(ITEMS as u64, CAPACITY);
 
-    preload_cache(&cached, &distribution);
+    preload_cache(&cached, &distribution, |key| key);
 
     let mut index = 0;
     criterion.bench_function("Cached.delete() | No contention", |bencher| {
@@ -43,7 +43,7 @@ pub fn delete_8_threads(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
     let distribution = distribution(ITEMS as u64, CAPACITY);
 
-    preload_cache(&cached, &distribution);
+    preload_cache(&cached, &distribution, |key| key);
     execute_parallel(criterion, "Cached.delete() | 8 threads", prepare_execution_block(cached, Arc::new(distribution)), 8);
 }
 
@@ -53,7 +53,7 @@ pub fn delete_16_threads(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
     let distribution = distribution(ITEMS as u64, CAPACITY);
 
-    preload_cache(&cached, &distribution);
+    preload_cache(&cached, &distribution, |key| key);
     execute_parallel(criterion, "Cached.delete() | 16 threads", prepare_execution_block(cached, Arc::new(distribution)), 16);
 }
 
@@ -63,7 +63,7 @@ pub fn delete_32_threads(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
     let distribution = distribution(ITEMS as u64, CAPACITY);
 
-    preload_cache(&cached, &distribution);
+    preload_cache(&cached, &distribution, |key| key);
     execute_parallel(criterion, "Cached.delete() | 32 threads", prepare_execution_block(cached, Arc::new(distribution)), 32);
 }
 
