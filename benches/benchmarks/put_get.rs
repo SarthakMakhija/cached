@@ -1,7 +1,5 @@
-use std::ops::Div;
 use std::sync::Arc;
-use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use rand::{Rng, thread_rng};
@@ -10,6 +8,8 @@ use rand_distr::Zipf;
 use cached::cache::cached::CacheD;
 use cached::cache::config::ConfigBuilder;
 use cached::cache::types::{TotalCounters, Weight};
+
+use crate::benchmarks::common::execute_parallel;
 
 const CAPACITY: usize = 2 << 14;
 const COUNTERS: TotalCounters = (CAPACITY * 10) as TotalCounters;
@@ -42,77 +42,32 @@ pub fn put_get_single_threaded(criterion: &mut Criterion) {
 
 #[cfg(feature = "bench_testable")]
 pub fn put_get_8_threads(criterion: &mut Criterion) {
-    let cached = Arc::new(CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build()));
-    let distribution = distribution();
-
-    put_get_parallel(criterion, "Cached.put/Cached.get() | 8 threads", cached, Arc::new(distribution), 8);
+    execute_parallel(criterion, "Cached.put/Cached.get() | 8 threads", prepare_execution_block(), 8);
 }
 
 #[cfg(feature = "bench_testable")]
 pub fn put_get_16_threads(criterion: &mut Criterion) {
-    let cached = Arc::new(CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build()));
-    let distribution = distribution();
-
-    put_get_parallel(criterion, "Cached.put/Cached.get() | 16 threads", cached, Arc::new(distribution), 16);
+    execute_parallel(criterion, "Cached.put/Cached.get() | 16 threads", prepare_execution_block(), 16);
 }
 
 #[cfg(feature = "bench_testable")]
 pub fn put_get_32_threads(criterion: &mut Criterion) {
+    execute_parallel(criterion, "Cached.put/Cached.get() | 32 threads", prepare_execution_block(), 32);
+}
+
+fn prepare_execution_block() -> Arc<impl Fn(u64) -> () + Send + Sync + 'static> {
     let cached = Arc::new(CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build()));
     let distribution = distribution();
 
-    put_get_parallel(criterion, "Cached.put/Cached.get() | 32 threads", cached, Arc::new(distribution), 32);
-}
-
-#[cfg(feature = "bench_testable")]
-pub fn put_get_parallel(
-    criterion: &mut Criterion,
-    id: &'static str,
-    cached: Arc<CacheD<u64, u64>>,
-    distribution: Arc<Vec<u64>>,
-    thread_count: u8) {
-
-    criterion.bench_function(id, |bencher| bencher.iter_custom(|iterations| {
-        let per_thread_iterations = iterations / thread_count as u64;
-        let mut current_start = 0;
-        let mut current_end = current_start + per_thread_iterations;
-
-        let mut threads = Vec::new();
-        for _thread_id in 1..=thread_count {
-            threads.push(thread::spawn({
-                let cached = cached.clone();
-                let distribution = distribution.clone();
-
-                move || {
-                    let start = Instant::now();
-                    for index in current_start..current_end {
-                        let key_index = index as usize & MASK;
-                        if index & 0x01 == 0 {
-                            let _ = cached.get(&distribution[key_index & MASK]);
-                        } else {
-                            let _ = cached.put(distribution[key_index & MASK], distribution[key_index & MASK]).unwrap();
-                        }
-                    }
-                    start.elapsed()
-                }
-            }));
-            current_start = current_end;
-            current_end += per_thread_iterations;
+    let block = Arc::new(move |index| {
+        let key_index = index as usize;
+        if index & 0x01 == 0 {
+            let _ = cached.get(&distribution[key_index & MASK]);
+        } else {
+            let _ = cached.put(distribution[key_index & MASK], distribution[key_index & MASK]).unwrap();
         }
-
-        let mut total_time = Duration::from_nanos(0);
-        for thread in threads {
-            let elapsed = thread.join().unwrap();
-            total_time += elapsed;
-        }
-        total_time.div(thread_count as u32)
-    }));
-}
-
-async fn setup(cached: Arc<CacheD<u64, u64>>, distribution: Vec<u64>) {
-    for element in distribution {
-        cached.put(element, element).unwrap().handle().await;
-    }
+    });
+    block
 }
 
 fn distribution() -> Vec<u64> {
