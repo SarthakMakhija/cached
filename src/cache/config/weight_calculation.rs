@@ -5,7 +5,7 @@ use crate::cache::types::{KeyId, Weight};
 pub(crate) struct Calculation;
 
 const KEY_ID_SIZE: usize = std::mem::size_of::<KeyId>();
-const SYSTEM_SIZE_SIZE: usize = std::mem::size_of::<SystemTime>();
+const SYSTEM_TIME_SIZE: usize = std::mem::size_of::<SystemTime>();
 
 impl Calculation {
     pub(crate) fn perform<Key, Value>(key: &Key, value: &Value) -> Weight {
@@ -19,7 +19,7 @@ impl Calculation {
 
     fn weighted_key_size<Key>() -> usize { std::mem::size_of::<WeightedKey<Key>>() }
 
-    fn ttl_ticker_entry_size() -> usize { KEY_ID_SIZE + SYSTEM_SIZE_SIZE }
+    fn ttl_ticker_entry_size() -> usize { KEY_ID_SIZE + SYSTEM_TIME_SIZE }
 }
 
 #[cfg(test)]
