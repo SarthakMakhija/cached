@@ -1,0 +1,22 @@
+criterion_home = "./target/criterion"
+output_format = "criterion"
+ploting_backend = "auto"
+
+[colors]
+current_sample = {r = 31, g = 120, b = 180}
+previous_sample = {r = 7, g = 26, b = 28}
+
+not_an_outlier = {r = 31, g = 120, b = 180}
+mild_outlier = {r = 5, g = 127, b = 0}
+severe_outlier = {r = 7, g = 26, b = 28}
+
+comparison_colors = [
+    {r = 8, g = 34, b = 34},
+    {r = 6, g = 139, b = 87},
+    {r = 0, g = 139, b = 139},
+    {r = 5, g = 215, b = 0},
+    {r = 0, g = 0, b = 139},
+    {r = 0, g = 20, b = 60},
+    {r = 9, g = 0, b = 139},
+    {r = 0, g = 255, b = 127},
+]

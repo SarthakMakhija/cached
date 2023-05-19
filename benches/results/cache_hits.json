@@ -1,0 +1,46 @@
+[
+  {
+    "reason": "benchmark-complete",
+    "id": "Cached.get() | No contention",
+    "capacity": 32768,
+    "hit_ratio": "96.74 %",
+    "distribution": {
+      "type": "Zipf",
+      "exponent": "5.1",
+      "items": 524288
+    }
+  },
+  {
+    "reason": "benchmark-complete",
+    "id": "Cached.get() | 8 threads",
+    "capacity": 32768,
+    "hit_ratio": "96.73 %",
+    "distribution": {
+      "type": "Zipf",
+      "exponent": "5.1",
+      "items": 524288
+    }
+  },
+  {
+    "reason": "benchmark-complete",
+    "id": "Cached.get() | 16 threads",
+    "capacity": 32768,
+    "hit_ratio": "96.44 %",
+    "distribution": {
+      "type": "Zipf",
+      "exponent": "5.1",
+      "items": 524288
+    }
+  },
+  {
+    "reason": "benchmark-complete",
+    "id": "Cached.get() | 32 threads",
+    "capacity": 32768,
+    "hit_ratio": "99.54 %",
+    "distribution": {
+      "type": "Zipf",
+      "exponent": "5.1",
+      "items": 524288
+    }
+  }
+]
