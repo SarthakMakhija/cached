@@ -33,7 +33,13 @@ pub fn execute_parallel<F>(
 #[cfg(feature = "bench_testable")]
 #[cfg(not(tarpaulin_include))]
 pub fn distribution(items: u64, capacity: usize) -> Vec<u64> {
-    thread_rng().sample_iter(Zipf::new(items, 1.01).unwrap()).take(capacity).map(|value| value as u64).collect::<Vec<_>>()
+    distribution_with_exponent(items, capacity, 1.01)
+}
+
+#[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
+pub fn distribution_with_exponent(items: u64, capacity: usize, exponent: f64) -> Vec<u64> {
+    thread_rng().sample_iter(Zipf::new(items, exponent).unwrap()).take(capacity).map(|value| value as u64).collect::<Vec<_>>()
 }
 
 #[cfg(feature = "bench_testable")]
