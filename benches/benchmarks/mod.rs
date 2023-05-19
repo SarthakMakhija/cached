@@ -7,4 +7,5 @@ pub mod put_get;
 pub mod delete;
 pub mod upsert;
 pub mod cache_hits;
+pub mod get_ref;
 pub mod common;
