@@ -15,6 +15,7 @@ const SHARDS: TotalShards = 256;
 const CACHE_WEIGHT: Weight = CAPACITY as Weight;
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn read_buffer_one_thread(criterion: &mut Criterion) {
     criterion.bench_function("Pool.add() | No contention", |bencher| bencher.iter_custom(|iterations| {
         let consumer = Arc::new(ProxyAdmissionPolicy::<u64>::new(COUNTERS, CAPACITY, SHARDS, CACHE_WEIGHT));
@@ -29,20 +30,24 @@ pub fn read_buffer_one_thread(criterion: &mut Criterion) {
 }
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn read_buffer_8_threads(criterion: &mut Criterion) {
     execute_parallel(criterion, "Pool.add() | 8 threads", prepare_execution_block(), 8);
 }
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn read_buffer_16_threads(criterion: &mut Criterion) {
     execute_parallel(criterion, "Pool.add() | 16 threads", prepare_execution_block(), 16);
 }
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn read_buffer_32_threads(criterion: &mut Criterion) {
     execute_parallel(criterion, "Pool.add() | 32 threads", prepare_execution_block(), 32);
 }
 
+#[cfg(not(tarpaulin_include))]
 fn prepare_execution_block() -> Arc<impl Fn(u64) + Send + Sync + 'static> {
     let consumer = Arc::new(ProxyAdmissionPolicy::<u64>::new(COUNTERS, CAPACITY, SHARDS, CACHE_WEIGHT));
     let pool = Arc::new(ProxyPool::new(32, 64, consumer));

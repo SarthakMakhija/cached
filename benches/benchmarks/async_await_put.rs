@@ -18,6 +18,7 @@ const ITEMS: usize = CAPACITY / 3;
 const MASK: usize = CAPACITY - 1;
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn async_put_single_task(criterion: &mut Criterion) {
     criterion.bench_function("Async Cached.put() | No contention", |bencher| {
         let runtime = Builder::new_multi_thread()
@@ -44,22 +45,26 @@ pub fn async_put_single_task(criterion: &mut Criterion) {
     });
 }
 
+#[cfg(not(tarpaulin_include))]
 pub fn async_put_8_tasks(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
     put_async(criterion, "Async Cached.put() | 8 tasks", Arc::new(cached), 8, 8);
 }
 
+#[cfg(not(tarpaulin_include))]
 pub fn async_put_16_tasks(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
     put_async(criterion, "Async Cached.put() | 16 tasks", Arc::new(cached), 8, 16);
 }
 
+#[cfg(not(tarpaulin_include))]
 pub fn async_put_32_tasks(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
     put_async(criterion, "Async Cached.put() | 32 tasks", Arc::new(cached), 8, 32);
 }
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn put_async(
     criterion: &mut Criterion,
     id: &'static str,

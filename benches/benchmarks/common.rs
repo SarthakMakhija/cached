@@ -10,6 +10,7 @@ use rand_distr::Zipf;
 use cached::cache::cached::CacheD;
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn execute_parallel<F>(
     criterion: &mut Criterion,
     id: &'static str,
@@ -30,11 +31,13 @@ pub fn execute_parallel<F>(
 }
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn distribution(items: u64, capacity: usize) -> Vec<u64> {
     thread_rng().sample_iter(Zipf::new(items, 1.01).unwrap()).take(capacity).map(|value| value as u64).collect::<Vec<_>>()
 }
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn preload_cache(cached: &CacheD<u64, u64>, distribution: &Vec<u64>) {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -45,12 +48,14 @@ pub fn preload_cache(cached: &CacheD<u64, u64>, distribution: &Vec<u64>) {
         });
 }
 
+#[cfg(not(tarpaulin_include))]
 async fn setup(cached: &CacheD<u64, u64>, distribution: &Vec<u64>) {
     for element in distribution {
         cached.put(*element, *element).unwrap().handle().await;
     }
 }
 
+#[cfg(not(tarpaulin_include))]
 fn spawn_threads<F>(block: Arc<F>, thread_count: u8, iterations: u64) -> Vec<JoinHandle<Duration>> where F: Fn(u64) + Send + Sync + 'static {
     let per_thread_iterations = iterations / thread_count as u64;
     let mut current_start = 0;

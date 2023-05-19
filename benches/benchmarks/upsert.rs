@@ -18,6 +18,7 @@ const ITEMS: usize = CAPACITY / 3;
 const MASK: usize = CAPACITY - 1;
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn upsert_single_threaded(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
     let distribution = distribution(ITEMS as u64, CAPACITY);
@@ -39,6 +40,7 @@ pub fn upsert_single_threaded(criterion: &mut Criterion) {
 }
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn upsert_8_threads(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
     let distribution = distribution(ITEMS as u64, CAPACITY);
@@ -48,6 +50,7 @@ pub fn upsert_8_threads(criterion: &mut Criterion) {
 }
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn upsert_16_threads(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
     let distribution = distribution(ITEMS as u64, CAPACITY);
@@ -57,6 +60,7 @@ pub fn upsert_16_threads(criterion: &mut Criterion) {
 }
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn upsert_32_threads(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
     let distribution = distribution(ITEMS as u64, CAPACITY);
@@ -65,6 +69,7 @@ pub fn upsert_32_threads(criterion: &mut Criterion) {
     execute_parallel(criterion, "Cached.upsert() | 32 threads", prepare_execution_block(cached, Arc::new(distribution)), 32);
 }
 
+#[cfg(not(tarpaulin_include))]
 fn prepare_execution_block(cached: CacheD<u64, u64>, distribution: Arc<Vec<u64>>) -> Arc<impl Fn(u64) + Send + Sync + 'static> {
     Arc::new(move |index| {
         let key_index = index as usize;

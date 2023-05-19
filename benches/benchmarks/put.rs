@@ -17,6 +17,7 @@ const ITEMS: usize = CAPACITY / 3;
 const MASK: usize = CAPACITY - 1;
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn put_single_threaded(criterion: &mut Criterion) {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
 
@@ -36,20 +37,24 @@ pub fn put_single_threaded(criterion: &mut Criterion) {
 }
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn put_8_threads(criterion: &mut Criterion) {
     execute_parallel(criterion, "Cached.put() | 8 threads", prepare_execution_block(), 8);
 }
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn put_16_threads(criterion: &mut Criterion) {
     execute_parallel(criterion, "Cached.put() | 16 threads", prepare_execution_block(), 16);
 }
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn put_32_threads(criterion: &mut Criterion) {
     execute_parallel(criterion, "Cached.put() | 32 threads", prepare_execution_block(), 32);
 }
 
+#[cfg(not(tarpaulin_include))]
 fn prepare_execution_block() -> Arc<impl Fn(u64) + Send + Sync + 'static> {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
     let distribution = distribution(ITEMS as u64, CAPACITY);

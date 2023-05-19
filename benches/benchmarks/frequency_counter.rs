@@ -9,6 +9,7 @@ const MASK: usize = CAPACITY - 1;
 const ITEMS: usize = CAPACITY / 3;
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn increase_frequency(criterion: &mut Criterion) {
     let distribution = distribution(ITEMS as u64, CAPACITY);
     let mut group = criterion.benchmark_group("increase frequency");
@@ -27,6 +28,7 @@ pub fn increase_frequency(criterion: &mut Criterion) {
 }
 
 #[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn estimate_frequency(criterion: &mut Criterion) {
     let mut group = criterion.benchmark_group("estimate frequency");
 
@@ -51,6 +53,7 @@ pub fn estimate_frequency(criterion: &mut Criterion) {
     group.finish();
 }
 
+#[cfg(not(tarpaulin_include))]
 fn increment(distribution: &[u64], bencher: &mut Bencher, total_counters: TotalCounters) {
     let mut index = 0;
     let mut counter = ProxyFrequencyCounter::new(total_counters);
@@ -62,6 +65,7 @@ fn increment(distribution: &[u64], bencher: &mut Bencher, total_counters: TotalC
     })
 }
 
+#[cfg(not(tarpaulin_include))]
 fn setup(frequency_counter: &mut ProxyFrequencyCounter) -> Vec<u64> {
     let distribution = distribution(ITEMS as u64, CAPACITY);
     for item in &distribution {
@@ -70,6 +74,7 @@ fn setup(frequency_counter: &mut ProxyFrequencyCounter) -> Vec<u64> {
     distribution
 }
 
+#[cfg(not(tarpaulin_include))]
 fn estimate(counter: &ProxyFrequencyCounter, distribution: &[u64], bencher: &mut Bencher) {
     let mut index = 0;
 
