@@ -24,14 +24,19 @@ struct HitsMissRecorder {
 }
 
 impl HitsMissRecorder {
+    #[cfg(not(tarpaulin_include))]
     fn new() -> Self {
         HitsMissRecorder {
             hits: AtomicU64::new(0),
             miss: AtomicU64::new(0),
         }
     }
+
+    #[cfg(not(tarpaulin_include))]
     fn record_hit(&self) { self.hits.fetch_add(1, Ordering::SeqCst); }
+    #[cfg(not(tarpaulin_include))]
     fn record_miss(&self) { self.miss.fetch_add(1, Ordering::SeqCst); }
+    #[cfg(not(tarpaulin_include))]
     fn ratio(&self) -> f64 {
         (self.hits.load(Ordering::SeqCst) as f64 / (self.hits.load(Ordering::SeqCst) + self.miss.load(Ordering::SeqCst)) as f64) * 100.0
     }
