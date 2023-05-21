@@ -10,10 +10,10 @@ LFU-based in-memory cache in Rust inspired by [Ristretto](https://github.com/dgr
 ### Features
 - **High Cache-hit ratio**: Provides high-cache ratio, the result is available [here](https://github.com/SarthakMakhija/cached/blob/main/benches/results/cache_hits.json)
 - **High throughput**: Provides high throughput for all read and write operations. The results are available [here](https://github.com/SarthakMakhija/cached/tree/main/benches/results)
-- **Simple API**: Provides simple APIs for `put`, `get`, `multi_get`, `map_get`, `delete` and `upsert` 
-- **TTL and Access frequency based eviction**: Eviction is based either on `time_to_live` if provided or the access frequency of the keys. A key with a higher access frequency can evict others
+- **Simple API**: Provides clean and simple APIs for `put`, `get`, `multi_get`, `map_get`, `delete` and `upsert` 
+- **TTL and Access frequency based eviction**: Eviction is based either on `time_to_live` if provided or the access frequency of the keys
 - **Fully concurrent**: Provides support for concurrent puts, gets, deletes and upserts
-- **Metrics**: Provides various metrics like: `CacheHits`, `CacheMisses`, `KeysAdded`, `KeysDeleted` etc., and exposes to the clients as `StatsSummary`
+- **Metrics**: Provides various metrics like: `CacheHits`, `CacheMisses`, `KeysAdded`, `KeysDeleted` etc., and exposes the metrics as `StatsSummary` to the clients
 - **Configurable**: Provides configurable parameters to allow the clients to choose what works best for them 
 
 ### Examples
@@ -23,7 +23,7 @@ LFU-based in-memory cache in Rust inspired by [Ristretto](https://github.com/dgr
 const COUNTERS: TotalCounters = 100;
 //Total capacity of the cache, used as the capacity parameter in DashMap
 const CAPACITY: TotalCapacity = 10;
-//Total weight of the cache
+//Total weight of the cache that determines the total cache size
 const CACHE_WEIGHT: Weight    = 100;
 
 #[tokio::test]
@@ -123,20 +123,20 @@ const CAPACITY: usize = 100_000;
 //TotalCounters for count-min sketch, it is 10 times the capacity
 const COUNTERS: TotalCounters = (CAPACITY * 10) as TotalCounters;
 
-//Each key/value pair takes 40 bytes of memory, so the total cache weight is 40 times the total capacity.
+//Each key/value pair takes 40 bytes of memory, so the total cache weight is kept 40 times the total capacity.
 //WEIGHT determines the total space of the Cache.
-//This parameter will be changed to understand the impact of cache-hit ratio
+//This parameter will be changed to understand the impact on cache-hit ratio
 const WEIGHT: Weight = (CAPACITY * 40) as Weight;
 
 //Total of 100_000 * 16 items form a sample in Zipf distribution
 const ITEMS: usize = CAPACITY * 16;
 ```
 
-| **Weight**   	 | **Zipf exponent** 	 | **Cache-hit ratio** 	 | **Comments**                                                                                    	 |
-|----------------|---------------------|-----------------------|---------------------------------------------------------------------------------------------------|
-| 100_000*40 	   | 1.001             	 | 98%                 	 | Cache weight allows all the incoming keys to be accepted.                                       	 |
-| 100_000*39 	   | 1.001             	 | 71%                 	 | Cache weight is less than the total incoming keys, so some of the incoming keys may be rejected 	 |
-| 100_000*35 	   | 1.001             	 | 64%                 	 | Cache weight is less than the total incoming keys, so some of the incoming keys may be rejected 	 |
+| **Weight**   	 | **Zipf exponent** 	 | **Cache-hit ratio** 	 | **Comments**                                                                                    	               |
+|----------------|---------------------|-----------------------|-----------------------------------------------------------------------------------------------------------------|
+| 100_000*40 	   | 1.001             	 | 98%                 	 | Cache weight allows all the incoming keys to be accepted.                                       	               |
+| 100_000*39 	   | 1.001             	 | 71%                 	 | Cache weight is less than the total weight of the incoming keys, so some of the incoming keys may be rejected 	 |
+| 100_000*35 	   | 1.001             	 | 64%                 	 | Cache weight is less than the total weight of the incoming keys, so some of the incoming keys may be rejected 	 |
 
 Benchmark for Cache-hit is available [here](https://github.com/SarthakMakhija/cached/blob/main/benches/benchmarks/cache_hits.rs) and its result is available 
 [here](https://github.com/SarthakMakhija/cached/blob/main/benches/results/cache_hits.json).
@@ -155,7 +155,7 @@ const CACHE_WEIGHT: Weight    = 1024;
 let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, CACHE_WEIGHT).build());
 ```
 This example creates an instance of `Cached` with a total size of 1024 bytes. 
-After the space is full, `put` of new key/value pair will result in `AdmissionPolicy` deciding whether the incoming key/value pair should be accepted. 
+After the space is full, `put` of a new key/value pair will result in `AdmissionPolicy` deciding whether the incoming key/value pair should be accepted. 
 If the new key/value pair gets accepted, some existing key/value pairs are evicted to create the required space.
 
 2. **Do I need to specify the weight of the key/value pair as a part of the `put` operation?**
@@ -185,7 +185,7 @@ This example creates an instance of `Cached` by providing a custom `weight_calcu
 
 4. **What is the difference between `get` and `get_ref` methods of `Cached`?**
 
-The method `get` is available only if the value is cloneable, whereas the method `get_ref` is available if the value is not cloneable.
+The method `get` is available only if the value is cloneable, whereas the method `get_ref` is available even if the value is not cloneable.
 `get_ref` returns an option of `KeyValueRef` whose lifetime is bound to the lifetime of `RwLockReadGuard<'a, HashMap<K, V, S>>` from `DashMap`. This means
 `get_ref` will hold a `RwLock` against the key (or the map bucket) within the scope of its usage, whereas `get` will return the cloned value.
 
@@ -224,8 +224,7 @@ assert_eq!("Martin", iterator.next().unwrap().unwrap().first);
 assert_eq!(None, iterator.next().unwrap());
 ```
 
-The example creates an instance of `Cached` where the value type is `Arc<Name>`. This allows the clients to use `multi_get_iterator`
-method.
+The example creates an instance of `Cached` where the value type is `Arc<Name>`. This allows the clients to use `multi_get_iterator` method.
 
 Refer to the test `get_value_for_an_existing_key_if_value_is_not_cloneable_by_passing_an_arc` in [cached.rs](https://github.com/SarthakMakhija/cached/blob/main/src/cache/cached.rs).
 
