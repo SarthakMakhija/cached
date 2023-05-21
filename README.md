@@ -5,7 +5,7 @@
 [![Build](https://github.com/SarthakMakhija/cached/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/SarthakMakhija/cached/actions/workflows/build.yml)
 [![Coverage](https://codecov.io/gh/SarthakMakhija/cached/branch/main/graph/badge.svg?token=ED4FKSYPCU)](https://codecov.io/gh/SarthakMakhija/cached)
 
-LFU-based in-memory cache in Rust.
+LFU-based in-memory cache in Rust inspired by [Ristretto](https://github.com/dgraph-io/ristretto).
 
 ### Features
 - **High Cache-hit ratio**: Provides high-cache ratio, the numbers are available [here](https://github.com/SarthakMakhija/cached/blob/main/benches/results/cache_hits.json)
@@ -15,11 +15,14 @@ LFU-based in-memory cache in Rust.
 - **Metrics**: Provides various metrics like: `CacheHits`, `CacheMisses`, `KeysAdded`, `KeysDeleted` etc., and exposes to the clients as `StatsSummary`
 - **Configurable**: Provides configurable parameters to allows the clients to choose what works the best for them 
 
-###Examples
+### Examples
 ```rust
 
+//Total counters in count-min sketch based frequency counter
 const COUNTERS: TotalCounters = 100;
+//Total capacity of the cache, used as the capacity parameter in DashMap
 const CAPACITY: TotalCapacity = 10;
+//Total weight of the cache
 const CACHE_WEIGHT: Weight    = 100;
 
 #[tokio::test]
@@ -79,7 +82,7 @@ The benchmark runs with the following parameters:
 //Total of 100_000 key/value pairs are loaded in the cache
 const CAPACITY: usize = 100_000;
 
-//TotalCounters for count-min sketch will be 10 times the capacity
+//TotalCounters for count-min sketch, it is 10 times the capacity
 const COUNTERS: TotalCounters = (CAPACITY * 10) as TotalCounters;
 
 //Each key/value pair takes 40 bytes of memory, so the total cache weight is 40 times the total capacity. 
