@@ -121,12 +121,12 @@ impl<Key, Value> Store<Key, Value>
     }
 
     pub(crate) fn update(&self, key: &Key, value: Option<Value>, time_to_live: Option<Duration>, remove_time_to_live: bool) -> UpdateResponse<Value> {
-        if let Some(mut existing) = self.store.get_mut(key) {
-            let existing_expiry = existing.expire_after();
-            let new_expiry = existing.update(value, time_to_live, remove_time_to_live, &self.clock);
+        if let Some(mut existing_value) = self.store.get_mut(key) {
+            let existing_expiry = existing_value.expire_after();
+            let new_expiry = existing_value.update(value, time_to_live, remove_time_to_live, &self.clock);
 
             let response = UpdateResponse(
-                Some(KeyIdExpiry(existing.key_id(), existing_expiry)),
+                Some(KeyIdExpiry(existing_value.key_id(), existing_expiry)),
                 new_expiry,
                 None,
             );

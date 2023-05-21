@@ -8,12 +8,12 @@ use crate::cache::errors::Errors;
 use crate::cache::expiration::config::TTLConfig;
 use crate::cache::policy::config::CacheWeightConfig;
 use crate::cache::pool::{BufferSize, PoolSize};
-use crate::cache::types::{KeyHash, TotalCapacity, TotalCounters, TotalShards, Weight};
+use crate::cache::types::{IsTimeToLiveSpecified, KeyHash, TotalCapacity, TotalCounters, TotalShards, Weight};
 
 pub(crate) mod weight_calculation;
 
 pub type HashFn<Key> = dyn Fn(&Key) -> KeyHash + Send + Sync;
-pub type WeightCalculationFn<Key, Value> = dyn Fn(&Key, &Value) -> Weight + Send + Sync;
+pub type WeightCalculationFn<Key, Value> = dyn Fn(&Key, &Value, IsTimeToLiveSpecified) -> Weight + Send + Sync;
 
 const COMMAND_BUFFER_SIZE: usize = 32 * 1024;
 const ACCESS_POOL_SIZE: PoolSize = PoolSize(32);
@@ -166,6 +166,7 @@ mod tests {
     use crate::cache::config::{Config, ConfigBuilder};
     use crate::cache::config::tests::setup::UnixEpochClock;
     use crate::cache::pool::{BufferSize, PoolSize};
+    use crate::cache::types::IsTimeToLiveSpecified;
 
     mod setup {
         use std::time::SystemTime;
@@ -203,12 +204,12 @@ mod tests {
     fn weight_calculation_function() {
         let builder: ConfigBuilder<&str, &str> = test_config_builder();
 
-        let weight_calculation_fn = Box::new(|_key: &&str, _value: &&str| 10);
+        let weight_calculation_fn = Box::new(|_key: &&str, _value: &&str, _is_time_to_live_specified: IsTimeToLiveSpecified| 10);
         let config = builder.weight_calculation_fn(weight_calculation_fn).build();
 
         let key = "topic";
         let value = "microservices";
-        let weight = (config.weight_calculation_fn)(&key, &value);
+        let weight = (config.weight_calculation_fn)(&key, &value, false);
 
         assert_eq!(10, weight);
     }
