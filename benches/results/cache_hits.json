@@ -2,45 +2,97 @@
   {
     "reason": "benchmark-complete",
     "id": "Cached.get() | No contention",
-    "capacity": 32768,
-    "hit_ratio": "96.74 %",
+    "capacity": "100_000",
+    "weight": "100_000 * 39",
+    "hit_ratio": "75.58 %",
     "distribution": {
       "type": "Zipf",
-      "exponent": "5.1",
-      "items": 524288
+      "exponent": "1.001",
+      "items": "100_000 * 16"
+    }
+  },
+  {
+    "reason": "benchmark-complete",
+    "id": "Cached.get() | No contention",
+    "capacity": "100_000",
+    "weight": "100_000 * 40",
+    "hit_ratio": "100 %",
+    "distribution": {
+      "type": "Zipf",
+      "exponent": "1.001",
+      "items": "100_000 * 16"
     }
   },
   {
     "reason": "benchmark-complete",
     "id": "Cached.get() | 8 threads",
-    "capacity": 32768,
-    "hit_ratio": "96.73 %",
+    "capacity": "100_000",
+    "weight": "100_000 * 39",
+    "hit_ratio": "70.91 %",
     "distribution": {
       "type": "Zipf",
-      "exponent": "5.1",
-      "items": 524288
+      "exponent": "1.001",
+      "items": "100_000 * 16"
+    }
+  },
+  {
+    "reason": "benchmark-complete",
+    "id": "Cached.get() | 8 threads",
+    "capacity": "100_000",
+    "weight": "100_000 * 40",
+    "hit_ratio": "100 %",
+    "distribution": {
+      "type": "Zipf",
+      "exponent": "1.001",
+      "items": "100_000 * 16"
     }
   },
   {
     "reason": "benchmark-complete",
     "id": "Cached.get() | 16 threads",
-    "capacity": 32768,
-    "hit_ratio": "96.44 %",
+    "capacity": "100_000",
+    "weight": "100_000 * 39",
+    "hit_ratio": "69.69 %",
     "distribution": {
       "type": "Zipf",
-      "exponent": "5.1",
-      "items": 524288
+      "exponent": "1.001",
+      "items": "100_000 * 16"
+    }
+  },
+  {
+    "reason": "benchmark-complete",
+    "id": "Cached.get() | 16 threads",
+    "capacity": "100_000",
+    "weight": "100_000 * 40",
+    "hit_ratio": "100 %",
+    "distribution": {
+      "type": "Zipf",
+      "exponent": "1.001",
+      "items": "100_000 * 16"
     }
   },
   {
     "reason": "benchmark-complete",
     "id": "Cached.get() | 32 threads",
-    "capacity": 32768,
-    "hit_ratio": "99.54 %",
+    "capacity": "100_000",
+    "weight": "100_000 * 39",
+    "hit_ratio": "71.83 %",
     "distribution": {
       "type": "Zipf",
-      "exponent": "5.1",
-      "items": 524288
+      "exponent": "1.001",
+      "items": "100_000 * 16"
+    }
+  },
+  {
+    "reason": "benchmark-complete",
+    "id": "Cached.get() | 32 threads",
+    "capacity": "100_000",
+    "weight": "100_000 * 40",
+    "hit_ratio": "100 %",
+    "distribution": {
+      "type": "Zipf",
+      "exponent": "1.001",
+      "items": "100_000 * 16"
     }
   }
 ]
