@@ -73,7 +73,7 @@ async fn update_the_weight_of_an_existing_key() {
 
 ### Cache-hit ratio
 
-Cache-hit ratio is measured using [Zipf](https://en.wikipedia.org/wiki/Zipf%27s_law) distribution using [rand_distr](https://docs.rs/rand_distr/latest/rand_distr/struct.Zipf.html) crate.
+Cache-hit ratio is measured with [Zipf](https://en.wikipedia.org/wiki/Zipf%27s_law) distribution using [rand_distr](https://docs.rs/rand_distr/latest/rand_distr/struct.Zipf.html) crate.
 Each key and value is of type `u64` and the system calculated weight of a single key/value pair is 40 bytes.
 
 The benchmark runs with the following parameters:
@@ -96,9 +96,9 @@ const ITEMS: usize = CAPACITY * 16;
 
 | **Weight**   	 | **Zipf exponent** 	 | **Cache-hit ratio** 	 | **Comments**                                                                                    	 |
 |----------------|---------------------|-----------------------|---------------------------------------------------------------------------------------------------|
-| 100_000 * 40 	 | 1.001             	 | 98%                 	 | Cache weight allows all the incoming keys to be accepted.                                       	 |
-| 100_000 * 39 	 | 1.001             	 | 71%                 	 | Cache weight is less than the total incoming keys, so some of the incoming keys may be rejected 	 |
-| 100_000 * 35 	 | 1.001             	 | 64%                 	 | Cache weight is less than the total incoming keys, so some of the incoming keys may be rejected 	 |
+| 100_000*40 	   | 1.001             	 | 98%                 	 | Cache weight allows all the incoming keys to be accepted.                                       	 |
+| 100_000*39 	   | 1.001             	 | 71%                 	 | Cache weight is less than the total incoming keys, so some of the incoming keys may be rejected 	 |
+| 100_000*35 	   | 1.001             	 | 64%                 	 | Cache weight is less than the total incoming keys, so some of the incoming keys may be rejected 	 |
 
 Benchmark for Cache-hit is available [here](https://github.com/SarthakMakhija/cached/blob/main/benches/benchmarks/cache_hits.rs) and its results are available 
 [here](https://github.com/SarthakMakhija/cached/blob/main/benches/results/cache_hits.json).
@@ -144,22 +144,18 @@ This example creates an instance of `Cached` by providing a custom `weight_calcu
 
 4. **What is the difference between `get_ref` and `get` methods of `Cached`?**
 
-<<Pending>>
+`get_ref` is available in `Cached` if the value is not cloneable, whereas `get` is available if the value is cloneable.
+`get_ref` returns an option of `KeyValueRef` whose lifetime is bound to the lifetime of `RwLockReadGuard<'a, HashMap<K, V, S>>` from `DashMap`. This means 
+`get_ref` will hold a `RwLock` against the key (or the map bucket) within the scope of its usage whereas `get` will return the cloned value.
 
-6. **Does `Cached` provide a feature to get the values corresponding to multiple keys?**
+5. **Does `Cached` provide a feature to get the values corresponding to multiple keys?**
 
 Yes. If the `Value` type is `Cloneable`, `Cached` provides `multi_get`, `multi_get_iterator` and `multi_get_map_iterator`
 as additional features.
 
-6. **Is it possible to update just the time to live or the weight of a key?**
+6. **I can't clone the value, however I need multi_get_iterator. Is there an option?**
 
-<<Pending>>
-
-7. **Why do `put`, `upsert` and `delete` return CommandSendResult?**
-
-8. **I can't clone the value, however I need multi_get_iterator. Is there an option?**
-
-Yes. Clients can pass `Arc<T>` if `T` is not cloneable. Let's take a look the following example:
+Yes. Clients can pass `Arc<T>` if `T` is not cloneable. Let's take the following example:
 
 ```rust
 #[tokio::test]
@@ -186,9 +182,41 @@ assert_eq!(None, iterator.next().unwrap());
 ```
 
 The example creates an instance of `Cached` where the value type is `Arc<Name>`. This allows the clients to use `multi_get_iterator`
-method. Refer to the test `get_value_for_an_existing_key_if_value_is_not_cloneable_by_passing_an_arc` in [cached.rs](https://github.com/SarthakMakhija/cached/blob/main/src/cache/cached.rs).
+method. 
 
-<<Pending>>
+Refer to the test `get_value_for_an_existing_key_if_value_is_not_cloneable_by_passing_an_arc` in [cached.rs](https://github.com/SarthakMakhija/cached/blob/main/src/cache/cached.rs).
+
+7. **Is it possible to update just the time to live or the weight of a key?**
+
+Yes, `UpsertRequest` allows the clients to update the `value`, `weight` or `time_to_live` or all of these for a key.
+Let's assume that the key "topic" exists in an instance of `Cached` and consider the following example:
+
+```rust
+//updates the weight of the key
+cached.upsert(UpsertRequestBuilder::new("topic").weight(29).build()).unwrap();
+
+//updates the value of the key
+cached.upsert(UpsertRequestBuilder::new("topic").value("microservices").build()).unwrap();
+
+//updates the time to live of the key
+cached.upsert(UpsertRequestBuilder::new("topic").time_to_live(Duration::from_secs(100)).build()).unwrap();
+
+//removes the time to live of the key
+cached.upsert(UpsertRequestBuilder::new("topic").remove_time_to_live().build()).unwrap();
+
+//updates the value and time to live of the key
+cached.upsert(UpsertRequestBuilder::new("topic").value("microservices").time_to_live(Duration::from_secs(10)).build()).unwrap(); 
+```
+
+8. **What does the return type of `put`, `upsert` and `delete` signify?**
+
+All of the `put`, `upsert` and `delete` operations implement [singular update queue pattern](https://martinfowler.com/articles/patterns-of-distributed-systems/singular-update-queue.html)
+and return an instance of `CommandSendResult` that allows the clients to get a handle on which they can await.  
+
+`CommandSendResult` is an alias for `Result<Arc<CommandAcknowledgement>, CommandSendError>`, it will result in an error if either of
+`put`, `upsert` or `delete` operations are performed when the cache is being shutdown.
+
+The success part of `CommandSendResult` is an instance of `CommandAcknowledgement` which returns a handle to the clients to perform `await`.
 
 ### References
 
