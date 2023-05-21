@@ -16,7 +16,7 @@
     "id": "Cached.get() | No contention",
     "capacity": "100_000",
     "weight": "100_000 * 40",
-    "hit_ratio": "100 %",
+    "hit_ratio": "98 %",
     "distribution": {
       "type": "Zipf",
       "exponent": "1.001",
@@ -40,7 +40,7 @@
     "id": "Cached.get() | 8 threads",
     "capacity": "100_000",
     "weight": "100_000 * 40",
-    "hit_ratio": "100 %",
+    "hit_ratio": "98 %",
     "distribution": {
       "type": "Zipf",
       "exponent": "1.001",
@@ -64,7 +64,7 @@
     "id": "Cached.get() | 16 threads",
     "capacity": "100_000",
     "weight": "100_000 * 40",
-    "hit_ratio": "100 %",
+    "hit_ratio": "98 %",
     "distribution": {
       "type": "Zipf",
       "exponent": "1.001",
@@ -88,7 +88,7 @@
     "id": "Cached.get() | 32 threads",
     "capacity": "100_000",
     "weight": "100_000 * 40",
-    "hit_ratio": "100 %",
+    "hit_ratio": "98 %",
     "distribution": {
       "type": "Zipf",
       "exponent": "1.001",
