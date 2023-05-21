@@ -151,7 +151,7 @@ Benchmark for Cache-hit is available [here](https://github.com/SarthakMakhija/ca
 
 ### FAQs
 
-1. **What is the meaning of `CacheWeight?**
+1. **What is the meaning of CacheWeight?**
 
 `CacheWeight` refers to the total size reserved for the cache. Let's take the following example:
 
