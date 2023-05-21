@@ -85,7 +85,8 @@ const CAPACITY: usize = 100_000;
 //TotalCounters for count-min sketch, it is 10 times the capacity
 const COUNTERS: TotalCounters = (CAPACITY * 10) as TotalCounters;
 
-//Each key/value pair takes 40 bytes of memory, so the total cache weight is 40 times the total capacity. 
+//Each key/value pair takes 40 bytes of memory, so the total cache weight is 40 times the total capacity.
+//WEIGHT determines the total space of the Cache.
 //This parameter will be changed to understand the impact of cache-hit ratio
 const WEIGHT: Weight = (CAPACITY * 40) as Weight;
 
@@ -93,16 +94,70 @@ const WEIGHT: Weight = (CAPACITY * 40) as Weight;
 const ITEMS: usize = CAPACITY * 16;
 ```
 
-| Total Cache Weight       	 | Zipf exponent 	 | Cache-hit ratio 	 | Comments                                                                                        	                          |
-|----------------------------|-----------------|-------------------|----------------------------------------------------------------------------------------------------------------------------|
-| 100_000 * 40 	             | 1.001         	 | 98%             	 | Total cache weight is `100_000 * 40`, it allows all the incoming keys to be accepted.                                    	 |
-| 100_000 * 39 	             | 1.001         	 | 71%             	 | Cache weight is less than the total incoming keys, so some of the incoming keys will be rejected 	                         |
-| 100_000 * 35 	             | 1.001         	 | 64%             	 | Cache weight is less than the total incoming keys, so some of the incoming keys will be rejected 	                         |
+| **Weight**   	 | **Zipf exponent** 	 | **Cache-hit ratio** 	 | **Comments**                                                                                    	 |
+|----------------|---------------------|-----------------------|---------------------------------------------------------------------------------------------------|
+| 100_000 * 40 	 | 1.001             	 | 98%                 	 | Cache weight allows all the incoming keys to be accepted.                                       	 |
+| 100_000 * 39 	 | 1.001             	 | 71%                 	 | Cache weight is less than the total incoming keys, so some of the incoming keys may be rejected 	 |
+| 100_000 * 35 	 | 1.001             	 | 64%                 	 | Cache weight is less than the total incoming keys, so some of the incoming keys may be rejected 	 |
 
 Benchmark for Cache-hit is available [here](https://github.com/SarthakMakhija/cached/blob/main/benches/benchmarks/cache_hits.rs) and its results are available 
 [here](https://github.com/SarthakMakhija/cached/blob/main/benches/results/cache_hits.json).
 
 ### FAQs
+
+1. **What is the meaning of `CacheWeight?**
+
+`CacheWeight` refers to the total size reserved for the cache. Let's take the following example:
+
+```rust
+const COUNTERS: TotalCounters = 100;
+const CAPACITY: TotalCapacity = 10;
+const CACHE_WEIGHT: Weight    = 1024;
+
+let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, CACHE_WEIGHT).build());
+```
+This example creates an instance of `Cached` with a total size of 1024 bytes. After the space is full, `put` of new key/value pair will result in `AdmissionPolicy`
+taking a decision if the incoming key/value pair should be accepted or not. If the new key/value pair gets accepted, then some existing key/value pairs must be evicted to create the required space.
+
+2. **Do I need to specify the weight of the key/value pair as a part of the `put` operation?**
+
+`Cached` provides `put_with_weight` method that takes a key, a value and the weight. Clients can invoke this method if the weight of the 
+key/value pair is known, otherwise `Cached` determines the weight of the key/value pair automatically. Refer to [weight_calculation.rs](https://github.com/SarthakMakhija/cached/blob/main/src/cache/config/weight_calculation.rs)
+to understand the weight calculation logic.
+
+3. **Is it possible for the clients to provide their own weight calculation function?**
+
+Yes, clients can provide their own weight calculation function. Let's look at the following code:
+
+```rust
+const COUNTERS: TotalCounters = 100;
+const CAPACITY: TotalCapacity = 10;
+const CACHE_WEIGHT: Weight    = 1024;
+
+let weight_calculation: Box<WeightCalculationFn<&str, &str>> = Box::new(|_key, _value, _is_time_to_live_specified| 1);
+let config = ConfigBuilder::new(COUNTERS, CAPACITY, CACHE_WEIGHT).weight_calculation_fn(weight_calculation).build();
+
+let cached = CacheD::new(config);
+```
+
+This example creates an instance of `Cached` by providing a custom `weight_calculation_fn` that returns 1 as the weight of every key/value pair.
+
+4. **What is the difference between `get_ref` and `get` methods of `Cached`?**
+
+<<Pending>>
+
+6. **Does `Cached` provide a feature to get the values corresponding to multiple keys?**
+
+Yes. If the `Value` type is `Cloneable`, `Cached` provides `multi_get`, `multi_get_iterator` and `multi_get_map_iterator`
+as additional features.
+
+6. **Is it possible to update just the time to live or the weight of a key?**
+
+<<Pending>>
+
+7. **Why do `put`, `upsert` and `delete` return CommandSendResult?**
+
+<<Pending>>
 
 ### References
 
