@@ -15,14 +15,6 @@
 * [FAQs](#faqs)
 * [References](#references)
 
-### Content organization
-* [Features](#features)
-* [Examples](#examples)
-* [Usage](#usage)
-* [Measuring cache-hit ratio](#measuring-cache-hit-ratio)
-* [FAQs](#faqs)
-* [References](#references)
-
 ### Features
 - **High Cache-hit ratio**: Provides high-cache ratio, the result is available [here](https://github.com/SarthakMakhija/cached/blob/main/benches/results/cache_hits.json)
 - **High throughput**: Provides high throughput for all read and write operations. The results are available [here](https://github.com/SarthakMakhija/cached/tree/main/benches/results)
