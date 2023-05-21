@@ -8,7 +8,8 @@
 LFU-based in-memory cache in Rust inspired by [Ristretto](https://github.com/dgraph-io/ristretto).
 
 ### Features
-- **High Cache-hit ratio**: Provides high-cache ratio, the numbers are available [here](https://github.com/SarthakMakhija/cached/blob/main/benches/results/cache_hits.json)
+- **High Cache-hit ratio**: Provides high-cache ratio, the result is available [here](https://github.com/SarthakMakhija/cached/blob/main/benches/results/cache_hits.json)
+- **High throughput**: Provides high throughput for all read and write operations. The results are available [here](https://github.com/SarthakMakhija/cached/tree/main/benches/results)
 - **Simple API**: Provides simple APIs for `put`, `get`, `multi_get`, `map_get`, `delete` and `upsert` 
 - **TTL and Access frequency based eviction**: Eviction is based either on `time_to_live`, if provided, or access frequency of the keys. A key with a higher access frequency can evict others 
 - **Fully concurrent**: Provides support for concurrent puts, gets, deletes and upserts
@@ -71,6 +72,41 @@ async fn update_the_weight_of_an_existing_key() {
 ```
 ### Usage
 
+The following code shown an example with an `await` on the handle.  
+
+```rust
+#[tokio::main]
+async fn main() {
+    let cached = CacheD::new(ConfigBuilder::new(100, 100, 1000).build());
+
+    let acknowledgement =
+        cached.put("topic", "cache").unwrap();
+    
+    let status = acknowledgement.handle().await;
+    assert_eq!(CommandStatus::Accepted, status);
+
+    let value = cached.get(&"topic").unwrap();
+    assert_eq!("cache", value);
+}
+```
+
+The following code shown an example without an `await`.
+
+```rust
+fn main() {
+    let cached = CacheD::new(ConfigBuilder::new(100, 100, 1000).build());
+
+    let _ = cached.put("topic", "microservices").unwrap();
+
+    let value = cached.get(&"topic");
+    if let Some(value) = value {
+        assert_eq!("microservices", value);
+    } else {
+        println!("Key/value pair is not yet added");
+    }
+}
+```
+
 ### Cache-hit ratio
 
 Cache-hit ratio is measured with [Zipf](https://en.wikipedia.org/wiki/Zipf%27s_law) distribution using [rand_distr](https://docs.rs/rand_distr/latest/rand_distr/struct.Zipf.html) crate.
@@ -100,7 +136,7 @@ const ITEMS: usize = CAPACITY * 16;
 | 100_000*39 	   | 1.001             	 | 71%                 	 | Cache weight is less than the total incoming keys, so some of the incoming keys may be rejected 	 |
 | 100_000*35 	   | 1.001             	 | 64%                 	 | Cache weight is less than the total incoming keys, so some of the incoming keys may be rejected 	 |
 
-Benchmark for Cache-hit is available [here](https://github.com/SarthakMakhija/cached/blob/main/benches/benchmarks/cache_hits.rs) and its results are available 
+Benchmark for Cache-hit is available [here](https://github.com/SarthakMakhija/cached/blob/main/benches/benchmarks/cache_hits.rs) and its result is available 
 [here](https://github.com/SarthakMakhija/cached/blob/main/benches/results/cache_hits.json).
 
 ### FAQs
@@ -134,8 +170,10 @@ const COUNTERS: TotalCounters = 100;
 const CAPACITY: TotalCapacity = 10;
 const CACHE_WEIGHT: Weight    = 1024;
 
-let weight_calculation: Box<WeightCalculationFn<&str, &str>> = Box::new(|_key, _value, _is_time_to_live_specified| 1);
-let config = ConfigBuilder::new(COUNTERS, CAPACITY, CACHE_WEIGHT).weight_calculation_fn(weight_calculation).build();
+let weight_calculation: Box<WeightCalculationFn<&str, &str>> 
+            = Box::new(|_key, _value, _is_time_to_live_specified| 1);
+let config 
+            = ConfigBuilder::new(COUNTERS, CAPACITY, CACHE_WEIGHT).weight_calculation_fn(weight_calculation).build();
 
 let cached = CacheD::new(config);
 ```
@@ -167,11 +205,13 @@ struct Name {
 let cached: CacheD<&str, Arc<Name>> = CacheD::new(ConfigBuilder::new(100, 10, 1000).build());
 
 let acknowledgement =
-    cached.put("captain", Arc::new(Name { first: "John".to_string(), last: "Mcnamara".to_string() })).unwrap();
+    cached.put("captain", 
+               Arc::new(Name { first: "John".to_string(), last: "Mcnamara".to_string() })).unwrap();
 acknowledgement.handle().await;
 
 let acknowledgement =
-    cached.put("vice-captain", Arc::new(Name { first: "Martin".to_string(), last: "Trolley".to_string() })).unwrap();
+    cached.put("vice-captain", 
+               Arc::new(Name { first: "Martin".to_string(), last: "Trolley".to_string() })).unwrap();
 acknowledgement.handle().await;
 
 let mut iterator = cached.multi_get_iterator(vec![&"captain", &"vice-captain", &"disk"]);
