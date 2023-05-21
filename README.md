@@ -157,6 +157,37 @@ as additional features.
 
 7. **Why do `put`, `upsert` and `delete` return CommandSendResult?**
 
+8. **I can't clone the value, however I need multi_get_iterator. Is there an option?**
+
+Yes. Clients can pass `Arc<T>` if `T` is not cloneable. Let's take a look the following example:
+
+```rust
+#[tokio::test]
+#[derive(Eq, PartialEq, Debug)]
+struct Name {
+    first: String,
+    last: String,
+}
+let cached: CacheD<&str, Arc<Name>> = CacheD::new(ConfigBuilder::new(100, 10, 1000).build());
+
+let acknowledgement =
+    cached.put("captain", Arc::new(Name { first: "John".to_string(), last: "Mcnamara".to_string() })).unwrap();
+acknowledgement.handle().await;
+
+let acknowledgement =
+    cached.put("vice-captain", Arc::new(Name { first: "Martin".to_string(), last: "Trolley".to_string() })).unwrap();
+acknowledgement.handle().await;
+
+let mut iterator = cached.multi_get_iterator(vec![&"captain", &"vice-captain", &"disk"]);
+
+assert_eq!("John", iterator.next().unwrap().unwrap().first);
+assert_eq!("Martin", iterator.next().unwrap().unwrap().first);
+assert_eq!(None, iterator.next().unwrap());
+```
+
+The example creates an instance of `Cached` where the value type is `Arc<Name>`. This allows the clients to use `multi_get_iterator`
+method. Refer to the test `get_value_for_an_existing_key_if_value_is_not_cloneable_by_passing_an_arc` in [cached.rs](https://github.com/SarthakMakhija/cached/blob/main/src/cache/cached.rs).
+
 <<Pending>>
 
 ### References

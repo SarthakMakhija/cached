@@ -322,6 +322,7 @@ impl<'a, Key, Value, MapFn, MappedValue> Iterator for MultiGetMapIterator<'a, Ke
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use std::thread;
     use std::time::Duration;
 
@@ -624,6 +625,19 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn get_value_for_an_existing_key_if_value_is_not_cloneable_by_passing_an_arc() {
+        let cached = CacheD::new(ConfigBuilder::new(100, 10, 1000).build());
+
+        let acknowledgement =
+            cached.put("name", Arc::new(Name { first: "John".to_string(), last: "Mcnamara".to_string() })).unwrap();
+        acknowledgement.handle().await;
+
+        let value = cached.get(&"name").unwrap();
+        assert_eq!("John".to_string(), value.first);
+        assert_eq!("Mcnamara".to_string(), value.last);
+    }
+
+    #[tokio::test]
     async fn delete_a_key() {
         let cached = CacheD::new(test_config_builder().build());
 
@@ -717,6 +731,24 @@ mod tests {
         assert_eq!(Some("in-memory"), iterator.next().unwrap());
         assert_eq!(Some("SSD"), iterator.next().unwrap());
         assert_eq!(None, iterator.next());
+    }
+
+    #[tokio::test]
+    async fn get_multiple_keys_via_an_iterator_given_value_is_not_cloneable() {
+        let cached = CacheD::new(ConfigBuilder::new(100, 10, 1000).build());
+
+        let acknowledgement =
+            cached.put("captain", Arc::new(Name { first: "John".to_string(), last: "Mcnamara".to_string() })).unwrap();
+        acknowledgement.handle().await;
+
+        let acknowledgement =
+            cached.put("vice-captain", Arc::new(Name { first: "Martin".to_string(), last: "Trolley".to_string() })).unwrap();
+        acknowledgement.handle().await;
+
+        let mut iterator = cached.multi_get_iterator(vec![&"captain", &"vice-captain", &"disk"]);
+        assert_eq!("John", iterator.next().unwrap().unwrap().first);
+        assert_eq!("Martin", iterator.next().unwrap().unwrap().first);
+        assert_eq!(None, iterator.next().unwrap());
     }
 
     #[tokio::test]
