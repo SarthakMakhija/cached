@@ -7,6 +7,14 @@
 
 LFU-based in-memory cache in Rust inspired by [Ristretto](https://github.com/dgraph-io/ristretto).
 
+### Content organization
+* [Features](#features)
+* [Examples](#examples)
+* [Usage](#usage)
+* [Measuring cache-hit ratio](#measuring-cache-hit-ratio)
+* [FAQs](#faqs)
+* [References](#references)
+
 ### Features
 - **High Cache-hit ratio**: Provides high-cache ratio, the result is available [here](https://github.com/SarthakMakhija/cached/blob/main/benches/results/cache_hits.json)
 - **High throughput**: Provides high throughput for all read and write operations. The results are available [here](https://github.com/SarthakMakhija/cached/tree/main/benches/results)
@@ -109,7 +117,7 @@ fn main() {
 }
 ```
 
-### Cache-hit ratio
+### Measuring cache-hit ratio
 
 Cache-hit ratio is measured with [Zipf](https://en.wikipedia.org/wiki/Zipf%27s_law) distribution using [rand_distr](https://docs.rs/rand_distr/latest/rand_distr/struct.Zipf.html) crate.
 Each key and value is of type `u64`, and the system calculated weight of a single key/value pair is 40 bytes.
