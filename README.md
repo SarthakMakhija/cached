@@ -11,10 +11,10 @@ LFU-based in-memory cache in Rust inspired by [Ristretto](https://github.com/dgr
 - **High Cache-hit ratio**: Provides high-cache ratio, the result is available [here](https://github.com/SarthakMakhija/cached/blob/main/benches/results/cache_hits.json)
 - **High throughput**: Provides high throughput for all read and write operations. The results are available [here](https://github.com/SarthakMakhija/cached/tree/main/benches/results)
 - **Simple API**: Provides simple APIs for `put`, `get`, `multi_get`, `map_get`, `delete` and `upsert` 
-- **TTL and Access frequency based eviction**: Eviction is based either on `time_to_live`, if provided, or access frequency of the keys. A key with a higher access frequency can evict others 
+- **TTL and Access frequency based eviction**: Eviction is based either on `time_to_live` if provided or the access frequency of the keys. A key with a higher access frequency can evict others
 - **Fully concurrent**: Provides support for concurrent puts, gets, deletes and upserts
 - **Metrics**: Provides various metrics like: `CacheHits`, `CacheMisses`, `KeysAdded`, `KeysDeleted` etc., and exposes to the clients as `StatsSummary`
-- **Configurable**: Provides configurable parameters to allows the clients to choose what works the best for them 
+- **Configurable**: Provides configurable parameters to allow the clients to choose what works best for them 
 
 ### Examples
 ```rust
@@ -31,8 +31,10 @@ async fn put_a_key_value() {
     let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, CACHE_WEIGHT).build());
     let acknowledgement =
             cached.put("topic", "LFU cache").unwrap();
-     acknowledgement.handle().await;
      
+     let status = acknowledgement.handle().await;
+     assert_eq!(CommandStatus::Accepted, status);
+    
      let value = cached.get(&"topic");
      assert_eq!(Some("LFU cache"), value);
 }
@@ -43,7 +45,7 @@ async fn get_value_for_an_existing_key_and_map_it() {
 
     let acknowledgement =
         cached.put_with_weight("topic", "LFU cache", 20).unwrap();
-    acknowledgement.handle().await;
+    let _ = acknowledgement.handle().await;
 
     let value = cached.map_get(&"topic", |value| value.to_uppercase());
     assert_eq!("LFU CACHE", value.unwrap());
@@ -55,11 +57,11 @@ async fn update_the_weight_of_an_existing_key() {
 
     let acknowledgement =
         cached.put("topic", "LFU cache").unwrap();
-    acknowledgement.handle().await;
+    let _ = acknowledgement.handle().await;
 
     let acknowledgement =
         cached.upsert(UpsertRequestBuilder::new("topic").weight(29).build()).unwrap();
-    acknowledgement.handle().await;
+    let _ = acknowledgement.handle().await;
 
     let value = cached.get_ref(&"topic");
     let value_ref = value.unwrap();
@@ -72,7 +74,7 @@ async fn update_the_weight_of_an_existing_key() {
 ```
 ### Usage
 
-The following code shown an example with an `await` on the handle.  
+The following code shows an example with an `await` on the handle.  
 
 ```rust
 #[tokio::main]
@@ -90,7 +92,7 @@ async fn main() {
 }
 ```
 
-The following code shown an example without an `await`.
+The following code shows an example without an `await`.
 
 ```rust
 fn main() {
@@ -110,7 +112,7 @@ fn main() {
 ### Cache-hit ratio
 
 Cache-hit ratio is measured with [Zipf](https://en.wikipedia.org/wiki/Zipf%27s_law) distribution using [rand_distr](https://docs.rs/rand_distr/latest/rand_distr/struct.Zipf.html) crate.
-Each key and value is of type `u64` and the system calculated weight of a single key/value pair is 40 bytes.
+Each key and value is of type `u64`, and the system calculated weight of a single key/value pair is 40 bytes.
 
 The benchmark runs with the following parameters:
 
@@ -152,14 +154,15 @@ const CACHE_WEIGHT: Weight    = 1024;
 
 let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, CACHE_WEIGHT).build());
 ```
-This example creates an instance of `Cached` with a total size of 1024 bytes. After the space is full, `put` of new key/value pair will result in `AdmissionPolicy`
-taking a decision if the incoming key/value pair should be accepted or not. If the new key/value pair gets accepted, then some existing key/value pairs must be evicted to create the required space.
+This example creates an instance of `Cached` with a total size of 1024 bytes. 
+After the space is full, `put` of new key/value pair will result in `AdmissionPolicy` deciding whether the incoming key/value pair should be accepted. 
+If the new key/value pair gets accepted, some existing key/value pairs are evicted to create the required space.
 
 2. **Do I need to specify the weight of the key/value pair as a part of the `put` operation?**
 
-`Cached` provides `put_with_weight` method that takes a key, a value and the weight. Clients can invoke this method if the weight of the 
-key/value pair is known, otherwise `Cached` determines the weight of the key/value pair automatically. Refer to [weight_calculation.rs](https://github.com/SarthakMakhija/cached/blob/main/src/cache/config/weight_calculation.rs)
-to understand the weight calculation logic.
+`Cached` provides `put_with_weight` method that takes a key, a value and the weight. Clients can invoke this method if the weight of the
+key/value pair is known; otherwise, `Cached` automatically determines the weight of the key/value pair. 
+Refer to [weight_calculation.rs](https://github.com/SarthakMakhija/cached/blob/main/src/cache/config/weight_calculation.rs) to understand the weight calculation logic.
 
 3. **Is it possible for the clients to provide their own weight calculation function?**
 
@@ -180,20 +183,19 @@ let cached = CacheD::new(config);
 
 This example creates an instance of `Cached` by providing a custom `weight_calculation_fn` that returns 1 as the weight of every key/value pair.
 
-4. **What is the difference between `get_ref` and `get` methods of `Cached`?**
+4. **What is the difference between `get` and `get_ref` methods of `Cached`?**
 
-`get_ref` is available in `Cached` if the value is not cloneable, whereas `get` is available if the value is cloneable.
-`get_ref` returns an option of `KeyValueRef` whose lifetime is bound to the lifetime of `RwLockReadGuard<'a, HashMap<K, V, S>>` from `DashMap`. This means 
-`get_ref` will hold a `RwLock` against the key (or the map bucket) within the scope of its usage whereas `get` will return the cloned value.
+The method `get` is available only if the value is cloneable, whereas the method `get_ref` is available if the value is not cloneable.
+`get_ref` returns an option of `KeyValueRef` whose lifetime is bound to the lifetime of `RwLockReadGuard<'a, HashMap<K, V, S>>` from `DashMap`. This means
+`get_ref` will hold a `RwLock` against the key (or the map bucket) within the scope of its usage, whereas `get` will return the cloned value.
 
 5. **Does `Cached` provide a feature to get the values corresponding to multiple keys?**
 
-Yes. If the `Value` type is `Cloneable`, `Cached` provides `multi_get`, `multi_get_iterator` and `multi_get_map_iterator`
-as additional features.
+Yes, `Cached` provides `multi_get`, `multi_get_iterator` and `multi_get_map_iterator` methods if the `Value` type is `Cloneable`.
 
 6. **I can't clone the value, however I need multi_get_iterator. Is there an option?**
 
-Yes. Clients can pass `Arc<T>` if `T` is not cloneable. Let's take the following example:
+Clients can pass `Arc<T>` as the value if `T` is not cloneable. Let's take the following example:
 
 ```rust
 #[tokio::test]
@@ -202,6 +204,7 @@ struct Name {
     first: String,
     last: String,
 }
+
 let cached: CacheD<&str, Arc<Name>> = CacheD::new(ConfigBuilder::new(100, 10, 1000).build());
 
 let acknowledgement =
@@ -222,13 +225,13 @@ assert_eq!(None, iterator.next().unwrap());
 ```
 
 The example creates an instance of `Cached` where the value type is `Arc<Name>`. This allows the clients to use `multi_get_iterator`
-method. 
+method.
 
 Refer to the test `get_value_for_an_existing_key_if_value_is_not_cloneable_by_passing_an_arc` in [cached.rs](https://github.com/SarthakMakhija/cached/blob/main/src/cache/cached.rs).
 
 7. **Is it possible to update just the time to live or the weight of a key?**
 
-Yes, `UpsertRequest` allows the clients to update the `value`, `weight` or `time_to_live` or all of these for a key.
+Yes, `UpsertRequest` allows the clients to update the `value`, `weight` or `time_to_live` for a key.
 Let's assume that the key "topic" exists in an instance of `Cached` and consider the following example:
 
 ```rust
@@ -251,12 +254,12 @@ cached.upsert(UpsertRequestBuilder::new("topic").value("microservices").time_to_
 8. **What does the return type of `put`, `upsert` and `delete` signify?**
 
 All of the `put`, `upsert` and `delete` operations implement [singular update queue pattern](https://martinfowler.com/articles/patterns-of-distributed-systems/singular-update-queue.html)
-and return an instance of `CommandSendResult` that allows the clients to get a handle on which they can await.  
+and return an instance of `CommandSendResult` that allows the clients to get a handle on which they can await.
 
-`CommandSendResult` is an alias for `Result<Arc<CommandAcknowledgement>, CommandSendError>`, it will result in an error if either of
-`put`, `upsert` or `delete` operations are performed when the cache is being shutdown.
+`CommandSendResult` is an alias for `Result<Arc<CommandAcknowledgement>, CommandSendError>`. It will result in an error if either of
+`put`, `upsert` or `delete` operations are performed when the cache is being shut down.
 
-The success part of `CommandSendResult` is an instance of `CommandAcknowledgement` which returns a handle to the clients to perform `await`.
+The success part of `CommandSendResult` is an instance of `CommandAcknowledgement`, which returns a handle to the clients to perform `await`.
 
 ### References
 
