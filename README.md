@@ -5,7 +5,15 @@
 [![Build](https://github.com/SarthakMakhija/cached/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/SarthakMakhija/cached/actions/workflows/build.yml)
 [![Coverage](https://codecov.io/gh/SarthakMakhija/cached/branch/main/graph/badge.svg?token=ED4FKSYPCU)](https://codecov.io/gh/SarthakMakhija/cached)
 
-LFU-based in-memory cache in Rust inspired by [Ristretto](https://github.com/dgraph-io/ristretto).
+**Cached** is an LFU-based in-memory cache in Rust inspired by [Ristretto](https://github.com/dgraph-io/ristretto).
+
+### Content organization
+* [Features](#features)
+* [Examples](#examples)
+* [Usage](#usage)
+* [Measuring cache-hit ratio](#measuring-cache-hit-ratio)
+* [FAQs](#faqs)
+* [References](#references)
 
 ### Content organization
 * [Features](#features)
@@ -162,14 +170,14 @@ const CACHE_WEIGHT: Weight    = 1024;
 
 let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, CACHE_WEIGHT).build());
 ```
-This example creates an instance of `Cached` with a total size of 1024 bytes. 
+This example creates an instance of **Cached** with a total size of 1024 bytes. 
 After the space is full, `put` of a new key/value pair will result in `AdmissionPolicy` deciding whether the incoming key/value pair should be accepted. 
 If the new key/value pair gets accepted, some existing key/value pairs are evicted to create the required space.
 
 2. **Do I need to specify the weight of the key/value pair as a part of the `put` operation?**
 
-`Cached` provides `put_with_weight` method that takes a key, a value and the weight. Clients can invoke this method if the weight of the
-key/value pair is known; otherwise, `Cached` automatically determines the weight of the key/value pair. 
+**Cached** provides `put_with_weight` method that takes a key, a value and the weight. Clients can invoke this method if the weight of the
+key/value pair is known; otherwise, **Cached** automatically determines the weight of the key/value pair. 
 Refer to [weight_calculation.rs](https://github.com/SarthakMakhija/cached/blob/main/src/cache/config/weight_calculation.rs) to understand the weight calculation logic.
 
 3. **Is it possible for the clients to provide their own weight calculation function?**
@@ -189,17 +197,17 @@ let config
 let cached = CacheD::new(config);
 ```
 
-This example creates an instance of `Cached` by providing a custom `weight_calculation_fn` that returns 1 as the weight of every key/value pair.
+This example creates an instance of **Cached** by providing a custom `weight_calculation_fn` that returns 1 as the weight of every key/value pair.
 
-4. **What is the difference between `get` and `get_ref` methods of `Cached`?**
+4. **What is the difference between `get` and `get_ref` methods of Cached?**
 
 The method `get` is available only if the value is cloneable, whereas the method `get_ref` is available even if the value is not cloneable.
 `get_ref` returns an option of `KeyValueRef` whose lifetime is bound to the lifetime of `RwLockReadGuard<'a, HashMap<K, V, S>>` from `DashMap`. This means
 `get_ref` will hold a `RwLock` against the key (or the map bucket) within the scope of its usage, whereas `get` will return the cloned value.
 
-5. **Does `Cached` provide a feature to get the values corresponding to multiple keys?**
+5. **Does Cached provide a feature to get the values corresponding to multiple keys?**
 
-Yes, `Cached` provides `multi_get`, `multi_get_iterator` and `multi_get_map_iterator` methods if the `Value` type is `Cloneable`.
+Yes, **Cached** provides `multi_get`, `multi_get_iterator` and `multi_get_map_iterator` methods if the `Value` type is `Cloneable`.
 
 6. **I can't clone the value, however I need multi_get_iterator. Is there an option?**
 
@@ -232,14 +240,14 @@ assert_eq!("Martin", iterator.next().unwrap().unwrap().first);
 assert_eq!(None, iterator.next().unwrap());
 ```
 
-The example creates an instance of `Cached` where the value type is `Arc<Name>`. This allows the clients to use `multi_get_iterator` method.
+The example creates an instance of **Cached** where the value type is `Arc<Name>`. This allows the clients to use `multi_get_iterator` method.
 
 Refer to the test `get_value_for_an_existing_key_if_value_is_not_cloneable_by_passing_an_arc` in [cached.rs](https://github.com/SarthakMakhija/cached/blob/main/src/cache/cached.rs).
 
 7. **Is it possible to update just the time to live or the weight of a key?**
 
 Yes, `UpsertRequest` allows the clients to update the `value`, `weight` or `time_to_live` for a key.
-Let's assume that the key "topic" exists in an instance of `Cached` and consider the following example:
+Let's assume that the key "topic" exists in an instance of **Cached** and consider the following example:
 
 ```rust
 //updates the weight of the key
