@@ -1163,7 +1163,7 @@ mod upsert_tests {
     }
 
     #[tokio::test]
-    async fn update_the_time_to_live_of_an_existing_key() {
+    async fn update_the_time_to_live_of_an_existing_key_with_original_key_not_having_time_to_live() {
         let clock: ClockType = Box::new(UnixEpochClock {});
         let cached = CacheD::new(test_config_builder().clock(clock.clone_box()).build());
 
@@ -1323,6 +1323,31 @@ mod upsert_tests {
         assert_eq!(Some(300), new_weight);
 
         assert_eq!(None, stored_value.expire_after());
+    }
+
+    #[tokio::test]
+    async fn update_the_time_to_live_of_an_existing_key() {
+        let clock: ClockType = Box::new(UnixEpochClock {});
+        let cached = CacheD::new(test_config_builder().clock(clock.clone_box()).build());
+
+        let acknowledgement =
+            cached.put_with_ttl("topic", "microservices", Duration::from_secs(100)).unwrap();
+        acknowledgement.handle().await;
+
+        let original_weight = weight_of(&cached, "topic");
+
+        let acknowledgement =
+            cached.upsert(UpsertRequestBuilder::new("topic").time_to_live(Duration::from_secs(500)).build()).unwrap();
+        acknowledgement.handle().await;
+
+        let value = cached.get_ref(&"topic");
+        let value_ref = value.unwrap();
+        let stored_value = value_ref.value();
+        let key_id = stored_value.key_id();
+
+        let new_weight = cached.admission_policy.weight_of(&key_id);
+        assert_eq!("microservices", stored_value.value());
+        assert_eq!(original_weight, new_weight);
     }
 
     fn weight_of(cached: &CacheD<&str, &str>, key: &'static str) -> Option<Weight> {

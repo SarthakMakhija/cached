@@ -108,4 +108,11 @@ mod tests {
         let response = acknowledgement.handle().await;
         assert_eq!(CommandStatus::Accepted, response);
     }
+
+    #[tokio::test]
+    async fn accepted() {
+        let acknowledgement = CommandAcknowledgement::accepted();
+        let response = acknowledgement.handle().await;
+        assert_eq!(CommandStatus::Accepted, response);
+    }
 }
