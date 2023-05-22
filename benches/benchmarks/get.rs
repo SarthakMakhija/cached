@@ -9,10 +9,20 @@ use cached::cache::types::{TotalCounters, Weight};
 
 use crate::benchmarks::common::{distribution, execute_parallel, preload_cache};
 
+/// Defines the total number of key/value pairs that are loaded in the cache
 const CAPACITY: usize = 2 << 14;
-const COUNTERS: TotalCounters = (CAPACITY * 10) as TotalCounters;
-const WEIGHT: Weight = CAPACITY as Weight;
 
+/// Defines the total number of counters used to measure the access frequency.
+const COUNTERS: TotalCounters = (CAPACITY * 10) as TotalCounters;
+
+/// Defines the total size of the cache.
+/// It is kept to CAPACITY * 40 because the benchmark inserts keys and values of type u64.
+/// Weight of a single u64 key and u64 value without time_to_live is 40 bytes. Check `src/cache/config/weight_calculation.rs`
+/// As a part of this benchmark, we preload the cache with the total number of elements = CAPACITY.
+/// We want all the elements to be admitted in the cache, hence weight = CAPACITY * 40 bytes.
+const WEIGHT: Weight = (CAPACITY * 40) as Weight;
+
+/// Defines the total sample size that is used for generating Zipf distribution.
 const ITEMS: usize = CAPACITY / 3;
 const MASK: usize = CAPACITY - 1;
 
