@@ -15,11 +15,15 @@ pub(crate) struct PoolSize(pub(crate) usize);
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub(crate) struct BufferSize(pub(crate) usize);
 
+/// Pool represents a ring-buffer that is used to buffer the gets for various keys.
+/// PoolSize is a configurable parameter defined in [`crate::cache::config::Config`].
 pub(crate) struct Pool<Consumer: BufferConsumer> {
     buffers: Vec<RwLock<Buffer<Consumer>>>,
     pool_size: PoolSize,
 }
 
+/// Each buffer inside the Pool is a Vec<KeyHash>. The capacity of buffer is a configurable parameter.
+/// Once the buffer is full, it is drained.
 struct Buffer<Consumer: BufferConsumer> {
     key_hashes: Vec<KeyHash>,
     capacity: BufferSize,
@@ -36,6 +40,9 @@ impl<Consumer> Buffer<Consumer>
         }
     }
 
+    /// Adds the key_hash to key_hashes.
+    /// Before adding the key_hash, it is checked to see if the buffer needs draining.
+    /// If the buffer needs to be drained, an event of type `BufferEvent::Full` is created and sent to the consumer
     pub(crate) fn add(&mut self, key_hash: KeyHash) {
         if self.key_hashes.len() >= self.capacity.0 {
             debug!("Draining the buffer");
@@ -56,6 +63,9 @@ impl<Consumer> Pool<Consumer>
         Pool { buffers, pool_size }
     }
 
+    /// Adds the key_hash to a random buffer. There are a total of pool_size buffers and the
+    /// generated random number lies between 0 and pool_size
+    /// After the buffer is picked, a write lock is acquired on the buffer to add the key_hash.
     pub(crate) fn add(&self, key_hash: KeyHash) {
         let pool_size = self.pool_size.0;
         let index = thread_rng().gen_range(0..pool_size);

@@ -1,5 +1,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
+/// IncreasingIdGenerator generates ids for the incoming keys.
+/// Each id is an [`AtomicU64`]
 pub(crate) struct IncreasingIdGenerator {
     id: AtomicU64,
 }
@@ -11,6 +13,8 @@ impl IncreasingIdGenerator {
         }
     }
 
+    /// Returns the next id for the incoming key
+    /// The first generated id is 1 and each invocation of next results in an increasing id.
     pub(crate) fn next(&self) -> u64 {
         self.id.fetch_add(1, Ordering::AcqRel)
     }
