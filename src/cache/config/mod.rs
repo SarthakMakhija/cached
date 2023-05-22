@@ -97,6 +97,7 @@ impl<Key, Value> ConfigBuilder<Key, Value>
     /// If you expect your cache to hold 100_000 elements, then counters should be 10 times 100_000 to
     /// get a close estimate of the access frequency
     /// `capacity` is used as a parameter for [`dashmap::DashMap`] inside [`crate::cache::store::Store`]
+    ///  It defines the number of items that the cache may store
     /// `cache_weight` defines the total cache size. cache_weight is treated as the cache size in bytes
     /// If cache_weight is set to 1024, that means the cache should take only 1024 bytes of memory.
     /// After the cache size is full, any further `put` operation will result in either of the following:

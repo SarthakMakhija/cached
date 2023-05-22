@@ -95,7 +95,7 @@ impl<Key, Value> Store<Key, Value>
     /// Create a new instance of Store with `clock`, `stats_counter`, `capacity` and `shards`.
     /// `clock`: Defines the clock to be used to get the current time. By default [`crate::cache::clock::SystemClock`] is used.
     /// `stats_counter`: Is an instance of [`crate::cache::stats::ConcurrentStatsCounter`]
-    /// `capacity`: Is used as a capacity parameter in DashMap
+    /// `capacity`: Is used as a capacity parameter in DashMap, it defines the number of items that the cache may store
     /// `shards`: Is used as a shards parameter in DashMap
     pub(crate) fn new(clock: ClockType, stats_counter: Arc<ConcurrentStatsCounter>, capacity: TotalCapacity, shards: TotalShards) -> Arc<Store<Key, Value>> {
         Arc::new(Store {
