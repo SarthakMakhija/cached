@@ -2,6 +2,7 @@ use std::time::SystemTime;
 
 pub type ClockType = Box<dyn Clock + Send + Sync>;
 
+/// The default implementation of Clock trait.
 #[derive(Clone)]
 pub struct SystemClock {}
 
@@ -9,6 +10,10 @@ pub trait BoxedClockClone {
     fn clone_box(&self) -> ClockType;
 }
 
+/// Clock represents a trait to get the current [`std::time::SystemTime`]
+/// The default implementation of Clock is SystemClock.
+/// Clients can provide their implementation of Clock using [`crate::cache::config::Config`] and since Clock
+/// is considered to be a lightweight object, Clock is of type [`BoxedClockClone`]
 pub trait Clock: Send + Sync + BoxedClockClone {
     fn now(&self) -> SystemTime;
 

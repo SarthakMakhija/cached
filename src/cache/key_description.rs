@@ -2,6 +2,11 @@ use std::hash::Hash;
 
 use crate::cache::types::{KeyHash, KeyId, Weight};
 
+/// The description of a key consists of the following:
+    /// Key
+    /// id of the key represented by id
+    /// hash of the key represented by hash
+    /// weight of the key represented by weight
 pub(crate) struct KeyDescription<Key>
     where Key: Hash + Eq + Clone {
     key: Key,
@@ -16,6 +21,9 @@ impl<Key> KeyDescription<Key>
         KeyDescription { key, id, hash, weight }
     }
 
+    /// Clones the key.
+    /// Key needs to be cloned because it is added in 2 structures:
+    /// [`crate::cache::store::Store`] and [`crate::cache::policy::cache_weight::CacheWeight`]
     pub(crate) fn clone_key(&self) -> Key { self.key.clone() }
 }
 
