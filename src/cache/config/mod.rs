@@ -61,10 +61,12 @@ pub struct Config<Key, Value>
 impl<Key, Value> Config<Key, Value>
     where Key: Hash + 'static,
           Value: 'static {
+    /// Creates a new instance of TTLConfig
     pub(crate) fn ttl_config(&self) -> TTLConfig {
         TTLConfig::new(self.shards, self.ttl_tick_duration, self.clock.clone_box())
     }
 
+    /// Creates a new instance of CacheWeightConfig
     pub(crate) fn cache_weight_config(&self) -> CacheWeightConfig {
         CacheWeightConfig::new(self.capacity, self.shards, self.total_cache_weight)
     }
