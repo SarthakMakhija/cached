@@ -10,12 +10,29 @@ use cached::cache::types::{TotalCounters, Weight};
 
 use crate::benchmarks::common::{distribution_with_exponent, execute_parallel, preload_cache};
 
+/// Defines the total number of key/value pairs that are loaded in the cache
 const CAPACITY: usize = 100_000;
+
+/// Defines the total number of counters used to measure the access frequency.
 const COUNTERS: TotalCounters = (CAPACITY * 10) as TotalCounters;
+
+/// Defines the total size of the cache.
+/// It is kept to CAPACITY * 40 because the benchmark inserts keys and values of type u64.
+/// Weight of a single u64 key and u64 value without time_to_live is 40 bytes. Check `src/cache/config/weight_calculation.rs`
+/// As a part of this benchmark, we preload the cache with the total number of elements = CAPACITY.
+/// We want all the elements to be admitted in the cache, hence weight = CAPACITY * 40 bytes.
 const WEIGHT: Weight = (CAPACITY * 40) as Weight;
 
+/// Defines the total sample size that is used for generating Zipf distribution.
+/// Here, ITEMS is 16 times the CAPACITY to provide a larger sample for Zipf distribution.
+/// W/C = 16, W denotes the sample size, and C is the cache size (denoted by CAPA)
+/// [TinyLFU](https://dgraph.io/blog/refs/TinyLFU%20-%20A%20Highly%20Efficient%20Cache%20Admission%20Policy.pdf)
 const ITEMS: usize = CAPACITY * 16;
+
 const MASK: usize = CAPACITY - 1;
+
+/// This benchmark uses 1.001 as the Zipf distribution exponent.
+/// For now, this benchmark prints the cache-hit ratio on console and the cache-hits.json under results/ is manually prepared.
 
 #[derive(Debug)]
 struct HitsMissRecorder {

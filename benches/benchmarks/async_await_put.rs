@@ -10,12 +10,27 @@ use cached::cache::config::ConfigBuilder;
 use cached::cache::types::{TotalCounters, Weight};
 use crate::benchmarks::common::distribution;
 
+/// Defines the total number of key/value pairs that are loaded in the cache
 const CAPACITY: usize = 2 << 20;
+
+/// Defines the total number of counters used to measure the access frequency.
+/// Its value will not impact this benchmark as we are not accessing the keys
 const COUNTERS: TotalCounters = (CAPACITY * 10) as TotalCounters;
+
+/// Defines the total size of the cache. It is kept same as the capacity,
+/// however the benchmark inserts keys and values of type u64.
+/// Weight of a single u64 key and u64 value without time_to_live is 40 bytes. Check `src/cache/config/weight_calculation.rs`
+/// Keeping WEIGHT = CAPACITY will cause some key rejections at the level of AdmissionPolicy and will be more realistic
+/// than keeping the total weight as CAPACITY * 40.
 const WEIGHT: Weight = CAPACITY as Weight;
 
+/// Defines the total sample size that is used for generating Zipf distribution.
 const ITEMS: usize = CAPACITY / 3;
+
 const MASK: usize = CAPACITY - 1;
+
+/// This benchmark differs from `put.rs` benchmark in a way that it performs an `.await` operation on the result of `put` operation.
+/// As a part of this benchmark we leverage `to_async` function of `criterion` and use `tokio` as the async runtime.
 
 #[cfg(feature = "bench_testable")]
 #[cfg(not(tarpaulin_include))]
