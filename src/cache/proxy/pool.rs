@@ -5,6 +5,10 @@ use crate::cache::pool::{BufferSize, Pool, PoolSize};
 
 use crate::cache::types::KeyHash;
 
+/// Proxy representation of the [`crate::cache::pool::Pool`].
+/// Pool provides a single behavior to add a key_hash to its buffer after a key has been accessed.
+/// ProxyPool provides the same behavior and ends up delegating to the Pool object.
+/// ProxyPool is used in `benchmark benches/benchmarks/read_buffer.rs`
 #[cfg(feature = "bench_testable")]
 pub struct ProxyPool<Consumer: BufferConsumer> {
     pool: Pool<Consumer>,
