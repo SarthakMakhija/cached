@@ -13,30 +13,30 @@ struct Row(Vec<u8>);
 
 impl Row {
     fn increment_at(&mut self, position: u64) {
-        /// Get the index
+        // Get the index
         let index = (position / 2) as usize;
 
-        /// If the position is an odd number, upper four bits store the counter value,
-        /// else lower four bits store the counter value
+        // If the position is an odd number, upper four bits store the counter value,
+        // else lower four bits store the counter value
         let shift = (position & BINARY_ONE) * SHIFT_OFFSET;
         let is_less_than15 = (self.0[index] >> shift) & MAX_VALUE_LOWER_FOUR_BITS < MAX_VALUE_LOWER_FOUR_BITS;
 
-        /// If the value is less than 15, increment
+        // If the value is less than 15, increment
         if is_less_than15 {
             self.0[index] += 1 << shift;
         }
     }
 
     fn get_at(&self, position: u64) -> FrequencyEstimate {
-        /// Get the index
+        // Get the index
         let index = (position / 2) as usize;
 
-        /// If the position is an odd number, the upper four bits store the counter value,
-        /// else lower four bits store the counter value
+        // If the position is an odd number, the upper four bits store the counter value,
+        // else lower four bits store the counter value
         let shift = (position & BINARY_ONE) * SHIFT_OFFSET;
 
-        /// Perform the shift (shift would be either 0 or 4)
-        /// Perform an AND operation with 0x0f, which 00001111
+        // Perform the shift (shift would be either 0 or 4)
+        // Perform an AND operation with 0x0f, which 00001111
         (self.0[index] >> shift) & MAX_VALUE_LOWER_FOUR_BITS
     }
 
