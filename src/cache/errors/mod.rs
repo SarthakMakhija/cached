@@ -14,6 +14,8 @@ const ERROR_MESSAGE_UPSERT_VALUE_MISSING: &str = "Upsert has resulted in a put r
 const ERROR_MESSAGE_INVALID_UPSERT: &str = "Upsert request is invalid, either 'value', 'weight', 'time_to_live' or 'remove_time_to_live' must be specified";
 const ERROR_MESSAGE_INVALID_UPSERT_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE: &str = "Upsert request is invalid, only one of 'time_to_live' or 'remove_time_to_live' must be specified";
 
+/// Errors enum define various application errors.
+/// Currently, errors are categorized either as OperationError or ConfigError under [`ErrorType`] enum.
 #[derive(Eq, PartialEq, Debug)]
 pub(crate) enum Errors {
     TotalCountersGtZero,

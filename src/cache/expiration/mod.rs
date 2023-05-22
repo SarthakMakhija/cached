@@ -14,6 +14,9 @@ use crate::cache::types::{ExpireAfter, KeyId};
 
 pub(crate) mod config;
 
+/// TTLTicker removes the expired keys.
+/// TTLTicker is a shared lock based HashMap. Each shard holds a [`parking_lot::RwLock`] protected [`hashbrown::HashMap`]
+/// During the event of cache shutdown, keep_running is set to false.
 pub(crate) struct TTLTicker {
     shards: Arc<[RwLock<HashMap<KeyId, ExpireAfter>>]>,
     keep_running: Arc<AtomicBool>,
@@ -54,10 +57,6 @@ impl TTLTicker {
         self.shards[shard_index].write().remove(key_id);
     }
 
-    pub(crate) fn shutdown(&self) {
-        self.keep_running.store(false, Ordering::Release);
-    }
-
     pub(crate) fn get(self: &Arc<TTLTicker>, key_id: &KeyId, expire_after: &ExpireAfter) -> Option<ExpireAfter> {
         let shard_index = self.shard_index(expire_after);
         self.shards[shard_index].read().get(key_id).copied()
@@ -69,11 +68,25 @@ impl TTLTicker {
         });
     }
 
+    pub(crate) fn shutdown(&self) {
+        self.keep_running.store(false, Ordering::Release);
+    }
+
+    /// Determines the shard to pick for put, update, delete and get operations based on the time.
+    /// Detailed explanation is available in the `spin` method.
     fn shard_index(self: &Arc<TTLTicker>, time: &SystemTime) -> usize {
         let since_the_epoch = time.duration_since(UNIX_EPOCH).expect("Time went backwards");
         since_the_epoch.as_secs() as usize % self.shards.len()
     }
 
+    /// Spins a single thread every tick_duration. tick_duration is a configurable parameter defined in [`crate::cache::config::Config`].
+    /// Every time the thread runs, it identifies the shard_index to pick for removing the expired keys.
+    /// One way is to lock all the shards and perform the cleanup of the expired keys.
+    /// This approach will introduce contention, all the puts with time_to_live might suffer.
+    /// Other way is to pick one shard at a time and perform the cleanup.
+    /// In order to minimize contention, a single shard is picked based on the current_time.
+    /// The current_time `(clock.now())` is converted to a duration `time.duration_since(UNIX_EPOCH)` and
+    /// its modulo operation with total number of shards gives the shard_index.
     fn spin<EvictHook>(self: Arc<TTLTicker>, tick_duration: Duration, clock: ClockType, evict_hook: EvictHook)
         where EvictHook: Fn(&KeyId) + Send + Sync + 'static {
         let keep_running = self.keep_running.clone();
