@@ -3,6 +3,10 @@ use log::debug;
 
 use crate::cache::types::{DoorKeeperCapacity, DoorKeeperFalsePositiveRate, KeyHash};
 
+/// DoorKeeper is an implementation of BloomFilter that is used by TinyLFU abstraction to manage the key accesses
+/// A Bloom filter is a probabilistic data structure used to test whether an element is a set member.
+/// A bloom filter can query against large amounts of data and return either “possibly in the set” or “definitely not in the set”.
+/// A bloom filter can have false positives, but false negatives are impossible.
 pub(crate) struct DoorKeeper {
     bloom: Bloom<KeyHash>,
 }
