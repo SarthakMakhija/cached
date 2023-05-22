@@ -4,9 +4,21 @@ use cached::cache::proxy::frequency_counter::ProxyFrequencyCounter;
 use cached::cache::types::TotalCounters;
 use crate::benchmarks::common::distribution;
 
+/// Defines the total size of the distribution that will be used in increment and estimate methods of `FrequencyCounter`.
 const CAPACITY: usize = 2 << 20;
-const MASK: usize = CAPACITY - 1;
+
+/// Defines the total sample size that is used for generating Zipf distribution.
 const ITEMS: usize = CAPACITY / 3;
+
+const MASK: usize = CAPACITY - 1;
+
+/// As a part of this benchmark we measure the `FrequencyCounter.increment` and `FrequencyCounter.estimate` methods
+/// In order to benchmark the `increment` method, we invoke the `increment` method a total of CAPACITY times by
+/// treating each element of the distribution as a KeyHash.
+/// In order to benchmark the `estimate` method, we perform `setup` which loads the distribution in the `FrequencyCounter`
+/// and then we invoke the `estimate` method a total of CAPACITY times by treating each element of the distribution as a KeyHash.
+
+/// This benchmark also varies the `total_counters` which is CAPACITY, CAPACITY*2, CAPACITY*10
 
 #[cfg(feature = "bench_testable")]
 #[cfg(not(tarpaulin_include))]
