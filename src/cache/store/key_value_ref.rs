@@ -2,11 +2,16 @@ use std::hash::Hash;
 
 use dashmap::mapref::one::Ref;
 
+/// KeyValueRef contains DashMap's Ref [`dashmap::mapref::one::Ref`] which internally holds
+/// a `RwLockReadGuard` for the shard.
+/// Any time `get_ref` method is invoked, the `Store` returns `Option<KeyValueRef<'_, Key, StoredValue<Value>>>`.
+/// If the key is present in the `Store`, `get_ref` will return `Some<KeyValueRef<'_, Key, StoredValue<Value>>>`.
+/// Hence, the invocation of `get_ref` will hold a lock against the shard that contains the key (within the scope of its usage).
+/// The principle idea behind having this abstraction is to hide DashMap's Ref [`dashmap::mapref::one::Ref`].
 pub struct KeyValueRef<'a, Key, Value>
     where Key: Eq + Hash {
     key_value_ref: Ref<'a, Key, Value>,
 }
-
 
 impl<'a, Key, Value> KeyValueRef<'a, Key, Value>
     where Key: Eq + Hash {
@@ -16,10 +21,12 @@ impl<'a, Key, Value> KeyValueRef<'a, Key, Value>
         }
     }
 
+    /// Returns the reference of the key present in the Store
     pub fn key(&self) -> &Key {
         self.key_value_ref.key()
     }
 
+    /// Returns the reference of the value present in the Store
     pub fn value(&self) -> &Value {
         self.key_value_ref.value()
     }

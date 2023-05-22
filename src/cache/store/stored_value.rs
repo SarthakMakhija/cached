@@ -4,6 +4,9 @@ use std::time::{Duration, SystemTime};
 use crate::cache::clock::ClockType;
 use crate::cache::types::{ExpireAfter, KeyId};
 
+/// StoredValue wraps the client provided Value and it is stored as a value in the [`crate::cache::store::Store`].
+/// StoredValue encapsulates the `value`, `key_id`, the optional expiry of the key
+/// and a flag to identify whether a key is soft deleted
 pub struct StoredValue<Value> {
     value: Value,
     key_id: KeyId,
@@ -40,10 +43,15 @@ impl<Value> StoredValue<Value> {
         true
     }
 
+    /// Returns a reference to the value stored inside Store
     pub fn value_ref(&self) -> &Value { &self.value }
 
+    // Returns the KeyId
     pub fn key_id(&self) -> KeyId { self.key_id }
 
+    /// Returns the expiry of the key. It returns:
+        /// None: if the expiry is not set
+        /// Some: if the expiry is set
     pub fn expire_after(&self) -> Option<ExpireAfter> { self.expire_after }
 
     pub(crate) fn update(&mut self,
@@ -71,6 +79,7 @@ impl<Value> StoredValue<Value> {
 
 impl<Value> StoredValue<Value>
     where Value: Clone {
+    /// Returns the cloned value stored inside Store
     pub fn value(&self) -> Value { self.value.clone() }
 }
 

@@ -13,9 +13,11 @@ use crate::cache::types::{ExpireAfter, KeyId, TotalCapacity, TotalShards};
 pub mod stored_value;
 pub mod key_value_ref;
 
+/// KeyIdExpiry holds the key id and the optional expiry of the key
 #[derive(Eq, PartialEq, Debug)]
 pub(crate) struct KeyIdExpiry(pub(crate) KeyId, pub(crate) Option<ExpireAfter>);
 
+/// UpdateResponse holds the existing `KeyIdExpiry`, the new `KeyIdExpiry` and the `Value`
 #[derive(Eq, PartialEq, Debug)]
 pub(crate) struct UpdateResponse<Value>(Option<KeyIdExpiry>, Option<ExpireAfter>, Option<Value>);
 
@@ -27,6 +29,11 @@ pub(crate) enum TypeOfExpiryUpdate {
     Nothing,
 }
 
+/// UpdateResponse encapsulates the existing `KeyIdExpiry`, new `KeyIdExpiry` and an optional value.
+/// As a part of the `update` operation, an instance of `UpdateResponse` is returned containing:
+/// the existing `KeyIdExpiry`, if the key was present in the `Store`,
+/// the new `KeyIdExpiry`, if the client made changes to the `time_to_live` of the value
+/// the original value if the update did not happen because the key was not present in the Store
 impl<Value> UpdateResponse<Value> {
     pub(crate) fn did_update_happen(&self) -> bool {
         self.0.is_some()
@@ -48,6 +55,13 @@ impl<Value> UpdateResponse<Value> {
         self.0.as_ref().unwrap().0
     }
 
+    /// Determines the type of expiry update performed by the client.
+    /// `TypeOfExpiryUpdate` can be:
+    /// "Added" -> meaning `time_to_live` was added as a part of the upsert operation
+    /// "Deleted" -> meaning `time_to_live` was remove as a part of the upsert operation
+    /// "Updated" -> meaning `time_to_live` was changed as a part of the upsert operation
+    /// "Nothing" -> meaning the upsert operation had nothing to do with `time_to_live`
+    /// Based on the `TypeOfExpiryUpdate`, Cached decides whether an entry needs to be made in [`crate::cache::expiration::TTLTicker`]
     pub(crate) fn type_of_expiry_update(&self) -> TypeOfExpiryUpdate {
         let existing_expiry = self.existing_expiry();
         let new_expiry = self.1;
@@ -67,6 +81,8 @@ impl<Value> UpdateResponse<Value> {
     }
 }
 
+/// Store holds the key/value mapping.
+/// Value is wrapped in another abstraction [`crate::cache::store::stored_value::StoredValue`] that contains key_id and expiry, if any, of the key.
 pub(crate) struct Store<Key, Value>
     where Key: Hash + Eq, {
     store: DashMap<Key, StoredValue<Value>>,
@@ -76,6 +92,11 @@ pub(crate) struct Store<Key, Value>
 
 impl<Key, Value> Store<Key, Value>
     where Key: Hash + Eq, {
+    /// Create a new instance of Store with `clock`, `stats_counter`, `capacity` and `shards`.
+    /// `clock`: Defines the clock to be used to get the current time. By default [`crate::cache::clock::SystemClock`] is used.
+    /// `stats_counter`: Is an instance of [`crate::cache::stats::ConcurrentStatsCounter`]
+    /// `capacity`: Is used as a capacity parameter in DashMap
+    /// `shards`: Is used as a shards parameter in DashMap
     pub(crate) fn new(clock: ClockType, stats_counter: Arc<ConcurrentStatsCounter>, capacity: TotalCapacity, shards: TotalShards) -> Arc<Store<Key, Value>> {
         Arc::new(Store {
             store: DashMap::with_capacity_and_shard_amount(capacity, shards),
