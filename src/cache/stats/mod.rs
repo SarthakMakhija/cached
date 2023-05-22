@@ -35,6 +35,7 @@ impl StatsType {
     ];
 }
 
+/// StatsSummary is view representation of various stats represented by [`StatsType`].
 #[derive(Debug, PartialEq)]
 pub struct StatsSummary {
     pub stats_by_type: HashMap<StatsType, u64>,
@@ -49,6 +50,7 @@ impl StatsSummary {
         }
     }
 
+    /// Returns an Option<u64> counter corresponding to the stats_type.
     pub fn get(&self, stats_type: &StatsType) -> Option<u64> {
         self.stats_by_type.get(stats_type).copied()
     }
@@ -58,6 +60,12 @@ impl StatsSummary {
 #[derive(Debug)]
 struct Counter(CachePadded<AtomicU64>);
 
+/// ConcurrentStatsCounter measures various stats defined by [`StatsType`].
+/// ConcurrentStatsCounter is represented as an array of entries where each entry is an instance of type [`Counter`].
+/// Each instance of [`Counter`] is a [`crossbeam_utils::CachePadded`] AtomicU64, to avoid false sharing.
+/// ConcurrentStatsCounter provides methods:
+    /// to increase the counters corresponding to various stats and
+    /// to get the values for these stats
 pub(crate) struct ConcurrentStatsCounter {
     entries: [Counter; TOTAL_STATS],
 }
