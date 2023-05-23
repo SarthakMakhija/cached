@@ -19,6 +19,26 @@ use crate::cache::types::{FrequencyEstimate, KeyHash, KeyId, TotalCounters, Weig
 const EVICTION_SAMPLE_SIZE: usize = 5;
 const CHANNEL_CAPACITY: usize = 10;
 
+/// `AdmissionPolicy` maintains the weight of each in the cache in the [`crate::cache::policy::cache_weight::CacheWeight`] abstraction.
+/// `AdmissionPolicy` is responsible for a few things:
+/// 1) It contains [`crate::cache::lfu::tiny_lfu::TinyLFU`] that provides methods to increase and estimate the access frequency of keys
+/// 2) It is responsible for deciding if a key should be admitted in the cache.
+    /// If the cache has weight available to accommodate the incoming key, it will be admitted
+    /// otherwise, `AdmissionPolicy` has 2 options: either reject the incoming key or create space to accommodate the incoming key. Read `create_space`.
+/// 3) It is responsible for updating the weight of a key
+/// 4) It is responsible for deleting a key which in turn reduces the cache weight
+/// 5) It also acts as a buffer consumer.
+    /// All the access (`get`) to keys are buffered [BP-Wrapper](https://dgraph.io/blog/refs/bp_wrapper.pdf). Read [`crate::cache::pool::Pool`] for more details
+    /// When a buffer is full, it is drained.
+    /// As a part of draining the buffer, an instance of buffer consumer is invoked
+    /// The buffer consumer which is `AdmissionPolicy` in this case, will `accept` the buffer and take a single lock on the `access_frequency` and increase
+    /// the access frequency of the keys
+/// *) Buffer consumer is implemented as a single thread that receives [`crate::cache::buffer_event::BufferEvent`] and acts on them.
+    /// However, there can be contention if too many accesses happen in the system which results in the access buffer(s) filling in too fast.
+    /// This contention is around acquiring the write lock on `TinyLFU` as [`crate::cache::lfu::tiny_lfu::TinyLFU`] is wrapped inside a `RwLock`.
+    /// In order to reduce this contention, the system decides to drop the buffers by maintaining a limited `CHANNEL_CAPACITY`.
+/// `AdmissionPolicy` is invoked by a single thread through [`crate::cache::command::command_executor::CommandExecutor`]
+///  and its delete is invoked by [`crate::cache::expiration::TTLTicker`]
 pub(crate) struct AdmissionPolicy<Key>
     where Key: Hash + Eq + Send + Sync + Clone + 'static, {
     access_frequency: Arc<RwLock<TinyLFU>>,
@@ -140,6 +160,22 @@ impl<Key> AdmissionPolicy<Key>
         self.stats_counter.clear();
     }
 
+    /// Attempts to create the space for the incoming key.
+    /// The approach behind `create_space` can be summarized as:
+    /// Facts   : We know that the cache weight is full and the incoming key can either be rejected or accepted.
+    ///           If the incoming key gets accepted, some of the existing keys have to be evicted to create the cache space
+    /// Comment : Since, it is an LFU based cache, the decision to accept/reject/evict is based on the access frequency of the keys.
+    /// Approach:
+    /// 1) Get an estimate of the access frequency of the incoming key. The incoming key has not been accessed yet, but we *might* get some access count
+    ///    because of hash conflicts since we rely on the probabilistic data structure [count-min sketch](https://tech-lessons.in/blog/count_min_sketch/)
+    ///    to maintain the access frequencies of the keys.
+    /// 2) What we are trying to do is determine the approximate estimation of the access frequency if this key were admitted in the cache
+    /// 3) Get a sample that consists of keyId, its weight and its access frequency. Our sample size is: `EVICTION_SAMPLE_SIZE`
+    /// 4) Pick the key with the smallest access frequency from the sample (K1)
+    /// 5) If the access frequency of the incoming key is less than the access frequency of the key K1, then reject the incoming key because
+    ///    its access frequency is less than the smallest access frequency
+    /// 6) Else, delete the key K1 and create the space in the cache. The space created will be equal to the weight of K1
+    /// 7) Repeat the process until either the incoming key is rejected or enough space to accommodate the incoming key is created in the cache
     fn create_space<DeleteHook>(&self,
                                 space_left: Weight,
                                 key_description: &KeyDescription<Key>,

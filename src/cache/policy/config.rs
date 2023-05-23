@@ -1,5 +1,10 @@
 use crate::cache::types::{TotalCapacity, TotalShards, Weight};
 
+/// CacheWeightConfig defines the following:
+/// `capacity`: is the capacity parameter for the DashMap used inside [`crate::cache::policy::cache_weight::CacheWeight`]
+///             it defines the total number of keys and their weight which may be a part of the DashMap
+/// `shards`:   is used as a `shard` parameter for the DashMap used inside [`crate::cache::policy::cache_weight::CacheWeight`]
+/// `total_cache_weight`: defines the maximum weight of the cache and is used inside [`crate::cache::policy::cache_weight::CacheWeight`]
 pub(crate) struct CacheWeightConfig {
     capacity: TotalCapacity,
     shards: TotalShards,

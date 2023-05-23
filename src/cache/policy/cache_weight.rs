@@ -13,6 +13,7 @@ use crate::cache::policy::config::CacheWeightConfig;
 use crate::cache::stats::ConcurrentStatsCounter;
 use crate::cache::types::{FrequencyEstimate, KeyHash, KeyId, Weight};
 
+/// WeightedKey maintains the key, its hash and its weight. It is used as a value type in the DashMap used inside `CacheWeight`
 pub(crate) struct WeightedKey<Key> {
     key: Key,
     pub(crate) key_hash: KeyHash,
@@ -29,14 +30,8 @@ impl<Key> WeightedKey<Key> {
     }
 }
 
-pub(crate) struct CacheWeight<Key>
-    where Key: Hash + Eq + Send + Sync + Clone + 'static, {
-    max_weight: Weight,
-    weight_used: RwLock<Weight>,
-    key_weights: DashMap<KeyId, WeightedKey<Key>>,
-    stats_counter: Arc<ConcurrentStatsCounter>,
-}
-
+/// SampledKey represents a key with its id, weight and estimated frequency.
+/// A collection of `SampledKey` is returned by `FrequencyCounterBasedMinHeapSamples` when a sample is requested during the admission of a key
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct SampledKey {
     pub(crate) id: KeyId,
@@ -78,6 +73,9 @@ impl SampledKey {
     }
 }
 
+/// FrequencyCounterBasedMinHeapSamples returns a sample to the `create_space` method of [`crate::cache::policy::admission_policy::AdmissionPolicy`]
+/// The idea is to return a sample and allow getting the key with the smallest access frequency.
+/// Internally, `FrequencyCounterBasedMinHeapSamples` uses [`std::collections::BinaryHeap`] and returns `SampledKey` that contains the key_id, its weight and its access frequency.
 pub(crate) struct FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
     where Freq: Fn(KeyHash) -> FrequencyEstimate {
     source: &'a DashMap<KeyId, WeightedKey<Key>>,
@@ -103,6 +101,15 @@ impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
         }
     }
 
+    /// There should never be a case where `min_frequency_key` is not able to return a key because sample size is always greater than 1.
+    /// However, the current implementation has a sort of a race condition.
+    /// Consider there is a `put` operation in progress through `AdmissionPolicy`.
+    /// At the same time, `shutdown` is invoked on the instance of `Cached`. The current implementation of `shutdown` sends a `Shutdown` command to the
+    /// [`crate::cache::command::command_executor::CommandExecutor`] and then calls `clear` on the `AdmissionPolicy`.
+    /// The `clear` method of `AdmissionPolicy` clears all the entries in the `CacheWeight`.
+    /// Consider that the `clear` operation is done on  `CacheWeight` and now `maybe_fill_in` is called but it would not be able to fill in the new keys
+    /// There would be a stage where `self.sample` might become empty and `pop` does not return anything.
+    /// Hence, at this stage, `min_frequency_key` returns an Option<SampledKey>
     pub(crate) fn min_frequency_key(&mut self) -> Option<SampledKey> {
         if let Some(key) = self.sample.pop() {
             self.current_sample_key_ids.remove(&key.id);
@@ -111,6 +118,9 @@ impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
         None
     }
 
+    /// Everytime a key is used from the sample, an attempt is made to fill_in the sample
+    /// In order to fill_in, we need to ensure that we do not add the key which is already present in the `BinaryHeap` again
+    /// Rust's `BinaryHeap` does not provide a `contains` method, so we use a `HashSet` to determine the key_ids that are a part of the current sample.
     pub(crate) fn maybe_fill_in(&mut self) -> bool {
         let mut filled_in: bool = false;
         let mut iterator = self.source.iter();
@@ -137,6 +147,7 @@ impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
         self.sample.len()
     }
 
+    /// Return an initial sample with size = `sample_size`
     fn initial_sample(
         source: &DashMap<KeyId, WeightedKey<Key>>,
         sample_size: usize,
@@ -156,6 +167,19 @@ impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
         }
         (sample, current_sample_key_ids)
     }
+}
+
+/// CacheWeight maintains the weight of each key in the Cache and also manages the weight that is used in the cache.
+/// Weight of each key is maintained via `WeightedKey` abstraction that contains the key, key_hash and its weight.
+/// Every time a key is added in the cache, it is also added in `CacheWeight`, there by increasing the total weight of the cache.
+/// Every time a key is updated, an attempt is made to update its weight, there by changing the total weight of the cache.
+/// Every time a key is deleted, it is also deleted from `CacheWeight`, there by decreasing the total weight of the cache.
+pub(crate) struct CacheWeight<Key>
+    where Key: Hash + Eq + Send + Sync + Clone + 'static, {
+    max_weight: Weight,
+    weight_used: RwLock<Weight>,
+    key_weights: DashMap<KeyId, WeightedKey<Key>>,
+    stats_counter: Arc<ConcurrentStatsCounter>,
 }
 
 impl<Key> CacheWeight<Key>
