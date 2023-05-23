@@ -17,14 +17,20 @@ use crate::cache::expiration::TTLTicker;
 use crate::cache::key_description::KeyDescription;
 use crate::cache::policy::admission_policy::AdmissionPolicy;
 use crate::cache::pool::Pool;
+use crate::cache::put_or_update::PutOrUpdateRequest;
 use crate::cache::stats::{ConcurrentStatsCounter, StatsSummary};
 use crate::cache::store::{Store, TypeOfExpiryUpdate};
 use crate::cache::store::key_value_ref::KeyValueRef;
 use crate::cache::store::stored_value::StoredValue;
 use crate::cache::types::{KeyId, Weight};
 use crate::cache::unique_id::increasing_id_generator::IncreasingIdGenerator;
-use crate::cache::put_or_update::PutOrUpdateRequest;
 
+/// `CacheD` is an LFU based, memory bound cache. Cached provides various methods including `put`, `put_with_weight`, `get`, `get_ref`, `map_get_ref`, `delete`, `put_or_update`.
+/// The core abstractions that `CacheD` interacts with include:
+/// [`crate::cache::store::Store`]: `Store` holds the key/value mapping.
+/// [`crate::cache::command::command_executor::CommandExecutor`]: `CommandExecutor` executes various commands of type [`crate::cache::command::CommandType`]. Each write operation results in a command to `CommandExecutor`.
+/// [`crate::cache::policy::admission_policy::AdmissionPolicy`]: `AdmissionPolicy` maintains the weight of each key in the cache and takes a decision on whether a key should be admitted
+/// [`crate::cache::expiration::TTLTicker`]: `TTLTicker` removes the expired keys.
 pub struct CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + 'static {
@@ -41,6 +47,7 @@ pub struct CacheD<Key, Value>
 impl<Key, Value> CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + 'static {
+    /// Creates a new instance of `Cached` with the provided [`crate::cache::config::Config`]
     pub fn new(config: Config<Key, Value>) -> Self {
         assert!(config.counters > 0);
 
@@ -63,12 +70,49 @@ impl<Key, Value> CacheD<Key, Value>
         }
     }
 
+    /// Puts the key/value pair in the cacheD instance and returns an instance of [` crate::cache::command::command_executor::CommandSendResult`] to the clients.
+    /// Weight is calculated by the weight calculation function provided as a part of `Config`.
+    /// `put` is not an immediate operation. Every invocation of `put` results in [`crate::cache::command::CommandType::Put`] to the `CommandExecutor`
+    /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
+    /// `AdmissionPolicy` may accept or reject the key/value pair depending on the available cache weight.
+    /// See [`crate::cache::policy::admission_policy::AdmissionPolicy`] for more details.
+    /// Since, `put` is not an immediate operation, clients can `await` on the response to get the [`crate::cache::command::CommandStatus`]
+    /// ```
+    /// use cached::cache::cached::CacheD;
+    /// use cached::cache::command::CommandStatus;
+    /// use cached::cache::config::ConfigBuilder;
+    /// #[tokio::main]
+    ///  async fn main() {
+    ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
+    ///     let status = cached.put("topic", "microservices").unwrap().handle().await;
+    ///     assert_eq!(CommandStatus::Accepted, status);
+    /// }
+    /// ```
     pub fn put(&self, key: Key, value: Value) -> CommandSendResult {
         let weight = (self.config.weight_calculation_fn)(&key, &value, false);
         assert!(weight > 0, "{}", Errors::WeightCalculationGtZero);
         self.put_with_weight(key, value, weight)
     }
 
+    /// Puts the key/value pair in the cacheD instance and returns an instance of [` crate::cache::command::command_executor::CommandSendResult`] to the clients.
+    /// Weight is provided by the clients.
+    /// `put_with_weight` is not an immediate operation. Every invocation of `put_with_weight` results in [`crate::cache::command::CommandType::Put`] to the `CommandExecutor`
+    /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
+    /// `AdmissionPolicy` may accept or reject the key/value pair depending on the available cache weight.
+    /// See [`crate::cache::policy::admission_policy::AdmissionPolicy`] for more details.
+    /// Since, `put_with_weight` is not an immediate operation, clients can `await` on the response to get the [`crate::cache::command::CommandStatus`]
+    /// ```
+    /// use cached::cache::cached::CacheD;
+    /// use cached::cache::command::CommandStatus;
+    /// use cached::cache::config::ConfigBuilder;
+    /// #[tokio::main]
+    ///  async fn main() {
+    ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
+    ///     let status = cached.put_with_weight("topic", "microservices", 50).unwrap().handle().await;
+    ///     assert_eq!(CommandStatus::Accepted, status);
+    ///     assert_eq!(50, cached.total_weight_used());
+    /// }
+    /// ```
     pub fn put_with_weight(&self, key: Key, value: Value, weight: Weight) -> CommandSendResult {
         if self.is_shutting_down() { return shutdown_result(); }
 
@@ -79,6 +123,25 @@ impl<Key, Value> CacheD<Key, Value>
         ))
     }
 
+    /// Puts the key/value pair with `time_to_live` in the cacheD instance and returns an instance of [` crate::cache::command::command_executor::CommandSendResult`] to the clients.
+    /// Weight is calculated by the weight calculation function provided as a part of `Config`.
+    /// `put_with_ttl` is not an immediate operation. Every invocation of `put_with_ttl` results in [`crate::cache::command::CommandType::PutWithTTL`] to the `CommandExecutor`
+    /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
+    /// `AdmissionPolicy` may accept or reject the key/value pair depending on the available cache weight.
+    /// See [`crate::cache::policy::admission_policy::AdmissionPolicy`] for more details.
+    /// Since, `put_with_ttl` is not an immediate operation, clients can `await` on the response to get the [`crate::cache::command::CommandStatus`]
+    /// ```
+    /// use cached::cache::cached::CacheD;
+    /// use cached::cache::command::CommandStatus;
+    /// use cached::cache::config::ConfigBuilder;
+    /// use std::time::Duration;
+    /// #[tokio::main]
+    ///  async fn main() {
+    ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
+    ///     let status = cached.put_with_ttl("topic", "microservices", Duration::from_secs(120)).unwrap().handle().await;
+    ///     assert_eq!(CommandStatus::Accepted, status);
+    /// }
+    /// ```
     pub fn put_with_ttl(&self, key: Key, value: Value, time_to_live: Duration) -> CommandSendResult {
         if self.is_shutting_down() { return shutdown_result(); }
 
@@ -89,6 +152,26 @@ impl<Key, Value> CacheD<Key, Value>
         )
     }
 
+    /// Puts the key/value pair with `time_to_live` in the cacheD instance and returns an instance of [` crate::cache::command::command_executor::CommandSendResult`] to the clients.
+    /// Weight is provided by the clients.
+    /// `put_with_weight_and_ttl` is not an immediate operation. Every invocation of `put_with_weight_and_ttl` results in [`crate::cache::command::CommandType::PutWithTTL`] to the `CommandExecutor`
+    /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
+    /// `AdmissionPolicy` may accept or reject the key/value pair depending on the available cache weight.
+    /// See [`crate::cache::policy::admission_policy::AdmissionPolicy`] for more details.
+    /// Since, `put_with_weight_and_ttl` is not an immediate operation, clients can `await` on the response to get the [`crate::cache::command::CommandStatus`]
+    /// ```
+    /// use cached::cache::cached::CacheD;
+    /// use cached::cache::command::CommandStatus;
+    /// use cached::cache::config::ConfigBuilder;
+    /// use std::time::Duration;
+    /// #[tokio::main]
+    ///  async fn main() {
+    ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
+    ///     let status = cached.put_with_weight_and_ttl("topic", "microservices", 50, Duration::from_secs(120)).unwrap().handle().await;
+    ///     assert_eq!(50, cached.total_weight_used());
+    ///     assert_eq!(CommandStatus::Accepted, status);
+    /// }
+    /// ```
     pub fn put_with_weight_and_ttl(&self, key: Key, value: Value, weight: Weight, time_to_live: Duration) -> CommandSendResult {
         if self.is_shutting_down() { return shutdown_result(); }
 
@@ -98,6 +181,25 @@ impl<Key, Value> CacheD<Key, Value>
         ))
     }
 
+    /// Performs a put or an update operation. `PutOrUpdateRequest` is a convenient way to perform put or update operation.
+    /// `put_or_update` attempts to perform the update operation on [`crate::cache::store::Store`], this update includes value, weight or time_to_live
+    /// If the update operation is successful then the changes made to `TTLTicker` and `AdmissionPolicy`, if applicable.
+    /// If the update is not successful then a `put` operation is performed.
+    /// ```
+    /// use cached::cache::cached::CacheD;
+    /// use cached::cache::command::CommandStatus;
+    /// use cached::cache::config::ConfigBuilder;
+    /// use cached::cache::put_or_update::PutOrUpdateRequestBuilder;
+    /// #[tokio::main]
+    ///  async fn main() {
+    ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
+    ///     let status = cached.put("topic", "microservices").unwrap().handle().await;
+    ///     assert_eq!(CommandStatus::Accepted, status);
+    ///     let _ = cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").value("Cached").build()).unwrap().handle().await;
+    ///     let value = cached.get(&"topic");
+    ///     assert_eq!(Some("Cached"), value);
+    /// }
+    /// ```
     pub fn put_or_update(&self, request: PutOrUpdateRequest<Key, Value>) -> CommandSendResult {
         if self.is_shutting_down() { return shutdown_result(); }
 
@@ -150,6 +252,25 @@ impl<Key, Value> CacheD<Key, Value>
         Ok(CommandAcknowledgement::accepted())
     }
 
+    /// Deletes the key/value pair from the instance of `CacheD`. Delete is a 2 step process:
+    /// 1) Marks the key as deleted in the [`crate::cache::store::Store`]. So, any `get` operations on the key would return None.
+    ///    This step is immediate.
+    /// 2) Sends a [`crate::cache::command::CommandType::Delete`] to the `CommandExecutor` which cause the key weight to be removed from `AdmissionPolicy`.
+    ///    This step may happen at a later point in time.
+    /// Since, `delete` is not an immediate operation, clients can `await` on the response to get the [`crate::cache::command::CommandStatus`]
+    /// ```
+    /// use cached::cache::cached::CacheD;
+    /// use cached::cache::command::CommandStatus;
+    /// use cached::cache::config::ConfigBuilder;
+    /// #[tokio::main]
+    ///  async fn main() {
+    ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
+    ///     let status = cached.put("topic", "microservices").unwrap().handle().await;
+    ///     assert_eq!(CommandStatus::Accepted, status);
+    ///     let _ = cached.delete(&"topic").unwrap().handle().await;
+    ///     assert_eq!(None, cached.get(&"topic"));
+    /// }
+    /// ```
     pub fn delete(&self, key: Key) -> CommandSendResult {
         if self.is_shutting_down() { return shutdown_result(); }
 
@@ -157,6 +278,27 @@ impl<Key, Value> CacheD<Key, Value>
         self.command_executor.send(CommandType::Delete(key))
     }
 
+    /// Returns an optional reference to the key/value present in the instance of `Cached`.
+    /// The reference is wrapped in [`crate::cache::store::key_value_ref::KeyValueRef`].
+    /// KeyValueRef contains DashMap's Ref [`dashmap::mapref::one::Ref`] which internally holds a `RwLockReadGuard` for the shard.
+    /// Any time `get_ref` method is invoked, the `Store` returns `Option<KeyValueRef<'_, Key, StoredValue<Value>>>`.
+    /// If the key is present in the `Store`, `get_ref` will return `Some<KeyValueRef<'_, Key, StoredValue<Value>>>`.
+    /// Hence, the invocation of `get_ref` will hold a lock against the shard that contains the key (within the scope of its usage).
+    /// ```
+    /// use cached::cache::cached::CacheD;
+    /// use cached::cache::command::CommandStatus;
+    /// use cached::cache::config::ConfigBuilder;
+    /// #[tokio::main]
+    ///  async fn main() {
+    ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
+    ///     let status = cached.put("topic", "microservices").unwrap().handle().await;
+    ///     assert_eq!(CommandStatus::Accepted, status);
+    ///     let value = cached.get_ref(&"topic");
+    ///     let value_ref = value.unwrap();
+    ///     let stored_value = value_ref.value();
+    ///     assert_eq!("microservices", stored_value.value());
+    /// }
+    /// ```
     pub fn get_ref(&self, key: &Key) -> Option<KeyValueRef<'_, Key, StoredValue<Value>>> {
         if self.is_shutting_down() { return None; }
 
@@ -167,6 +309,23 @@ impl<Key, Value> CacheD<Key, Value>
         None
     }
 
+    /// Returns an optional MappedValue for key present in the instance of `Cached`.
+    /// The parameter `map_fn` is an instance of `Fn` that takes a reference to [`crate::cache::store::stored_value::StoredValue`] and returns any MappedValue
+    /// This is an extension to `get_ref` method.
+    /// If the key is present in `Cached`, it returns `Some(MappedValue)`, else returns `None`.
+    /// ```
+    /// use cached::cache::cached::CacheD;
+    /// use cached::cache::command::CommandStatus;
+    /// use cached::cache::config::ConfigBuilder;
+    /// #[tokio::main]
+    ///  async fn main() {
+    ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
+    ///     let status = cached.put("topic", "microservices").unwrap().handle().await;
+    ///     assert_eq!(CommandStatus::Accepted, status);
+    ///     let value = cached.map_get_ref(&"topic", |stored_value| stored_value.value_ref().to_uppercase());
+    ///     assert_eq!("MICROSERVICES", value.unwrap());
+    /// }
+    /// ```
     pub fn map_get_ref<MapFn, MappedValue>(&self, key: &Key, map_fn: MapFn) -> Option<MappedValue>
         where MapFn: Fn(&StoredValue<Value>) -> MappedValue {
         if self.is_shutting_down() { return None; }
@@ -177,14 +336,48 @@ impl<Key, Value> CacheD<Key, Value>
         None
     }
 
+    /// Returns the total weight used in the cache.
     pub fn total_weight_used(&self) -> Weight {
         self.admission_policy.weight_used()
     }
 
+    /// Returns an instance of [`crate::cache::stats::StatsSummary`]
+    /// ```
+    /// use cached::cache::cached::CacheD;
+    /// use cached::cache::config::ConfigBuilder;
+    /// use cached::cache::stats::StatsType;
+    /// #[tokio::main]
+    ///  async fn main() {
+    ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 200).build());
+    ///     let _ = cached.put("topic", "microservices").unwrap().handle().await;
+    ///     let _ = cached.put("cache", "cached").unwrap().handle().await;
+    ///     let _ = cached.get(&"topic");
+    ///     let _ = cached.get(&"cache");
+    ///     let stats_summary = cached.stats_summary();
+    ///     assert_eq!(2, stats_summary.get(&StatsType::CacheHits).unwrap());
+    /// }
+    /// ```
     pub fn stats_summary(&self) -> StatsSummary {
         self.store.stats_counter().summary()
     }
 
+    /// Shuts down the cache.
+    /// Shutdown involves the following:
+    /// 1) Marking `is_shutting_down` to true
+    /// 2) Sending a [`crate::cache::command::CommandType::Shutdown`] to the [`crate::cache::command::command_executor::CommandExecutor`]
+    /// 3) Shutting down [`crate::cache::expiration::TTLTicker`]
+    /// 4) Clearing the data inside [`crate::cache::store::Store`]
+    /// 5) Clearing the data inside [`crate::cache::policy::admission_policy::AdmissionPolicy`]
+    /// 6) Clearing the data inside [`crate::cache::expiration::TTLTicker`]
+    /// Any attempt to perform an operation after tge `CacheD` instance is shutdown, will result in an error.
+    /// However, there is race condition sort of a scenario here.
+    /// Consider that `shutdown()` and `put()` on an instance of `Cached` are invoked at the same time.
+    /// Both these operations result in sending different commands to the `CommandExecutor`.
+    /// Somehow, the `Shutdown` command goes in before the `put` command.
+    /// This also means that the client could have performed `await` operation on response from `put`.
+    /// It becomes important to finish the future of the `put` command that has come in at the same time `shutdown` was invoked.
+    /// This is how `shutdown` in `CommandExecutor` is handled, it finishes all the futures in the pipiline that are placed after the `Shutdown` command.
+    /// Refer to the documentation inside [`crate::cache::command::command_executor::CommandExecutor`].
     pub fn shutdown(&self) {
         if self.is_shutting_down.compare_exchange(false, true, Ordering::Release, Ordering::Relaxed).is_ok() {
             info!("Starting to shutdown cached");
@@ -328,8 +521,8 @@ mod tests {
 
     use crate::cache::cached::CacheD;
     use crate::cache::config::{ConfigBuilder, WeightCalculationFn};
-    use crate::cache::stats::StatsType;
     use crate::cache::put_or_update::{PutOrUpdateRequest, PutOrUpdateRequestBuilder};
+    use crate::cache::stats::StatsType;
 
     #[derive(Eq, PartialEq, Debug)]
     struct Name {
@@ -1083,8 +1276,8 @@ mod put_or_update_tests {
     use crate::cache::cached::put_or_update_tests::setup::UnixEpochClock;
     use crate::cache::clock::ClockType;
     use crate::cache::config::ConfigBuilder;
-    use crate::cache::types::Weight;
     use crate::cache::put_or_update::PutOrUpdateRequestBuilder;
+    use crate::cache::types::Weight;
 
     mod setup {
         use std::time::SystemTime;

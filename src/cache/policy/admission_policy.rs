@@ -19,7 +19,7 @@ use crate::cache::types::{FrequencyEstimate, KeyHash, KeyId, TotalCounters, Weig
 const EVICTION_SAMPLE_SIZE: usize = 5;
 const CHANNEL_CAPACITY: usize = 10;
 
-/// `AdmissionPolicy` maintains the weight of each in the cache in the [`crate::cache::policy::cache_weight::CacheWeight`] abstraction.
+/// `AdmissionPolicy` maintains the weight of each key in the cache in the [`crate::cache::policy::cache_weight::CacheWeight`] abstraction.
 /// `AdmissionPolicy` is responsible for a few things:
 /// 1) It contains [`crate::cache::lfu::tiny_lfu::TinyLFU`] that provides methods to increase and estimate the access frequency of keys
 /// 2) It is responsible for deciding if a key should be admitted in the cache.

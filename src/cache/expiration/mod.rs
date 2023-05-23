@@ -14,8 +14,8 @@ use crate::cache::types::{ExpireAfter, KeyId};
 
 pub(crate) mod config;
 
-/// TTLTicker removes the expired keys.
-/// TTLTicker is a shared lock based HashMap. Each shard holds a [`parking_lot::RwLock`] protected [`hashbrown::HashMap`]
+/// `TTLTicker` removes the expired keys.
+/// `TTLTicker` is a shared lock based HashMap. Each shard holds a [`parking_lot::RwLock`] protected [`hashbrown::HashMap`]
 /// During the event of cache shutdown, keep_running is set to false.
 pub(crate) struct TTLTicker {
     shards: Arc<[RwLock<HashMap<KeyId, ExpireAfter>>]>,
