@@ -49,6 +49,10 @@ impl Display for ErrorType {
     }
 }
 
+/// Display implementation for `Errors`.
+/// All the error messages are returned in a consistent format:
+/// `[Type of the error]: Error Message`
+/// Example: `[Config error]: Total cache weight must be greater than zero`
 impl Display for Errors {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
