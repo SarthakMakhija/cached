@@ -12,7 +12,7 @@ pub(crate) mod command_executor;
 /// Put             : attempts to put the new key/value pair in the cache
 /// PutWithTTL      : attempts to put the new key/value pair with time_to_live in the cache
 /// Delete          : attempts to delete the key
-/// UpdateWeight    : updates the weight of the key. This command is sent as a part of `upsert` operation
+/// UpdateWeight    : updates the weight of the key. This command is sent as a part of `put_or_update` operation
 /// Shutdown        : informs the [`crate::cache::command::command_executor::CommandExecutor`] that the cache is being shutdown
 pub(crate) enum CommandType<Key, Value>
     where Key: Hash + Eq + Clone {

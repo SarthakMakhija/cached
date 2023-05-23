@@ -12,6 +12,6 @@ criterion_main! {
     benchmarks::get_ref::benches,
     benchmarks::put_get::benches,
     benchmarks::delete::benches,
-    benchmarks::upsert::benches,
+    benchmarks::put_or_update::benches,
     benchmarks::cache_hits::benches,
 }

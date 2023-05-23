@@ -23,7 +23,7 @@ use crate::cache::store::key_value_ref::KeyValueRef;
 use crate::cache::store::stored_value::StoredValue;
 use crate::cache::types::{KeyId, Weight};
 use crate::cache::unique_id::increasing_id_generator::IncreasingIdGenerator;
-use crate::cache::upsert::UpsertRequest;
+use crate::cache::put_or_update::PutOrUpdateRequest;
 
 pub struct CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
@@ -98,7 +98,7 @@ impl<Key, Value> CacheD<Key, Value>
         ))
     }
 
-    pub fn upsert(&self, request: UpsertRequest<Key, Value>) -> CommandSendResult {
+    pub fn put_or_update(&self, request: PutOrUpdateRequest<Key, Value>) -> CommandSendResult {
         if self.is_shutting_down() { return shutdown_result(); }
 
         let updated_weight = request.updated_weight(&self.config.weight_calculation_fn);
@@ -110,12 +110,12 @@ impl<Key, Value> CacheD<Key, Value>
 
         if !update_response.did_update_happen() {
             let value = update_response.value();
-            assert!(value.is_some(), "{}", Errors::UpsertValueMissing);
+            assert!(value.is_some(), "{}", Errors::PutOrUpdateValueMissing);
             assert!(updated_weight.is_some());
 
             let value = value.unwrap();
             let weight = updated_weight.unwrap();
-            assert!(weight > 0, "{}", Errors::KeyWeightGtZero("upsert"));
+            assert!(weight > 0, "{}", Errors::KeyWeightGtZero("PutOrUpdate"));
 
             return if let Some(time_to_live) = time_to_live {
                 self.put_with_weight_and_ttl(key, value, weight, time_to_live)
@@ -144,7 +144,7 @@ impl<Key, Value> CacheD<Key, Value>
         };
 
         if let Some(weight) = updated_weight {
-            assert!(weight > 0, "{}", Errors::KeyWeightGtZero("upsert"));
+            assert!(weight > 0, "{}", Errors::KeyWeightGtZero("PutOrUpdate"));
             return self.command_executor.send(CommandType::UpdateWeight(key_id, weight));
         }
         Ok(CommandAcknowledgement::accepted())
@@ -329,7 +329,7 @@ mod tests {
     use crate::cache::cached::CacheD;
     use crate::cache::config::{ConfigBuilder, WeightCalculationFn};
     use crate::cache::stats::StatsType;
-    use crate::cache::upsert::{UpsertRequest, UpsertRequestBuilder};
+    use crate::cache::put_or_update::{PutOrUpdateRequest, PutOrUpdateRequestBuilder};
 
     #[derive(Eq, PartialEq, Debug)]
     struct Name {
@@ -398,42 +398,42 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn upsert_results_in_put_value_must_be_present() {
+    fn put_or_update_results_in_put_value_must_be_present() {
         let cached = CacheD::new(test_config_builder().build());
-        let upsert: UpsertRequest<&str, &str> = UpsertRequestBuilder::new("store").build();
-        let _ = cached.upsert(upsert);
+        let put_or_update: PutOrUpdateRequest<&str, &str> = PutOrUpdateRequestBuilder::new("store").build();
+        let _ = cached.put_or_update(put_or_update);
     }
 
     #[test]
     #[should_panic]
-    fn upsert_results_in_put_with_weight_calculation_fn_must_return_weight_greater_than_zero() {
+    fn put_or_update_results_in_put_with_weight_calculation_fn_must_return_weight_greater_than_zero() {
         let weight_calculation: Box<WeightCalculationFn<&str, &str>> = Box::new(|_key, _value, _is_time_to_live_specified| 0);
         let cached = CacheD::new(test_config_builder().weight_calculation_fn(weight_calculation).build());
 
-        let upsert = UpsertRequestBuilder::new("store").value("cached").build();
-        let _ = cached.upsert(upsert);
+        let put_or_update = PutOrUpdateRequestBuilder::new("store").value("cached").build();
+        let _ = cached.put_or_update(put_or_update);
     }
 
     #[tokio::test]
     #[should_panic]
-    async fn upsert_results_in_update_with_weight_calculation_fn_must_return_weight_greater_than_zero() {
+    async fn put_or_update_results_in_update_with_weight_calculation_fn_must_return_weight_greater_than_zero() {
         let weight_calculation: Box<WeightCalculationFn<&str, &str>> = Box::new(|_key, _value, _is_time_to_live_specified| 0);
         let cached = CacheD::new(test_config_builder().weight_calculation_fn(weight_calculation).build());
         cached.put("topic", "microservices").unwrap().handle().await;
 
-        let upsert = UpsertRequestBuilder::new("topic").value("cached").build();
-        let _ = cached.upsert(upsert);
+        let put_or_update = PutOrUpdateRequestBuilder::new("topic").value("cached").build();
+        let _ = cached.put_or_update(put_or_update);
     }
 
 
     #[tokio::test]
     #[should_panic]
-    async fn upsert_results_in_update_with_weight_must_be_greater_than_zero() {
+    async fn put_or_update_results_in_update_with_weight_must_be_greater_than_zero() {
         let cached = CacheD::new(test_config_builder().build());
         cached.put("topic", "microservices").unwrap().handle().await;
 
-        let upsert = UpsertRequestBuilder::new("topic").value("cached").weight(0).build();
-        let _ = cached.upsert(upsert);
+        let put_or_update = PutOrUpdateRequestBuilder::new("topic").value("cached").weight(0).build();
+        let _ = cached.put_or_update(put_or_update);
     }
 
     #[tokio::test]
@@ -823,7 +823,7 @@ mod shutdown_tests {
 
     use crate::cache::cached::CacheD;
     use crate::cache::config::ConfigBuilder;
-    use crate::cache::upsert::UpsertRequestBuilder;
+    use crate::cache::put_or_update::PutOrUpdateRequestBuilder;
 
     fn test_config_builder() -> ConfigBuilder<&'static str, &'static str> {
         ConfigBuilder::new(100, 10, 100)
@@ -875,12 +875,12 @@ mod shutdown_tests {
     }
 
     #[test]
-    fn upsert_after_shutdown() {
+    fn put_or_update_after_shutdown() {
         let cached = CacheD::new(test_config_builder().build());
         cached.shutdown();
 
-        let upsert_result = cached.upsert(UpsertRequestBuilder::new("storage").weight(10).build());
-        assert!(upsert_result.is_err());
+        let put_or_update_result = cached.put_or_update(PutOrUpdateRequestBuilder::new("storage").weight(10).build());
+        assert!(put_or_update_result.is_err());
     }
 
     #[tokio::test]
@@ -1075,16 +1075,16 @@ mod shutdown_tests {
 }
 
 #[cfg(test)]
-mod upsert_tests {
+mod put_or_update_tests {
     use std::ops::Add;
     use std::time::Duration;
 
     use crate::cache::cached::CacheD;
-    use crate::cache::cached::upsert_tests::setup::UnixEpochClock;
+    use crate::cache::cached::put_or_update_tests::setup::UnixEpochClock;
     use crate::cache::clock::ClockType;
     use crate::cache::config::ConfigBuilder;
     use crate::cache::types::Weight;
-    use crate::cache::upsert::UpsertRequestBuilder;
+    use crate::cache::put_or_update::PutOrUpdateRequestBuilder;
 
     mod setup {
         use std::time::SystemTime;
@@ -1106,11 +1106,11 @@ mod upsert_tests {
     }
 
     #[tokio::test]
-    async fn upsert_a_non_existing_key_value() {
+    async fn put_or_update_a_non_existing_key_value() {
         let cached = CacheD::new(test_config_builder().build());
 
         let acknowledgement =
-            cached.upsert(UpsertRequestBuilder::new("topic").value("microservices").build()).unwrap();
+            cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").value("microservices").build()).unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get_ref(&"topic");
@@ -1121,11 +1121,11 @@ mod upsert_tests {
     }
 
     #[tokio::test]
-    async fn upsert_a_non_existing_key_value_with_weight() {
+    async fn put_or_update_a_non_existing_key_value_with_weight() {
         let cached = CacheD::new(test_config_builder().build());
 
         let acknowledgement =
-            cached.upsert(UpsertRequestBuilder::new("topic").value("microservices").weight(33).build()).unwrap();
+            cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").value("microservices").weight(33).build()).unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get_ref(&"topic");
@@ -1138,12 +1138,12 @@ mod upsert_tests {
     }
 
     #[tokio::test]
-    async fn upsert_a_non_existing_key_value_with_time_to_live() {
+    async fn put_or_update_a_non_existing_key_value_with_time_to_live() {
         let clock: ClockType = Box::new(UnixEpochClock {});
         let cached = CacheD::new(test_config_builder().clock(clock.clone_box()).build());
 
         let acknowledgement =
-            cached.upsert(UpsertRequestBuilder::new("topic").value("microservices").time_to_live(Duration::from_secs(10)).build()).unwrap();
+            cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").value("microservices").time_to_live(Duration::from_secs(10)).build()).unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get_ref(&"topic");
@@ -1163,7 +1163,7 @@ mod upsert_tests {
         acknowledgement.handle().await;
 
         let acknowledgement =
-            cached.upsert(UpsertRequestBuilder::new("topic").value("storage engine").build()).unwrap();
+            cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").value("storage engine").build()).unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get_ref(&"topic");
@@ -1182,7 +1182,7 @@ mod upsert_tests {
         acknowledgement.handle().await;
 
         let acknowledgement =
-            cached.upsert(UpsertRequestBuilder::new("topic").weight(29).build()).unwrap();
+            cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").weight(29).build()).unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get_ref(&"topic");
@@ -1206,7 +1206,7 @@ mod upsert_tests {
         let original_weight = weight_of(&cached, "topic");
 
         let acknowledgement =
-            cached.upsert(UpsertRequestBuilder::new("topic").time_to_live(Duration::from_secs(100)).build()).unwrap();
+            cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").time_to_live(Duration::from_secs(100)).build()).unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get_ref(&"topic");
@@ -1233,7 +1233,7 @@ mod upsert_tests {
         let original_weight = weight_of(&cached, "topic");
 
         let acknowledgement =
-            cached.upsert(UpsertRequestBuilder::new("topic").remove_time_to_live().build()).unwrap();
+            cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").remove_time_to_live().build()).unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get_ref(&"topic");
@@ -1259,7 +1259,7 @@ mod upsert_tests {
         let original_weight = weight_of(&cached, "topic");
 
         let acknowledgement =
-            cached.upsert(UpsertRequestBuilder::new("topic").time_to_live(Duration::from_secs(120)).build()).unwrap();
+            cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").time_to_live(Duration::from_secs(120)).build()).unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get_ref(&"topic");
@@ -1286,7 +1286,7 @@ mod upsert_tests {
         let original_weight = weight_of(&cached, "topic");
 
         let acknowledgement =
-            cached.upsert(UpsertRequestBuilder::new("topic").value("storage engine").time_to_live(Duration::from_secs(100)).build()).unwrap();
+            cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").value("storage engine").time_to_live(Duration::from_secs(100)).build()).unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get_ref(&"topic");
@@ -1313,7 +1313,7 @@ mod upsert_tests {
         let original_weight = weight_of(&cached, "topic");
 
         let acknowledgement =
-            cached.upsert(UpsertRequestBuilder::new("topic").value("storage engine").remove_time_to_live().build()).unwrap();
+            cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").value("storage engine").remove_time_to_live().build()).unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get_ref(&"topic");
@@ -1341,7 +1341,7 @@ mod upsert_tests {
         let original_weight = weight_of(&cached, "topic");
 
         let acknowledgement =
-            cached.upsert(UpsertRequestBuilder::new("topic").value("storage engine").weight(300).remove_time_to_live().build()).unwrap();
+            cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").value("storage engine").weight(300).remove_time_to_live().build()).unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get_ref(&"topic");
@@ -1369,7 +1369,7 @@ mod upsert_tests {
         let original_weight = weight_of(&cached, "topic");
 
         let acknowledgement =
-            cached.upsert(UpsertRequestBuilder::new("topic").time_to_live(Duration::from_secs(500)).build()).unwrap();
+            cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").time_to_live(Duration::from_secs(500)).build()).unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get_ref(&"topic");

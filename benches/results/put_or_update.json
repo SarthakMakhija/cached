@@ -1,8 +1,8 @@
 [
   {
     "reason": "benchmark-complete",
-    "id": "Cached.upsert() | No contention",
-    "report_directory": "./target/criterion/reports/Cached.upsert() _ No contention",
+    "id": "Cached.put_or_update() | No contention",
+    "report_directory": "./target/criterion/reports/Cached.put_or_update() _ No contention",
     "iteration_count": [
       1710,
       3420,
@@ -257,8 +257,8 @@
   },
   {
     "reason": "benchmark-complete",
-    "id": "Cached.upsert() | 8 threads",
-    "report_directory": "./target/criterion/reports/Cached.upsert() _ 8 threads",
+    "id": "Cached.put_or_update() | 8 threads",
+    "report_directory": "./target/criterion/reports/Cached.put_or_update() _ 8 threads",
     "iteration_count": [
       1641,
       3282,
@@ -513,8 +513,8 @@
   },
   {
     "reason": "benchmark-complete",
-    "id": "Cached.upsert() | 16 threads",
-    "report_directory": "./target/criterion/reports/Cached.upsert() _ 16 threads",
+    "id": "Cached.put_or_update() | 16 threads",
+    "report_directory": "./target/criterion/reports/Cached.put_or_update() _ 16 threads",
     "iteration_count": [
       1809,
       3618,
@@ -769,8 +769,8 @@
   },
   {
     "reason": "benchmark-complete",
-    "id": "Cached.upsert() | 32 threads",
-    "report_directory": "./target/criterion/reports/Cached.upsert() _ 32 threads",
+    "id": "Cached.put_or_update() | 32 threads",
+    "report_directory": "./target/criterion/reports/Cached.put_or_update() _ 32 threads",
     "iteration_count": [
       1632,
       3264,

@@ -10,9 +10,9 @@ const ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO: &str = "Buffer size must be greater tha
 const ERROR_MESSAGE_COMMAND_BUFFER_SIZE_GT_ZERO: &str = "Command buffer size must be greater than zero";
 const ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO: &str = "Weight of the input key/value must be greater than zero";
 const ERROR_MESSAGE_WEIGHT_CALCULATION_GT_ZERO: &str = "Weight of the input key/value calculated by the weight calculation function must be greater than zero";
-const ERROR_MESSAGE_UPSERT_VALUE_MISSING: &str = "Upsert has resulted in a put request, value must be specified";
-const ERROR_MESSAGE_INVALID_UPSERT: &str = "Upsert request is invalid, either 'value', 'weight', 'time_to_live' or 'remove_time_to_live' must be specified";
-const ERROR_MESSAGE_INVALID_UPSERT_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE: &str = "Upsert request is invalid, only one of 'time_to_live' or 'remove_time_to_live' must be specified";
+const ERROR_MESSAGE_PUT_OR_UPDATE_VALUE_MISSING: &str = "PutOrUpdate has resulted in a put request, value must be specified";
+const ERROR_MESSAGE_INVALID_PUT_OR_UPDATE: &str = "PutOrUpdate request is invalid, either 'value', 'weight', 'time_to_live' or 'remove_time_to_live' must be specified";
+const ERROR_MESSAGE_INVALID_PUT_OR_UPDATE_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE: &str = "PutOrUpdate request is invalid, only one of 'time_to_live' or 'remove_time_to_live' must be specified";
 
 /// Errors enum define various application errors.
 /// Currently, errors are categorized either as OperationError or ConfigError under [`ErrorType`] enum.
@@ -28,9 +28,9 @@ pub(crate) enum Errors {
     CommandBufferSizeGtZero,
     KeyWeightGtZero(&'static str),
     WeightCalculationGtZero,
-    UpsertValueMissing,
-    InvalidUpsert,
-    InvalidUpsertEitherTimeToLiveOrRemoveTimeToLive,
+    PutOrUpdateValueMissing,
+    InvalidPutOrUpdate,
+    InvalidPutOrUpdateEitherTimeToLiveOrRemoveTimeToLive,
 }
 
 pub(crate) enum ErrorType {
@@ -76,12 +76,12 @@ impl Display for Errors {
                 write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_WEIGHT_CALCULATION_GT_ZERO),
             Errors::KeyWeightGtZero(operation) =>
                 write!(formatter, "[{}]: {}", ErrorType::OperationError(operation), ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO),
-            Errors::UpsertValueMissing =>
-                write!(formatter, "[{}]: {}", ErrorType::OperationError("upsert"), ERROR_MESSAGE_UPSERT_VALUE_MISSING),
-            Errors::InvalidUpsert =>
-                write!(formatter, "[{}]: {}", ErrorType::OperationError("upsert request builder"), ERROR_MESSAGE_INVALID_UPSERT),
-            Errors::InvalidUpsertEitherTimeToLiveOrRemoveTimeToLive =>
-                write!(formatter, "[{}]: {}", ErrorType::OperationError("upsert request builder"), ERROR_MESSAGE_INVALID_UPSERT_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE),
+            Errors::PutOrUpdateValueMissing =>
+                write!(formatter, "[{}]: {}", ErrorType::OperationError("PutOrUpdate"), ERROR_MESSAGE_PUT_OR_UPDATE_VALUE_MISSING),
+            Errors::InvalidPutOrUpdate =>
+                write!(formatter, "[{}]: {}", ErrorType::OperationError("PutOrUpdate request builder"), ERROR_MESSAGE_INVALID_PUT_OR_UPDATE),
+            Errors::InvalidPutOrUpdateEitherTimeToLiveOrRemoveTimeToLive =>
+                write!(formatter, "[{}]: {}", ErrorType::OperationError("PutOrUpdate request builder"), ERROR_MESSAGE_INVALID_PUT_OR_UPDATE_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE),
         }
     }
 }
@@ -90,14 +90,14 @@ impl Display for Errors {
 mod tests {
     use crate::cache::errors::{ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO, ERROR_MESSAGE_TOTAL_CAPACITY_GT_ZERO, ERROR_MESSAGE_TOTAL_SHARDS_POWER_OF_2};
     use crate::cache::errors::ERROR_MESSAGE_COMMAND_BUFFER_SIZE_GT_ZERO;
-    use crate::cache::errors::ERROR_MESSAGE_INVALID_UPSERT;
-    use crate::cache::errors::ERROR_MESSAGE_INVALID_UPSERT_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE;
+    use crate::cache::errors::ERROR_MESSAGE_INVALID_PUT_OR_UPDATE;
+    use crate::cache::errors::ERROR_MESSAGE_INVALID_PUT_OR_UPDATE_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE;
     use crate::cache::errors::ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO;
     use crate::cache::errors::ERROR_MESSAGE_POOL_SIZE_GT_ZERO;
     use crate::cache::errors::ERROR_MESSAGE_TOTAL_CACHE_WEIGHT_GT_ZERO;
     use crate::cache::errors::ERROR_MESSAGE_TOTAL_COUNTERS_GT_ZERO;
     use crate::cache::errors::ERROR_MESSAGE_TOTAL_SHARDS_GT_ONE;
-    use crate::cache::errors::ERROR_MESSAGE_UPSERT_VALUE_MISSING;
+    use crate::cache::errors::ERROR_MESSAGE_PUT_OR_UPDATE_VALUE_MISSING;
     use crate::cache::errors::ERROR_MESSAGE_WEIGHT_CALCULATION_GT_ZERO;
     use crate::cache::errors::Errors;
     use crate::cache::errors::ErrorType;
@@ -163,20 +163,20 @@ mod tests {
     }
 
     #[test]
-    fn error_upsert_value_missing() {
-        let error = Errors::UpsertValueMissing;
-        assert_eq!(format!("[{}]: {}", ErrorType::OperationError("upsert"), ERROR_MESSAGE_UPSERT_VALUE_MISSING), error.to_string());
+    fn error_put_or_update_value_missing() {
+        let error = Errors::PutOrUpdateValueMissing;
+        assert_eq!(format!("[{}]: {}", ErrorType::OperationError("PutOrUpdate"), ERROR_MESSAGE_PUT_OR_UPDATE_VALUE_MISSING), error.to_string());
     }
 
     #[test]
-    fn error_upsert_invalid() {
-        let error = Errors::InvalidUpsert;
-        assert_eq!(format!("[{}]: {}", ErrorType::OperationError("upsert request builder"), ERROR_MESSAGE_INVALID_UPSERT), error.to_string());
+    fn error_put_or_update_invalid() {
+        let error = Errors::InvalidPutOrUpdate;
+        assert_eq!(format!("[{}]: {}", ErrorType::OperationError("PutOrUpdate request builder"), ERROR_MESSAGE_INVALID_PUT_OR_UPDATE), error.to_string());
     }
 
     #[test]
-    fn error_upsert_invalid_time_to_live() {
-        let error = Errors::InvalidUpsertEitherTimeToLiveOrRemoveTimeToLive;
-        assert_eq!(format!("[{}]: {}", ErrorType::OperationError("upsert request builder"), ERROR_MESSAGE_INVALID_UPSERT_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE), error.to_string());
+    fn error_put_or_update_invalid_time_to_live() {
+        let error = Errors::InvalidPutOrUpdateEitherTimeToLiveOrRemoveTimeToLive;
+        assert_eq!(format!("[{}]: {}", ErrorType::OperationError("PutOrUpdate request builder"), ERROR_MESSAGE_INVALID_PUT_OR_UPDATE_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE), error.to_string());
     }
 }

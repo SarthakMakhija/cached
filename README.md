@@ -18,9 +18,9 @@
 ### Features
 - **High Cache-hit ratio**: Provides high-cache ratio, the result is available [here](https://github.com/SarthakMakhija/cached/blob/main/benches/results/cache_hits.json)
 - **High throughput**: Provides high throughput for all read and write operations. The results are available [here](https://github.com/SarthakMakhija/cached/tree/main/benches/results)
-- **Simple API**: Provides clean and simple APIs for `put`, `get`, `multi_get`, `map_get`, `delete` and `upsert` 
+- **Simple API**: Provides clean and simple APIs for `put`, `get`, `multi_get`, `map_get`, `delete` and `put_or_update` 
 - **TTL and Access frequency based eviction**: Eviction is based either on `time_to_live` if provided or the access frequency of the keys
-- **Fully concurrent**: Provides support for concurrent puts, gets, deletes and upserts
+- **Fully concurrent**: Provides support for concurrent puts, gets, deletes and put_or_updates
 - **Metrics**: Provides various metrics like: `CacheHits`, `CacheMisses`, `KeysAdded`, `KeysDeleted` etc., and exposes the metrics as `StatsSummary` to the clients
 - **Configurable**: Provides configurable parameters to allow the clients to choose what works best for them 
 
@@ -68,7 +68,7 @@ async fn update_the_weight_of_an_existing_key() {
     let _ = acknowledgement.handle().await;
 
     let acknowledgement =
-        cached.upsert(UpsertRequestBuilder::new("topic").weight(29).build()).unwrap();
+        cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").weight(29).build()).unwrap();
     let _ = acknowledgement.handle().await;
 
     let value = cached.get_ref(&"topic");
@@ -238,33 +238,33 @@ Refer to the test `get_value_for_an_existing_key_if_value_is_not_cloneable_by_pa
 
 7. **Is it possible to update just the time to live or the weight of a key?**
 
-Yes, `UpsertRequest` allows the clients to update the `value`, `weight` or `time_to_live` for a key.
+Yes, `PutOrUpdateRequest` allows the clients to update the `value`, `weight` or `time_to_live` for a key.
 Let's assume that the key "topic" exists in an instance of **Cached** and consider the following example:
 
 ```rust
 //updates the weight of the key
-cached.upsert(UpsertRequestBuilder::new("topic").weight(29).build()).unwrap();
+cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").weight(29).build()).unwrap();
 
 //updates the value of the key
-cached.upsert(UpsertRequestBuilder::new("topic").value("microservices").build()).unwrap();
+cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").value("microservices").build()).unwrap();
 
 //updates the time to live of the key
-cached.upsert(UpsertRequestBuilder::new("topic").time_to_live(Duration::from_secs(100)).build()).unwrap();
+cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").time_to_live(Duration::from_secs(100)).build()).unwrap();
 
 //removes the time to live of the key
-cached.upsert(UpsertRequestBuilder::new("topic").remove_time_to_live().build()).unwrap();
+cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").remove_time_to_live().build()).unwrap();
 
 //updates the value and time to live of the key
-cached.upsert(UpsertRequestBuilder::new("topic").value("microservices").time_to_live(Duration::from_secs(10)).build()).unwrap(); 
+cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").value("microservices").time_to_live(Duration::from_secs(10)).build()).unwrap(); 
 ```
 
-8. **What does the return type of `put`, `upsert` and `delete` signify?**
+8. **What does the return type of `put`, `put_or_update` and `delete` signify?**
 
-All of the `put`, `upsert` and `delete` operations implement [singular update queue pattern](https://martinfowler.com/articles/patterns-of-distributed-systems/singular-update-queue.html)
+All of the `put`, `put_or_update` and `delete` operations implement [singular update queue pattern](https://martinfowler.com/articles/patterns-of-distributed-systems/singular-update-queue.html)
 and return an instance of `CommandSendResult` that allows the clients to get a handle on which they can await.
 
 `CommandSendResult` is an alias for `Result<Arc<CommandAcknowledgement>, CommandSendError>`. It will result in an error if either of
-`put`, `upsert` or `delete` operations are performed when the cache is being shut down.
+`put`, `put_or_update` or `delete` operations are performed when the cache is being shut down.
 
 The success part of `CommandSendResult` is an instance of `CommandAcknowledgement`, which returns a handle to the clients to perform `await`.
 

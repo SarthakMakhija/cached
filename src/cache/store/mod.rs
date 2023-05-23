@@ -57,10 +57,10 @@ impl<Value> UpdateResponse<Value> {
 
     /// Determines the type of expiry update performed by the client.
     /// `TypeOfExpiryUpdate` can be:
-    /// "Added" -> meaning `time_to_live` was added as a part of the upsert operation
-    /// "Deleted" -> meaning `time_to_live` was remove as a part of the upsert operation
-    /// "Updated" -> meaning `time_to_live` was changed as a part of the upsert operation
-    /// "Nothing" -> meaning the upsert operation had nothing to do with `time_to_live`
+    /// "Added" -> meaning `time_to_live` was added as a part of the put_or_update operation
+    /// "Deleted" -> meaning `time_to_live` was remove as a part of the put_or_update operation
+    /// "Updated" -> meaning `time_to_live` was changed as a part of the put_or_update operation
+    /// "Nothing" -> meaning the put_or_update operation had nothing to do with `time_to_live`
     /// Based on the `TypeOfExpiryUpdate`, Cached decides whether an entry needs to be made in [`crate::cache::expiration::TTLTicker`]
     pub(crate) fn type_of_expiry_update(&self) -> TypeOfExpiryUpdate {
         let existing_expiry = self.existing_expiry();

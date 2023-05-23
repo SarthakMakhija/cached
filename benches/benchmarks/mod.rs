@@ -5,7 +5,7 @@ pub mod async_await_put;
 pub mod get;
 pub mod put_get;
 pub mod delete;
-pub mod upsert;
+pub mod put_or_update;
 pub mod cache_hits;
 pub mod get_ref;
 pub mod common;

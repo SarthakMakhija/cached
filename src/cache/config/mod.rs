@@ -19,7 +19,7 @@ pub type HashFn<Key> = dyn Fn(&Key) -> KeyHash + Send + Sync;
 /// Default is the `perform` function defined in [`crate::cache::config::weight_calculation::Calculation`]
 pub type WeightCalculationFn<Key, Value> = dyn Fn(&Key, &Value, IsTimeToLiveSpecified) -> Weight + Send + Sync;
 
-/// Each put, upsert, delete results in a command to [`crate::cache::command::command_executor::CommandExecutor`].
+/// Each put, put_or_update, delete results in a command to [`crate::cache::command::command_executor::CommandExecutor`].
 /// CommandExecutor reads from an mpsc channel and COMMAND_BUFFER_SIZE defines the size (/buffer) of the command channel that
 /// is used by CommandExecutor.
 const COMMAND_BUFFER_SIZE: usize = 32 * 1024;

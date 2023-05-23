@@ -8,7 +8,7 @@ use cached::cache::cached::CacheD;
 use cached::cache::command::acknowledgement::CommandAcknowledgement;
 use cached::cache::command::CommandStatus;
 use cached::cache::config::ConfigBuilder;
-use cached::cache::upsert::UpsertRequestBuilder;
+use cached::cache::put_or_update::PutOrUpdateRequestBuilder;
 
 mod r#macro;
 
@@ -39,7 +39,7 @@ async fn update_values_for_an_existing_keys() {
     }
 
     let update_key_value_pairs = (1..10).map(|index| (index, index * 100)).collect::<HashMap<i32, i32>>();
-    let acknowledgements = upsert(&cached, update_key_value_pairs.clone());
+    let acknowledgements = put_or_update(&cached, update_key_value_pairs.clone());
     for acknowledgement in acknowledgements {
         acknowledgement.handle().await;
     }
@@ -128,13 +128,13 @@ fn put<Key, Value>(cached: &CacheD<Key, Value>, key_value_pairs: HashMap<Key, Va
     acknowledgements
 }
 
-fn upsert<Key, Value>(cached: &CacheD<Key, Value>, key_value_pairs: HashMap<Key, Value>) -> Vec<Arc<CommandAcknowledgement>>
+fn put_or_update<Key, Value>(cached: &CacheD<Key, Value>, key_value_pairs: HashMap<Key, Value>) -> Vec<Arc<CommandAcknowledgement>>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + Clone + 'static {
     let mut acknowledgements = Vec::new();
     for key_value in key_value_pairs {
         let acknowledgement =
-            cached.upsert(UpsertRequestBuilder::new(key_value.0).value(key_value.1).build()).unwrap();
+            cached.put_or_update(PutOrUpdateRequestBuilder::new(key_value.0).value(key_value.1).build()).unwrap();
         acknowledgements.push(acknowledgement);
     }
     acknowledgements

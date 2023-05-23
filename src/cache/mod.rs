@@ -2,7 +2,7 @@ pub mod cached;
 pub mod config;
 pub mod command;
 pub mod types;
-pub mod upsert;
+pub mod put_or_update;
 pub mod stats;
 pub mod clock;
 pub mod store;
