@@ -17,37 +17,50 @@
 
 ### Features
 &#x1F539; **High Cache-hit ratio**: Provides high-cache ratio, more on this in the [measuring-cache-hit-ratio section](#measuring-cache-hit-ratio)
+
 &#x1F539; **High throughput**: Provides high throughput for all read and write operations. The results are available [here](https://github.com/SarthakMakhija/cached/tree/main/benches/results)
-&#x1F539; **Simple API**: Provides clean and simple APIs for `put`, `get`, `multi_get`, `map_get`, `delete` and `put_or_update` 
+
+&#x1F539; **Simple API**: Provides clean and simple APIs for `put`, `get`, `multi_get`, `map_get`, `delete` and `put_or_update`
+
 &#x1F539; **Multiple get variants**: Provides `get`, `map_get`, `multi_get`, `multi_get_iterator` and `multi_get_map_iterator`
+
 &#x1F539; **TTL and Access frequency based eviction**: Eviction is based either on `time_to_live` if provided or the access frequency of the keys
+
 &#x1F539; **Fully concurrent**: Provides support for concurrent puts, gets, deletes and put_or_updates
+
 &#x1F539; **Metrics**: Provides various metrics like: `CacheHits`, `CacheMisses`, `KeysAdded`, `KeysDeleted` etc., and exposes the metrics as `StatsSummary` to the clients
+
 &#x1F539; **Configurable**: Provides configurable parameters to allow the clients to choose what works best for them 
 
 ### Core design ideas
 1) **LFU (least frequently used)**
+
 CacheD is an LFU based cache which makes it essential to store the access frequency of each key.
 Storing the access frequency in a `HashMap` like data structure would mean that the space used to store the frequency is directly proportional to the number of keys in the cache
 So, the tradeoff is to use a probabilistic data structure like [count-min sketch](https://tech-lessons.in/blog/count_min_sketch/).
 Cached uses count-min sketch inside [`crate::cache::lfu::frequency_counter::FrequencyCounter`] to store the frequency for each key.
 
 2) **Memory bound** 
+
 CacheD is a memory bound cache. It uses `Weight` as the terminology to denote the space. Every key/value pair has a weight, either the clients can provide weight while putting a key/value pair or the weight is auto-calculated.
 In order to create a new instance of CacheD, clients provide the total weight of the cache, which signifies the total space reserved for the cache. CacheD ensure that it never crosses the maximum weight of the cache.
 
 3) **Admission/Rejection of incoming keys**
+
 After the space allocated to the instance of CacheD is full, put of a new key/value pair will result in `AdmissionPolicy`deciding whether the incoming key/value pair should be accepted. 
 This decision is based on estimating the access frequency of the incoming key and comparing it against the estimated access frequencies of a sample of keys. 
 
 4) **Fine-grained locks**
+
 CacheD makes an attempt to used fine-grained locks over coarse grained locks wherever possible.
 
 5) **Expressive APIs**
+
 Cached provides expressive APIs to the clients. For example, the `put` operation is not an immediate operation, it happens at a later point in time. 
 The return type of `put` operation is an instance of `crate::cache::command::command_executor::CommandSendResult` and clients can use it to `await` 
-until the status of the `put` operation is returned. Similarly, the `put_or_update` operation takes an instance of `crate::cache::put_or_update::PutOrUpdateRequest`, 
-thereby allowing the clients to be very explicit in the type of change they want to perform.
+until the status of the `put` operation is returned. 
+
+Similarly, the `put_or_update` operation takes an instance of `crate::cache::put_or_update::PutOrUpdateRequest`, thereby allowing the clients to be very explicit in the type of change they want to perform.
 
 ### Examples and usage
 ```rust
@@ -57,7 +70,7 @@ const COUNTERS: TotalCounters = 100;
 //Total capacity of the cache, used as the capacity parameter in DashMap
 //It defines the number of items that the cache may store
 const CAPACITY: TotalCapacity = 10;
-//Total weight of the cache that determines the total cache size
+//Total weight of the cache that determines the total cache size (in bytes)
 const CACHE_WEIGHT: Weight    = 100;
 
 #[tokio::test]
@@ -165,8 +178,7 @@ const WEIGHT: Weight = (CAPACITY * 40) as Weight;
 
 /// Defines the total sample size that is used for generating Zipf distribution.
 /// Here, ITEMS is 16 times the CAPACITY to provide a larger sample for Zipf distribution.
-/// W/C = 16, W denotes the sample size, and C is the cache size (denoted by CAPA)
-/// [TinyLFU](https://dgraph.io/blog/refs/TinyLFU%20-%20A%20Highly%20Efficient%20Cache%20Admission%20Policy.pdf)
+/// W/C = 16, W denotes the sample size, and C is the cache size (denoted by CAPA: TinyLFU)
 const ITEMS: usize = CAPACITY * 16;
 ```
 
