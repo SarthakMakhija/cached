@@ -1143,15 +1143,17 @@ mod put_or_update_tests {
         let cached = CacheD::new(test_config_builder().clock(clock.clone_box()).build());
 
         let acknowledgement =
-            cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").value("microservices").time_to_live(Duration::from_secs(10)).build()).unwrap();
+            cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").value("microservices").weight(10).time_to_live(Duration::from_secs(10)).build()).unwrap();
         acknowledgement.handle().await;
 
         let value = cached.get_ref(&"topic");
         let value_ref = value.unwrap();
         let stored_value = value_ref.value();
+        let key_id = stored_value.key_id();
 
         assert_eq!(Some(clock.now().add(Duration::from_secs(10))), stored_value.expire_after());
         assert_eq!("microservices", stored_value.value());
+        assert_eq!(Some(10), cached.admission_policy.weight_of(&key_id));
     }
 
     #[tokio::test]
