@@ -48,7 +48,7 @@ use crate::cache::unique_id::increasing_id_generator::IncreasingIdGenerator;
 ///   After the space allocated to the instance of `CacheD` is full, put of a new key/value pair will result in `AdmissionPolicy`
 ///   deciding whether the incoming key/value pair should be accepted. This decision is based on estimating the access frequency of the incoming key
 ///   and comparing it against the estimated access frequencies of a sample of keys. Read more in [`crate::cache::policy::admission_policy::AdmissionPolicy`].
-/// 4) Fine grained locks
+/// 4) Fine-grained locks
 ///   `CacheD` makes an attempt to used fine grained locks over coarse grained locks wherever possible.
 /// 5) Expressive APIs
 ///   `Cached` provides expressive APIs to the clients.
