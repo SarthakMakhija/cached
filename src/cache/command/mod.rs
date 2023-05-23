@@ -8,6 +8,12 @@ pub mod acknowledgement;
 pub mod error;
 pub(crate) mod command_executor;
 
+/// CommandType defines various write commands including:
+/// Put             : attempts to put the new key/value pair in the cache
+/// PutWithTTL      : attempts to put the new key/value pair with time_to_live in the cache
+/// Delete          : attempts to delete the key
+/// UpdateWeight    : updates the weight of the key. This command is sent as a part of `upsert` operation
+/// Shutdown        : informs the [`crate::cache::command::command_executor::CommandExecutor`] that the cache is being shutdown
 pub(crate) enum CommandType<Key, Value>
     where Key: Hash + Eq + Clone {
     Put(KeyDescription<Key>, Value),
@@ -17,6 +23,8 @@ pub(crate) enum CommandType<Key, Value>
     Shutdown,
 }
 
+/// Provides the description of each command
+/// `description` is used if there is an error in sending a command to the [`crate::cache::command::command_executor::CommandExecutor`]
 impl<Key, Value> CommandType<Key, Value>
     where Key: Hash + Eq + Clone {
     fn description(&self) -> String {
@@ -30,6 +38,14 @@ impl<Key, Value> CommandType<Key, Value>
     }
 }
 
+/// CommandStatus defines the status of each command.
+/// Pending:        the initial status of the command, before a command is acted upon
+/// Accepted:       the command is successfully completed
+/// Rejected:       the command is rejected.
+    /// Put may be rejected for various reasons:
+    /// one reason is: the weight of the the incoming key/value pair is more than the total cache weight
+    /// Delete will be rejected if the key to be deleted is not preset in the cache
+/// ShuttingDown:   all the commands that could sneak in while the cache is being shutdown will be returned with `ShuttingDown` status
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum CommandStatus {
     Pending,

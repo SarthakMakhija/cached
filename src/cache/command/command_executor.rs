@@ -4,7 +4,7 @@ use std::thread;
 use std::time::Duration;
 
 use crossbeam_channel::Receiver;
-use log::info;
+use log::{error, info};
 
 use crate::cache::command::{CommandStatus, CommandType};
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
@@ -15,12 +15,19 @@ use crate::cache::policy::admission_policy::AdmissionPolicy;
 use crate::cache::stats::ConcurrentStatsCounter;
 use crate::cache::store::Store;
 
+/// Every command is returned a [`crate::cache::command::command_executor::CommandSendResult`] that
+/// wraps a [`crate::cache::command::acknowledgement::CommandAcknowledgement`] and a [`crate::cache::command::error::CommandSendError`]
 pub type CommandSendResult = Result<Arc<CommandAcknowledgement>, CommandSendError>;
 
 pub(crate) fn shutdown_result() -> CommandSendResult {
     Err(CommandSendError::shutdown())
 }
 
+/// CommandExecutor executes various commands of type [`crate::cache::command::CommandType`].
+/// CommandExecutor spins a thread when it is instantiated and starts receiving commands from the `crossbeam_channel::Receiver`.
+/// The command is wrapped in an abstraction `CommandAcknowledgementPair` that combines `CommandType` and `CommandAcknowledgement`
+/// Execution of a command typically involves interacting with [`crate::cache::policy::admission_policy::AdmissionPolicy`],
+/// [`crate::cache::store::Store`] and [`crate::cache::expiration::TTLTicker`]
 pub(crate) struct CommandExecutor<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + 'static {
@@ -78,6 +85,19 @@ impl<Key, Value> CommandExecutor<Key, Value>
         command_executor
     }
 
+    /// Spins a thread when `CommandExecutor` is instantiated.
+    /// The thread receives a command wrapped in `CommandAcknowledgementPair` from the [`crossbeam_channel::Receiver<T>`].
+    /// It identifies the command and performs an appropriate action.
+    /// Execution of a command typically involves interacting with [`crate::cache::policy::admission_policy::AdmissionPolicy`],
+    /// [`crate::cache::store::Store`] and [`crate::cache::expiration::TTLTicker`].
+    /// Handling `Shutdown` command is a little tricky. There exists a race condition kind of a case:
+    /// Consider that `shutdown()` and `put()` on an instance of `Cached` are invoked at the same time.
+    /// Both these operations result in sending different commands to `CommandExecutor`.
+    /// Somehow, the `Shutdown` command goes in before the `put` command.
+    /// This also means that the client could have performed `await` operation on the `CommandAcknowledgement` of the `put` command.
+    /// It is essential to complete the future that the client is awaiting on. That is what the `Shutdown` command does.
+    /// It drains the `receiver` and marks the status of the CommandAcknowledgement as `CommandStatus::ShuttingDown`.
+    /// The client(s) awaiting on the future will receive `CommandStatus::ShuttingDown`.
     fn spin(&self,
             receiver: Receiver<CommandAcknowledgementPair<Key, Value>>,
             store: Arc<Store<Key, Value>>,
@@ -139,6 +159,10 @@ impl<Key, Value> CommandExecutor<Key, Value>
         });
     }
 
+    /// Sends a command to the `CommandExecutor`. Every Command is wrapped in a `CommandAcknowledgementPair`
+    /// that allows 2 things:
+    /// 1) It allows returning an instance of `CommandAcknowledgement` to the clients, so that they can perform `await`
+    /// 2) It allows `CommandExecutor` to change the status of the command inside `CommandAcknowledgement`. This would then finish the `await` at the client's end.
     pub(crate) fn send(&self, command: CommandType<Key, Value>) -> CommandSendResult {
         let acknowledgement = CommandAcknowledgement::new();
         let send_result = self.sender.send(CommandAcknowledgementPair {
@@ -149,12 +173,13 @@ impl<Key, Value> CommandExecutor<Key, Value>
         match send_result {
             Ok(_) => Ok(acknowledgement),
             Err(err) => {
-                println!("received a SendError while sending command type {}", err.0.command.description());
+                error!("received a SendError while sending command type {}", err.0.command.description());
                 Err(CommandSendError::new(err.0.command.description()))
             }
         }
     }
 
+    /// Sends a Shutdown command to the `CommandExecutor`.
     pub(crate) fn shutdown(&self) -> CommandSendResult {
         self.send(CommandType::Shutdown)
     }

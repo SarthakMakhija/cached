@@ -6,10 +6,16 @@ use std::task::{Context, Poll, Waker};
 use parking_lot::Mutex;
 use crate::cache::command::CommandStatus;
 
+/// Every command is returned a `CommandAcknowledgement` wrapped in [`crate::cache::command::command_executor::CommandSendResult`]
+/// `CommandAcknowledgement` provides a handle to the clients to perform `.await`
 pub struct CommandAcknowledgement {
     handle: CommandAcknowledgementHandle,
 }
 
+/// CommandAcknowledgementHandle implements [`std::future::Future`] and returns a [`crate::cache::command::CommandStatus`]
+/// The initial status in the `CommandAcknowledgementHandle` is `CommandStatus::Pending`
+/// When the command is executed by the [`crate::cache::command::command_executor::CommandExecutor`], the status gets updated when
+/// the `done` method of `CommandAcknowledgement` is invoked.
 pub struct CommandAcknowledgementHandle {
     done: AtomicBool,
     status: Arc<Mutex<CommandStatus>>,
@@ -20,6 +26,7 @@ pub(crate) struct WakerState {
     waker: Option<Waker>,
 }
 
+/// CommandAcknowledgement provides a `handle()` method  that returns a reference to the `CommandAcknowledgementHandle`
 impl CommandAcknowledgement {
     pub(crate) fn new() -> Arc<CommandAcknowledgement> {
         Arc::new(
@@ -48,6 +55,7 @@ impl CommandAcknowledgement {
         )
     }
 
+    /// Invokes the `done()` method of `CommandAcknowledgementHandle` which changes the `CommandStatus`
     pub(crate) fn done(&self, status: CommandStatus) {
         self.handle.done(status);
     }
@@ -58,6 +66,7 @@ impl CommandAcknowledgement {
 }
 
 impl CommandAcknowledgementHandle {
+    /// Marks the flag to indicate that the command execution is done and changes the `CommandStatus`
     pub(crate) fn done(&self, status: CommandStatus) {
         self.done.store(true, Ordering::Release);
         *self.status.lock() = status;
@@ -67,6 +76,9 @@ impl CommandAcknowledgementHandle {
     }
 }
 
+/// Future implementation for CommandAcknowledgementHandle.
+/// The future is complete when the `done: AtomicBool` flag is marked true.
+/// When the `done` is marked, it returns `Poll::Ready` with a `CommandStatus`
 impl Future for &CommandAcknowledgementHandle {
     type Output = CommandStatus;
 
@@ -82,7 +94,6 @@ impl Future for &CommandAcknowledgementHandle {
                 guard.waker = Some(context.waker().clone());
             }
         }
-
         if self.done.load(Ordering::Acquire) {
             return Poll::Ready(*self.status.lock());
         }
