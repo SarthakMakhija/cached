@@ -419,6 +419,22 @@ impl<Key, Value> CacheD<Key, Value>
 impl<Key, Value> CacheD<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + Clone + 'static {
+
+    /// Returns an optional reference to the Value in the instance of `Cached`.
+    /// This method is only available if the Value type is Cloneable. This method clones the value and returns it to the client.
+    /// ```
+    /// use cached::cache::cached::CacheD;
+    /// use cached::cache::command::CommandStatus;
+    /// use cached::cache::config::ConfigBuilder;
+    /// #[tokio::main]
+    ///  async fn main() {
+    ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
+    ///     let status = cached.put("topic", "microservices").unwrap().handle().await;
+    ///     assert_eq!(CommandStatus::Accepted, status);
+    ///     let value = cached.get(&"topic");
+    ///     assert_eq!(Some("microservices"), value);
+    /// }
+    /// ```
     pub fn get(&self, key: &Key) -> Option<Value> {
         if self.is_shutting_down() { return None; }
 
@@ -429,6 +445,24 @@ impl<Key, Value> CacheD<Key, Value>
         None
     }
 
+    /// Returns an optional MappedValue for key present in the instance of `Cached`.
+    /// The parameter `map_fn` is an instance of `Fn` that takes the cloned Value and returns any MappedValue
+    /// This is an extension to the `get` method.
+    /// This method is only available if the Value type is Cloneable.
+    /// If the key is present in `Cached`, it returns `Some(MappedValue)`, else returns `None`.
+    /// ```
+    /// use cached::cache::cached::CacheD;
+    /// use cached::cache::command::CommandStatus;
+    /// use cached::cache::config::ConfigBuilder;
+    /// #[tokio::main]
+    ///  async fn main() {
+    ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
+    ///     let status = cached.put("topic", "microservices").unwrap().handle().await;
+    ///     assert_eq!(CommandStatus::Accepted, status);
+    ///     let value = cached.map_get(&"topic", |value| value.to_uppercase());
+    ///     assert_eq!("MICROSERVICES", value.unwrap());
+    /// }
+    /// ```
     pub fn map_get<MapFn, MappedValue>(&self, key: &Key, map_fn: MapFn) -> Option<MappedValue>
         where MapFn: Fn(Value) -> MappedValue {
         if self.is_shutting_down() { return None; }
@@ -439,12 +473,45 @@ impl<Key, Value> CacheD<Key, Value>
         None
     }
 
+    /// Returns values corresponding to multiple keys.
+    /// It takes a vector of reference of keys and returns a `HashMap` containing the key reference and the optional Value
+    /// If the value is present for a key, the returned `HashMap` will contain the key reference and `Some(Value)`
+    /// If the value is not present for a key, the returned `HashMap` will contain the key reference and `None`
+    /// This method is only available if the Value type is Cloneable.
+    /// ```
+    /// use cached::cache::cached::CacheD;
+    /// use cached::cache::config::ConfigBuilder;
+    /// #[tokio::main]
+    ///  async fn main() {
+    ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
+    ///     let status = cached.put("topic", "microservices").unwrap().handle().await;
+    ///     let values = cached.multi_get(vec![&"topic", &"non-existing"]);
+    ///     assert_eq!(&Some("microservices"), values.get(&"topic").unwrap());
+    ///     assert_eq!(&None, values.get(&"non-existing").unwrap());
+    /// }
+    /// ```
     pub fn multi_get<'a>(&self, keys: Vec<&'a Key>) -> HashMap<&'a Key, Option<Value>> {
         if self.is_shutting_down() { return HashMap::new(); }
 
         keys.into_iter().map(|key| (key, self.get(key))).collect::<HashMap<_, _>>()
     }
 
+    /// Returns an instance of [`MultiGetIterator`] that allows iterating over multiple keys and getting the value corresponding to each key
+    /// It takes a vector of reference of keys and an instance of `MultiGetIterator`
+    /// This method is only available if the Value type is Cloneable.
+    /// ```
+    /// use cached::cache::cached::CacheD;
+    /// use cached::cache::config::ConfigBuilder;
+    /// #[tokio::main]
+    ///  async fn main() {
+    ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
+    ///     let status = cached.put("topic", "microservices").unwrap().handle().await;
+    ///     let mut iterator = cached.multi_get_iterator(vec![&"topic", &"non-existing"]);
+    ///     assert_eq!(Some("microservices"), iterator.next().unwrap());
+    ///     assert_eq!(None, iterator.next().unwrap());
+    ///     assert_eq!(None, iterator.next());
+    /// }
+    /// ```
     pub fn multi_get_iterator<'a>(&'a self, keys: Vec<&'a Key>) -> MultiGetIterator<'a, Key, Value> {
         MultiGetIterator {
             cache: self,
@@ -452,6 +519,22 @@ impl<Key, Value> CacheD<Key, Value>
         }
     }
 
+    /// Returns an instance of [`MultiGetMapIterator`] that allows iterating over multiple keys, performing a map operation over each key and then getting the value corresponding to each key
+    /// It takes a vector of reference of keys and an instance of `MultiGetIterator`
+    /// This method is only available if the Value type is Cloneable.
+    /// ```
+    /// use cached::cache::cached::CacheD;
+    /// use cached::cache::config::ConfigBuilder;
+    /// #[tokio::main]
+    ///  async fn main() {
+    ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
+    ///     let status = cached.put("topic", "microservices").unwrap().handle().await;
+    ///     let mut iterator = cached.multi_get_map_iterator(vec![&"topic", &"non-existing"], |value| value.to_uppercase());
+    ///     assert_eq!(Some("MICROSERVICES".to_string()), iterator.next().unwrap());
+    ///     assert_eq!(None, iterator.next().unwrap());
+    ///     assert_eq!(None, iterator.next());
+    /// }
+    /// ```
     pub fn multi_get_map_iterator<'a, MapFn, MappedValue>(&'a self, keys: Vec<&'a Key>, map_fn: MapFn) -> MultiGetMapIterator<'a, Key, Value, MapFn, MappedValue>
         where MapFn: Fn(Value) -> MappedValue {
         MultiGetMapIterator {
@@ -464,6 +547,7 @@ impl<Key, Value> CacheD<Key, Value>
     }
 }
 
+/// `MultiGetIterator` allows iterating over multiple keys and getting the value corresponding to each key
 pub struct MultiGetIterator<'a, Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + Clone + 'static {
@@ -488,6 +572,7 @@ impl<'a, Key, Value> Iterator for MultiGetIterator<'a, Key, Value>
     }
 }
 
+/// `MultiGetMapIterator` allows iterating over multiple keys, performing a map operation over each key and then getting the value corresponding to each key
 pub struct MultiGetMapIterator<'a, Key, Value, MapFn, MappedValue>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + Clone + 'static,
