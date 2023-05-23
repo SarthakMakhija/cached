@@ -73,7 +73,7 @@ impl SampledKey {
     }
 }
 
-/// FrequencyCounterBasedMinHeapSamples returns a sample to the `create_space` method of [`crate::cache::policy::admission_policy::AdmissionPolicy`]
+/// FrequencyCounterBasedMinHeapSamples returns a sample to the `create_space` method of `crate::cache::policy::admission_policy::AdmissionPolicy`
 /// The idea is to return a sample and allow getting the key with the smallest access frequency.
 /// Internally, `FrequencyCounterBasedMinHeapSamples` uses [`std::collections::BinaryHeap`] and returns `SampledKey` that contains the key_id, its weight and its access frequency.
 pub(crate) struct FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
@@ -105,7 +105,7 @@ impl<'a, Key, Freq> FrequencyCounterBasedMinHeapSamples<'a, Key, Freq>
     /// However, the current implementation has a sort of a race condition.
     /// Consider there is a `put` operation in progress through `AdmissionPolicy`.
     /// At the same time, `shutdown` is invoked on the instance of `Cached`. The current implementation of `shutdown` sends a `Shutdown` command to the
-    /// [`crate::cache::command::command_executor::CommandExecutor`] and then calls `clear` on the `AdmissionPolicy`.
+    /// `crate::cache::command::command_executor::CommandExecutor` and then calls `clear` on the `AdmissionPolicy`.
     /// The `clear` method of `AdmissionPolicy` clears all the entries in the `CacheWeight`.
     /// Consider that the `clear` operation is done on  `CacheWeight` and now `maybe_fill_in` is called but it would not be able to fill in the new keys
     /// There would be a stage where `self.sample` might become empty and `pop` does not return anything.

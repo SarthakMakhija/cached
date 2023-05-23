@@ -6,10 +6,15 @@ use crate::cache::errors::Errors;
 use crate::cache::types::Weight;
 
 /// `PutOrUpdateRequest` encapsulates the values for `put` or an `update` operation.
+///
 /// `PutOrUpdateRequest` is a parameter to `put_or_update` method of [`crate::cache::cached::CacheD`].
+///
 /// `PutOrUpdateRequest` allows put operation with `value`, `weight` and `time_to_live`.
+///
 /// `PutOrUpdateRequest` also provides flexibility in updating just the `value` or the `weight` or the `time_to_live` or all of these for an existing key.
+///
 /// `PutOrUpdateRequest` also allows removing the `time_to_live` against an existing key. Either of `time_to_live` or `remove_time_to_live` can be provided.
+///
 /// If `PutOrUpdateRequest` results in a `put` operation, the flag `remove_time_to_live` will have no significance.
 pub struct PutOrUpdateRequest<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone,
@@ -26,6 +31,7 @@ impl<Key, Value> PutOrUpdateRequest<Key, Value>
           Value: Send + Sync {
 
     /// Returns the weight in a `PutOrUpdateRequest`.
+    ///
     /// Weight is either the client provided weight or calculated from the value and presence/absence of `time_to_live`
     pub(crate) fn updated_weight(&self, weight_calculation_fn: &WeightCalculationFn<Key, Value>) -> Option<Weight> {
         self.weight.or_else(|| self.value.as_ref().map(|value| {
@@ -83,12 +89,15 @@ impl<Key, Value> PutOrUpdateRequestBuilder<Key, Value>
         self
     }
 
-    /// Marks a flag to remove time_to_live. Either of `time_to_live` or `remove_time_to_live` can be provided
+    /// Marks a flag to remove time_to_live.
+    ///
+    /// Either of `time_to_live` or `remove_time_to_live` can be provided
     pub fn remove_time_to_live(mut self) -> PutOrUpdateRequestBuilder<Key, Value> {
         self.remove_time_to_live = true;
         self
     }
 
+    /// Builds an instance of PutOrUpdateRequest
     pub fn build(self) -> PutOrUpdateRequest<Key, Value> {
         let valid_put_or_update = self.value.is_some() || self.weight.is_some() || self.time_to_live.is_some() || self.remove_time_to_live;
         assert!(valid_put_or_update, "{}", Errors::InvalidPutOrUpdate);

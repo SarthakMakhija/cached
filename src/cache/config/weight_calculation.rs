@@ -15,7 +15,7 @@ impl Calculation {
     /// Total key/value weight = key_size + value_size + weighted_key_size + Optional<ttl_ticker_entry_size>
     /// Every key/value is stored in [`crate::store::Store`] and its size is denoted by `stored_value_size`
     /// A key id is generated for every key and its weight along with key_hash is stored in [`crate::cache::policy::cache_weight::CacheWeight`]
-    /// If time_to_live is specified in the `put` operation, the key_id is also stored in [`crate::cache::expiration::TTLTicker`]
+    /// If time_to_live is specified in the `put` operation, the key_id is also stored in `crate::cache::expiration::TTLTicker`
     /// Sum of all these sizes constitutes the weight of a key/value pair.
     pub(crate) fn perform<Key, Value>(key: &Key, value: &Value, time_to_live_specified: IsTimeToLiveSpecified) -> Weight {
         let (key_size, value_size) = Self::stored_value_size(key, value);

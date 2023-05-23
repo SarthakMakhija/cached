@@ -7,7 +7,7 @@ use crate::cache::policy::config::CacheWeightConfig;
 use crate::cache::stats::ConcurrentStatsCounter;
 use crate::cache::types::{TotalCapacity, TotalCounters, TotalShards, Weight};
 
-/// Proxy representation of the [`crate::cache::policy::admission_policy::AdmissionPolicy`].
+/// Proxy representation of the `crate::cache::policy::admission_policy::AdmissionPolicy`.
 /// AdmissionPolicy also acts as a buffer consumer that consumes the access buffer after it is drained.
 /// ProxyAdmissionPolicy implements `BufferConsumer` trait and ends up delegating to the AdmissionPolicy.
 /// ProxyAdmissionPolicy is used in `benchmark benches/benchmarks/read_buffer.rs`

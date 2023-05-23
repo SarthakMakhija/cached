@@ -5,18 +5,29 @@ use crossbeam_utils::CachePadded;
 
 const TOTAL_STATS: usize = 10;
 
+/// Defines various stats that are measured in the cache.
 #[repr(usize)]
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum StatsType {
+    /// Defines the number of hits for the keys
     CacheHits = 0,
+    /// Defines the number of misses for the keys
     CacheMisses = 1,
+    /// Defines the number of keys added
     KeysAdded = 2,
+    /// Defines the number of keys deleted
     KeysDeleted = 3,
+    /// Defines the number of keys updated
     KeysUpdated = 4,
+    /// Defines the number of keys rejected
     KeysRejected = 5,
+    /// Defines the total weight added
     WeightAdded = 6,
+    /// Defines the total weight removed
     WeightRemoved = 7,
+    /// Defines the total number of gets registered in the frequency counter
     AccessAdded = 8,
+    /// Defines the total number of gets dropped
     AccessDropped = 9,
 }
 
@@ -50,7 +61,7 @@ impl StatsSummary {
         }
     }
 
-    /// Returns an Option<u64> counter corresponding to the stats_type.
+    /// Returns an Option&lt;u64&gt; counter corresponding to the stats_type.
     pub fn get(&self, stats_type: &StatsType) -> Option<u64> {
         self.stats_by_type.get(stats_type).copied()
     }

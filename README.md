@@ -38,7 +38,7 @@
 CacheD is an LFU based cache which makes it essential to store the access frequency of each key.
 Storing the access frequency in a `HashMap` like data structure would mean that the space used to store the frequency is directly proportional to the number of keys in the cache
 So, the tradeoff is to use a probabilistic data structure like [count-min sketch](https://tech-lessons.in/blog/count_min_sketch/).
-Cached uses count-min sketch inside [`crate::cache::lfu::frequency_counter::FrequencyCounter`] to store the frequency for each key.
+Cached uses count-min sketch inside `crate::cache::lfu::frequency_counter::FrequencyCounter` to store the frequency for each key.
 
 2) **Memory bound** 
 

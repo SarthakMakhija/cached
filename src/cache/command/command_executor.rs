@@ -15,19 +15,19 @@ use crate::cache::policy::admission_policy::AdmissionPolicy;
 use crate::cache::stats::ConcurrentStatsCounter;
 use crate::cache::store::Store;
 
-/// Every command is returned a [`crate::cache::command::command_executor::CommandSendResult`] that
-/// wraps a [`crate::cache::command::acknowledgement::CommandAcknowledgement`] and a [`crate::cache::command::error::CommandSendError`]
+/// Every write operation like `put`, `put_or_update` and `delete` is returned a [`crate::cache::command::command_executor::CommandSendResult`] that
+/// wraps an instance of [`crate::cache::command::acknowledgement::CommandAcknowledgement`] and a [`crate::cache::command::error::CommandSendError`]
 pub type CommandSendResult = Result<Arc<CommandAcknowledgement>, CommandSendError>;
 
 pub(crate) fn shutdown_result() -> CommandSendResult {
     Err(CommandSendError::shutdown())
 }
 
-/// CommandExecutor executes various commands of type [`crate::cache::command::CommandType`].
+/// CommandExecutor executes various commands of type `crate::cache::command::CommandType`.
 /// CommandExecutor spins a thread when it is instantiated and starts receiving commands from the `crossbeam_channel::Receiver`.
 /// The command is wrapped in an abstraction `CommandAcknowledgementPair` that combines `CommandType` and `CommandAcknowledgement`
-/// Execution of a command typically involves interacting with [`crate::cache::policy::admission_policy::AdmissionPolicy`],
-/// [`crate::cache::store::Store`] and [`crate::cache::expiration::TTLTicker`]
+/// Execution of a command typically involves interacting with `crate::cache::policy::admission_policy::AdmissionPolicy`,
+/// `crate::cache::store::Store` and `crate::cache::expiration::TTLTicker`
 pub(crate) struct CommandExecutor<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone + 'static,
           Value: Send + Sync + 'static {
@@ -88,8 +88,8 @@ impl<Key, Value> CommandExecutor<Key, Value>
     /// Spins a thread when `CommandExecutor` is instantiated.
     /// The thread receives a command wrapped in `CommandAcknowledgementPair` from the [`crossbeam_channel::Receiver<T>`].
     /// It identifies the command and performs an appropriate action.
-    /// Execution of a command typically involves interacting with [`crate::cache::policy::admission_policy::AdmissionPolicy`],
-    /// [`crate::cache::store::Store`] and [`crate::cache::expiration::TTLTicker`].
+    /// Execution of a command typically involves interacting with `crate::cache::policy::admission_policy::AdmissionPolicy`,
+    /// `crate::cache::store::Store` and `crate::cache::expiration::TTLTicker`.
     /// Handling `Shutdown` command is a little tricky. There exists a race condition kind of a case:
     /// Consider that `shutdown()` and `put()` on an instance of `Cached` are invoked at the same time.
     /// Both these operations result in sending different commands to `CommandExecutor`.

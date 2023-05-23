@@ -37,8 +37,8 @@ const CHANNEL_CAPACITY: usize = 10;
     /// However, there can be contention if too many accesses happen in the system which results in the access buffer(s) filling in too fast.
     /// This contention is around acquiring the write lock on `TinyLFU` as [`crate::cache::lfu::tiny_lfu::TinyLFU`] is wrapped inside a `RwLock`.
     /// In order to reduce this contention, the system decides to drop the buffers by maintaining a limited `CHANNEL_CAPACITY`.
-/// `AdmissionPolicy` is invoked by a single thread through [`crate::cache::command::command_executor::CommandExecutor`]
-///  and its delete is invoked by [`crate::cache::expiration::TTLTicker`]
+/// `AdmissionPolicy` is invoked by a single thread through `crate::cache::command::command_executor::CommandExecutor`
+///  and its delete is invoked by `crate::cache::expiration::TTLTicker`
 pub(crate) struct AdmissionPolicy<Key>
     where Key: Hash + Eq + Send + Sync + Clone + 'static, {
     access_frequency: Arc<RwLock<TinyLFU>>,

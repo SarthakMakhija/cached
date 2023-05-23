@@ -61,7 +61,7 @@ impl<Value> UpdateResponse<Value> {
     /// "Deleted" -> meaning `time_to_live` was remove as a part of the put_or_update operation
     /// "Updated" -> meaning `time_to_live` was changed as a part of the put_or_update operation
     /// "Nothing" -> meaning the put_or_update operation had nothing to do with `time_to_live`
-    /// Based on the `TypeOfExpiryUpdate`, Cached decides whether an entry needs to be made in [`crate::cache::expiration::TTLTicker`]
+    /// Based on the `TypeOfExpiryUpdate`, Cached decides whether an entry needs to be made in `crate::cache::expiration::TTLTicker`
     pub(crate) fn type_of_expiry_update(&self) -> TypeOfExpiryUpdate {
         let existing_expiry = self.existing_expiry();
         let new_expiry = self.1;
@@ -82,7 +82,7 @@ impl<Value> UpdateResponse<Value> {
 }
 
 /// Store holds the key/value mapping.
-/// Value is wrapped in another abstraction [`crate::cache::store::stored_value::StoredValue`] that contains key_id and expiry, if any, of the key.
+/// Value is wrapped in another abstraction `crate::cache::store::stored_value::StoredValue` that contains key_id and expiry, if any, of the key.
 pub(crate) struct Store<Key, Value>
     where Key: Hash + Eq, {
     store: DashMap<Key, StoredValue<Value>>,
@@ -93,8 +93,8 @@ pub(crate) struct Store<Key, Value>
 impl<Key, Value> Store<Key, Value>
     where Key: Hash + Eq, {
     /// Create a new instance of Store with `clock`, `stats_counter`, `capacity` and `shards`.
-    /// `clock`: Defines the clock to be used to get the current time. By default [`crate::cache::clock::SystemClock`] is used.
-    /// `stats_counter`: Is an instance of [`crate::cache::stats::ConcurrentStatsCounter`]
+    /// `clock`: Defines the clock to be used to get the current time. By default `crate::cache::clock::SystemClock` is used.
+    /// `stats_counter`: Is an instance of `crate::cache::stats::ConcurrentStatsCounter`
     /// `capacity`: Is used as a capacity parameter in DashMap, it defines the number of items that the cache may store
     /// `shards`: Is used as a shards parameter in DashMap
     pub(crate) fn new(clock: ClockType, stats_counter: Arc<ConcurrentStatsCounter>, capacity: TotalCapacity, shards: TotalShards) -> Arc<Store<Key, Value>> {

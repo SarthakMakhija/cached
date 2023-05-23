@@ -3,7 +3,7 @@ use std::time::SystemTime;
 /// Defines the type for the hash of a key
 pub type KeyHash = u64;
 
-/// Defines the type for total counter used in [`crate::cache::lfu::frequency_counter::FrequencyCounter`],
+/// Defines the type for total counter used in `crate::cache::lfu::frequency_counter::FrequencyCounter`,
 /// for counting the access frequencies of keys
 pub type TotalCounters = u64;
 

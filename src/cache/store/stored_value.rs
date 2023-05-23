@@ -4,9 +4,40 @@ use std::time::{Duration, SystemTime};
 use crate::cache::clock::ClockType;
 use crate::cache::types::{ExpireAfter, KeyId};
 
-/// StoredValue wraps the client provided Value and it is stored as a value in the [`crate::cache::store::Store`].
+/// StoredValue wraps the client provided Value and it is stored as a value in the `crate::cache::store::Store`.
+///
 /// StoredValue encapsulates the `value`, `key_id`, the optional expiry of the key
 /// and a flag to identify whether a key is soft deleted
+///
+/// StoredValue is relevant to the clients on the invocation of `get_ref` and `map_get_ref` methods on [`crate::cache::cached::CacheD`]
+/// ```
+/// use cached::cache::cached::CacheD;
+/// use cached::cache::command::CommandStatus;
+/// use cached::cache::config::ConfigBuilder;
+/// #[tokio::main]
+///  async fn main() {
+///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
+///     let status = cached.put("topic", "microservices").unwrap().handle().await;
+///     assert_eq!(CommandStatus::Accepted, status);
+///     let value = cached.get_ref(&"topic");
+///     let value_ref = value.unwrap();
+///     let stored_value = value_ref.value();
+///     assert_eq!("microservices", stored_value.value());
+/// }
+/// ```
+/// ```
+/// use cached::cache::cached::CacheD;
+/// use cached::cache::command::CommandStatus;
+/// use cached::cache::config::ConfigBuilder;
+/// #[tokio::main]
+///  async fn main() {
+///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
+///     let status = cached.put("topic", "microservices").unwrap().handle().await;
+///     assert_eq!(CommandStatus::Accepted, status);
+///     let value = cached.map_get_ref(&"topic", |stored_value| stored_value.value_ref().to_uppercase());
+///     assert_eq!("MICROSERVICES", value.unwrap());
+/// }
+/// ```
 pub struct StoredValue<Value> {
     value: Value,
     key_id: KeyId,

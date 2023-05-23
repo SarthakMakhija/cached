@@ -8,13 +8,27 @@ use crate::cache::command::CommandStatus;
 
 /// Every command is returned a `CommandAcknowledgement` wrapped in [`crate::cache::command::command_executor::CommandSendResult`]
 /// `CommandAcknowledgement` provides a handle to the clients to perform `.await`
+///
+/// ```
+/// use cached::cache::cached::CacheD;
+/// use cached::cache::command::CommandStatus;
+/// use cached::cache::config::ConfigBuilder;
+/// #[tokio::main]
+///  async fn main() {
+///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
+///     let status = cached.put("topic", "microservices").unwrap().handle().await;
+///     assert_eq!(CommandStatus::Accepted, status);
+///     let value = cached.get(&"topic");
+///     assert_eq!(Some("microservices"), value);
+/// }
+/// ```
 pub struct CommandAcknowledgement {
     handle: CommandAcknowledgementHandle,
 }
 
 /// CommandAcknowledgementHandle implements [`std::future::Future`] and returns a [`crate::cache::command::CommandStatus`]
 /// The initial status in the `CommandAcknowledgementHandle` is `CommandStatus::Pending`
-/// When the command is executed by the [`crate::cache::command::command_executor::CommandExecutor`], the status gets updated when
+/// When the command is executed by the `crate::cache::command::command_executor::CommandExecutor`, the status gets updated when
 /// the `done` method of `CommandAcknowledgement` is invoked.
 pub struct CommandAcknowledgementHandle {
     done: AtomicBool,

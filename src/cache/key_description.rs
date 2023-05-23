@@ -23,7 +23,7 @@ impl<Key> KeyDescription<Key>
 
     /// Clones the key.
     /// Key needs to be cloned because it is added in 2 structures:
-    /// [`crate::cache::store::Store`] and [`crate::cache::policy::cache_weight::CacheWeight`]
+    /// `crate::cache::store::Store` and `crate::cache::policy::cache_weight::CacheWeight`
     pub(crate) fn clone_key(&self) -> Key { self.key.clone() }
 }
 
