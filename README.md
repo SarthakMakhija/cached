@@ -228,7 +228,8 @@ const CACHE_WEIGHT: Weight    = 1024;
 let weight_calculation: Box<WeightCalculationFn<&str, &str>> 
             = Box::new(|_key, _value, _is_time_to_live_specified| 1);
 let config 
-            = ConfigBuilder::new(COUNTERS, CAPACITY, CACHE_WEIGHT).weight_calculation_fn(weight_calculation).build();
+            = ConfigBuilder::new(COUNTERS, CAPACITY, CACHE_WEIGHT)
+                           .weight_calculation_fn(weight_calculation).build();
 
 let cached = CacheD::new(config);
 ```
@@ -261,13 +262,17 @@ let cached: CacheD<&str, Arc<Name>> = CacheD::new(ConfigBuilder::new(100, 10, 10
 
 let acknowledgement =
     cached.put("captain", 
-               Arc::new(Name { first: "John".to_string(), last: "Mcnamara".to_string() })).unwrap();
-acknowledgement.handle().await;
+               Arc::new(Name { 
+                            first: "John".to_string(), last: "Mcnamara".to_string() 
+                        })).unwrap();
+let _ = acknowledgement.handle().await;
 
 let acknowledgement =
     cached.put("vice-captain", 
-               Arc::new(Name { first: "Martin".to_string(), last: "Trolley".to_string() })).unwrap();
-acknowledgement.handle().await;
+               Arc::new(Name { 
+                            first: "Martin".to_string(), last: "Trolley".to_string() 
+                        })).unwrap();
+let _ = acknowledgement.handle().await;
 
 let mut iterator = cached.multi_get_iterator(vec![&"captain", &"vice-captain", &"disk"]);
 
@@ -287,19 +292,24 @@ Let's assume that the key "topic" exists in an instance of **Cached** and consid
 
 ```rust
 //updates the weight of the key
-cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").weight(29).build()).unwrap();
+cached.put_or_update(
+  PutOrUpdateRequestBuilder::new("topic").weight(29).build()).unwrap();
 
 //updates the value of the key
-cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").value("microservices").build()).unwrap();
+cached.put_or_update(
+    PutOrUpdateRequestBuilder::new("topic").value("microservices").build()).unwrap();
 
 //updates the time to live of the key
-cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").time_to_live(Duration::from_secs(100)).build()).unwrap();
+cached.put_or_update(
+  PutOrUpdateRequestBuilder::new("topic").time_to_live(Duration::from_secs(100)).build()).unwrap();
 
 //removes the time to live of the key
-cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").remove_time_to_live().build()).unwrap();
+cached.put_or_update(
+  PutOrUpdateRequestBuilder::new("topic").remove_time_to_live().build()).unwrap();
 
 //updates the value and time to live of the key
-cached.put_or_update(PutOrUpdateRequestBuilder::new("topic").value("microservices").time_to_live(Duration::from_secs(10)).build()).unwrap(); 
+cached.put_or_update(
+  PutOrUpdateRequestBuilder::new("topic").value("microservices").time_to_live(Duration::from_secs(10)).build()).unwrap(); 
 ```
 
 8. **What does the return type of `put`, `put_or_update` and `delete` signify?**
