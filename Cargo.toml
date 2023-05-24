@@ -11,7 +11,7 @@ repository = "https://github.com/SarthakMakhija/cached"
 license = "MIT OR Apache-2.0"
 keywords = ["cached", "LFU", "TinyLFU"]
 categories = ["caching"]
-include = ["src/", "LICENSE-*", "README.md"]
+include = ["src/", "LICENSE-*", "README.md", "tests/", "benches/"]
 
 [package.metadata.docs.rs]
 all-features = false
