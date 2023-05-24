@@ -1,7 +1,7 @@
 use criterion::{Bencher, Criterion, criterion_group, criterion_main};
 
-use cached::cache::proxy::frequency_counter::ProxyFrequencyCounter;
-use cached::cache::types::TotalCounters;
+use tinylfu_cached::cache::proxy::frequency_counter::ProxyFrequencyCounter;
+use tinylfu_cached::cache::types::TotalCounters;
 use crate::benchmarks::common::distribution;
 
 /// Defines the total size of the distribution that will be used in increment and estimate methods of `FrequencyCounter`.

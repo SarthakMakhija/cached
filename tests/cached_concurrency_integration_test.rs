@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use cached::cache::cached::CacheD;
-use cached::cache::config::ConfigBuilder;
+use tinylfu_cached::cache::cached::CacheD;
+use tinylfu_cached::cache::config::ConfigBuilder;
 
 #[tokio::test]
 async fn get_values_for_an_existing_keys() {

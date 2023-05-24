@@ -5,7 +5,7 @@
 [![Build](https://github.com/SarthakMakhija/cached/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/SarthakMakhija/cached/actions/workflows/build.yml)
 [![Coverage](https://codecov.io/gh/SarthakMakhija/cached/branch/main/graph/badge.svg?token=ED4FKSYPCU)](https://codecov.io/gh/SarthakMakhija/cached)
 
-**Cached** is a [high performance](https://github.com/SarthakMakhija/cached/tree/main/benches/results), LFU based in-memory cache in Rust inspired by [Ristretto](https://github.com/dgraph-io/ristretto).
+**Cached** is a [high performance](https://github.com/SarthakMakhija/cached/tree/main/benches/results), [LFU](https://dgraph.io/blog/refs/TinyLFU%20-%20A%20Highly%20Efficient%20Cache%20Admission%20Policy.pdf) based in-memory cache in Rust inspired by [Ristretto](https://github.com/dgraph-io/ristretto).
 
 ### Content organization
 * [Features](#features)

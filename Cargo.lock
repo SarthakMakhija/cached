@@ -194,25 +194,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89b2fd2a0dcf38d7971e2194b6b6eebab45ae01067456a7fd93d5547a61b70be"
 
 [[package]]
-name = "cached"
-version = "0.0.1"
-dependencies = [
- "async-std",
- "bloomfilter",
- "criterion",
- "crossbeam-channel",
- "crossbeam-utils",
- "dashmap",
- "hashbrown 0.13.2",
- "log",
- "num",
- "parking_lot",
- "rand",
- "rand_distr",
- "tokio",
-]
-
-[[package]]
 name = "cast"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1144,6 +1125,25 @@ name = "textwrap"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "222a222a5bfe1bba4a77b45ec488a741b3cb8872e5e499451fd7d0129c9c7c3d"
+
+[[package]]
+name = "tinylfu-cached"
+version = "0.0.1"
+dependencies = [
+ "async-std",
+ "bloomfilter",
+ "criterion",
+ "crossbeam-channel",
+ "crossbeam-utils",
+ "dashmap",
+ "hashbrown 0.13.2",
+ "log",
+ "num",
+ "parking_lot",
+ "rand",
+ "rand_distr",
+ "tokio",
+]
 
 [[package]]
 name = "tinytemplate"

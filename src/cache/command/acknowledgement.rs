@@ -10,9 +10,9 @@ use crate::cache::command::CommandStatus;
 /// `CommandAcknowledgement` provides a handle to the clients to perform `.await` to get the command status.
 ///
 /// ```
-/// use cached::cache::cached::CacheD;
-/// use cached::cache::command::CommandStatus;
-/// use cached::cache::config::ConfigBuilder;
+/// use tinylfu_cached::cache::cached::CacheD;
+/// use tinylfu_cached::cache::command::CommandStatus;
+/// use tinylfu_cached::cache::config::ConfigBuilder;
 /// #[tokio::main]
 ///  async fn main() {
 ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());

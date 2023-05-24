@@ -116,9 +116,9 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// Since, `put` is not an immediate operation, clients can `await` on the response to get the [`crate::cache::command::CommandStatus`]
     /// ```
-    /// use cached::cache::cached::CacheD;
-    /// use cached::cache::command::CommandStatus;
-    /// use cached::cache::config::ConfigBuilder;
+    /// use tinylfu_cached::cache::cached::CacheD;
+    /// use tinylfu_cached::cache::command::CommandStatus;
+    /// use tinylfu_cached::cache::config::ConfigBuilder;
     /// #[tokio::main]
     ///  async fn main() {
     ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
@@ -142,9 +142,9 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// Since, `put_with_weight` is not an immediate operation, clients can `await` on the response to get the [`crate::cache::command::CommandStatus`]
     /// ```
-    /// use cached::cache::cached::CacheD;
-    /// use cached::cache::command::CommandStatus;
-    /// use cached::cache::config::ConfigBuilder;
+    /// use tinylfu_cached::cache::cached::CacheD;
+    /// use tinylfu_cached::cache::command::CommandStatus;
+    /// use tinylfu_cached::cache::config::ConfigBuilder;
     /// #[tokio::main]
     ///  async fn main() {
     ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
@@ -173,9 +173,9 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// Since, `put_with_ttl` is not an immediate operation, clients can `await` on the response to get the [`crate::cache::command::CommandStatus`]
     /// ```
-    /// use cached::cache::cached::CacheD;
-    /// use cached::cache::command::CommandStatus;
-    /// use cached::cache::config::ConfigBuilder;
+    /// use tinylfu_cached::cache::cached::CacheD;
+    /// use tinylfu_cached::cache::command::CommandStatus;
+    /// use tinylfu_cached::cache::config::ConfigBuilder;
     /// use std::time::Duration;
     /// #[tokio::main]
     ///  async fn main() {
@@ -204,9 +204,9 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// Since, `put_with_weight_and_ttl` is not an immediate operation, clients can `await` on the response to get the [`crate::cache::command::CommandStatus`]
     /// ```
-    /// use cached::cache::cached::CacheD;
-    /// use cached::cache::command::CommandStatus;
-    /// use cached::cache::config::ConfigBuilder;
+    /// use tinylfu_cached::cache::cached::CacheD;
+    /// use tinylfu_cached::cache::command::CommandStatus;
+    /// use tinylfu_cached::cache::config::ConfigBuilder;
     /// use std::time::Duration;
     /// #[tokio::main]
     ///  async fn main() {
@@ -230,10 +230,10 @@ impl<Key, Value> CacheD<Key, Value>
     /// If the update operation is successful then the changes are made to `TTLTicker` and `AdmissionPolicy`, if applicable.
     /// If the update is not successful then a `put` operation is performed.
     /// ```
-    /// use cached::cache::cached::CacheD;
-    /// use cached::cache::command::CommandStatus;
-    /// use cached::cache::config::ConfigBuilder;
-    /// use cached::cache::put_or_update::PutOrUpdateRequestBuilder;
+    /// use tinylfu_cached::cache::cached::CacheD;
+    /// use tinylfu_cached::cache::command::CommandStatus;
+    /// use tinylfu_cached::cache::config::ConfigBuilder;
+    /// use tinylfu_cached::cache::put_or_update::PutOrUpdateRequestBuilder;
     /// #[tokio::main]
     ///  async fn main() {
     ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
@@ -306,9 +306,9 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// Since, `delete` is not an immediate operation, clients can `await` on the response to get the [`crate::cache::command::CommandStatus`]
     /// ```
-    /// use cached::cache::cached::CacheD;
-    /// use cached::cache::command::CommandStatus;
-    /// use cached::cache::config::ConfigBuilder;
+    /// use tinylfu_cached::cache::cached::CacheD;
+    /// use tinylfu_cached::cache::command::CommandStatus;
+    /// use tinylfu_cached::cache::config::ConfigBuilder;
     /// #[tokio::main]
     ///  async fn main() {
     ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
@@ -334,9 +334,9 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// Hence, the invocation of `get_ref` will hold a lock against the shard that contains the key (within the scope of its usage).
     /// ```
-    /// use cached::cache::cached::CacheD;
-    /// use cached::cache::command::CommandStatus;
-    /// use cached::cache::config::ConfigBuilder;
+    /// use tinylfu_cached::cache::cached::CacheD;
+    /// use tinylfu_cached::cache::command::CommandStatus;
+    /// use tinylfu_cached::cache::config::ConfigBuilder;
     /// #[tokio::main]
     ///  async fn main() {
     ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
@@ -364,9 +364,9 @@ impl<Key, Value> CacheD<Key, Value>
     /// This is an extension to `get_ref` method.
     /// If the key is present in `Cached`, it returns `Some(MappedValue)`, else returns `None`.
     /// ```
-    /// use cached::cache::cached::CacheD;
-    /// use cached::cache::command::CommandStatus;
-    /// use cached::cache::config::ConfigBuilder;
+    /// use tinylfu_cached::cache::cached::CacheD;
+    /// use tinylfu_cached::cache::command::CommandStatus;
+    /// use tinylfu_cached::cache::config::ConfigBuilder;
     /// #[tokio::main]
     ///  async fn main() {
     ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
@@ -393,9 +393,9 @@ impl<Key, Value> CacheD<Key, Value>
 
     /// Returns an instance of [`crate::cache::stats::StatsSummary`].
     /// ```
-    /// use cached::cache::cached::CacheD;
-    /// use cached::cache::config::ConfigBuilder;
-    /// use cached::cache::stats::StatsType;
+    /// use tinylfu_cached::cache::cached::CacheD;
+    /// use tinylfu_cached::cache::config::ConfigBuilder;
+    /// use tinylfu_cached::cache::stats::StatsType;
     /// #[tokio::main]
     ///  async fn main() {
     ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 200).build());
@@ -477,9 +477,9 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// This method is only available if the Value type is Cloneable. This method clones the value and returns it to the client.
     /// ```
-    /// use cached::cache::cached::CacheD;
-    /// use cached::cache::command::CommandStatus;
-    /// use cached::cache::config::ConfigBuilder;
+    /// use tinylfu_cached::cache::cached::CacheD;
+    /// use tinylfu_cached::cache::command::CommandStatus;
+    /// use tinylfu_cached::cache::config::ConfigBuilder;
     /// #[tokio::main]
     ///  async fn main() {
     ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
@@ -507,9 +507,9 @@ impl<Key, Value> CacheD<Key, Value>
     /// This method is only available if the Value type is Cloneable.
     /// If the key is present in `Cached`, it returns `Some(MappedValue)`, else returns `None`.
     /// ```
-    /// use cached::cache::cached::CacheD;
-    /// use cached::cache::command::CommandStatus;
-    /// use cached::cache::config::ConfigBuilder;
+    /// use tinylfu_cached::cache::cached::CacheD;
+    /// use tinylfu_cached::cache::command::CommandStatus;
+    /// use tinylfu_cached::cache::config::ConfigBuilder;
     /// #[tokio::main]
     ///  async fn main() {
     ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
@@ -537,8 +537,8 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// This method is only available if the Value type is Cloneable.
     /// ```
-    /// use cached::cache::cached::CacheD;
-    /// use cached::cache::config::ConfigBuilder;
+    /// use tinylfu_cached::cache::cached::CacheD;
+    /// use tinylfu_cached::cache::config::ConfigBuilder;
     /// #[tokio::main]
     ///  async fn main() {
     ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
@@ -560,8 +560,8 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// This method is only available if the Value type is Cloneable.
     /// ```
-    /// use cached::cache::cached::CacheD;
-    /// use cached::cache::config::ConfigBuilder;
+    /// use tinylfu_cached::cache::cached::CacheD;
+    /// use tinylfu_cached::cache::config::ConfigBuilder;
     /// #[tokio::main]
     ///  async fn main() {
     ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
@@ -585,8 +585,8 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// This method is only available if the Value type is Cloneable.
     /// ```
-    /// use cached::cache::cached::CacheD;
-    /// use cached::cache::config::ConfigBuilder;
+    /// use tinylfu_cached::cache::cached::CacheD;
+    /// use tinylfu_cached::cache::config::ConfigBuilder;
     /// #[tokio::main]
     ///  async fn main() {
     ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
@@ -611,8 +611,8 @@ impl<Key, Value> CacheD<Key, Value>
 
 /// `MultiGetIterator` allows iterating over multiple keys and getting the value corresponding to each key.
 /// ```
-/// use cached::cache::cached::CacheD;
-/// use cached::cache::config::ConfigBuilder;
+/// use tinylfu_cached::cache::cached::CacheD;
+/// use tinylfu_cached::cache::config::ConfigBuilder;
 /// #[tokio::main]
 ///  async fn main() {
 ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
@@ -649,8 +649,8 @@ impl<'a, Key, Value> Iterator for MultiGetIterator<'a, Key, Value>
 
 /// `MultiGetMapIterator` allows iterating over multiple keys, performing a map operation over each key and then getting the value corresponding to each key.
 /// ```
-/// use cached::cache::cached::CacheD;
-/// use cached::cache::config::ConfigBuilder;
+/// use tinylfu_cached::cache::cached::CacheD;
+/// use tinylfu_cached::cache::config::ConfigBuilder;
 /// #[tokio::main]
 ///  async fn main() {
 ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());

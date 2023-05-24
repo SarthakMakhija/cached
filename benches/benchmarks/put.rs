@@ -3,9 +3,9 @@ use std::time::Instant;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 
-use cached::cache::cached::CacheD;
-use cached::cache::config::ConfigBuilder;
-use cached::cache::types::{TotalCounters, Weight};
+use tinylfu_cached::cache::cached::CacheD;
+use tinylfu_cached::cache::config::ConfigBuilder;
+use tinylfu_cached::cache::types::{TotalCounters, Weight};
 
 use crate::benchmarks::common::{distribution, execute_parallel};
 

@@ -8,7 +8,7 @@ use criterion::Criterion;
 use rand::{Rng, thread_rng};
 use rand_distr::Zipf;
 
-use cached::cache::cached::CacheD;
+use tinylfu_cached::cache::cached::CacheD;
 
 #[cfg(feature = "bench_testable")]
 #[cfg(not(tarpaulin_include))]

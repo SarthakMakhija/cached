@@ -4,11 +4,11 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use cached::cache::cached::CacheD;
-use cached::cache::command::acknowledgement::CommandAcknowledgement;
-use cached::cache::command::CommandStatus;
-use cached::cache::config::ConfigBuilder;
-use cached::cache::put_or_update::PutOrUpdateRequestBuilder;
+use tinylfu_cached::cache::cached::CacheD;
+use tinylfu_cached::cache::command::acknowledgement::CommandAcknowledgement;
+use tinylfu_cached::cache::command::CommandStatus;
+use tinylfu_cached::cache::config::ConfigBuilder;
+use tinylfu_cached::cache::put_or_update::PutOrUpdateRequestBuilder;
 
 mod r#macro;
 

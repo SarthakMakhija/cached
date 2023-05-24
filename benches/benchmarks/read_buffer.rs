@@ -3,9 +3,9 @@ use std::time::Instant;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 
-use cached::cache::proxy::admission_policy::ProxyAdmissionPolicy;
-use cached::cache::proxy::pool::ProxyPool;
-use cached::cache::types::{TotalCapacity, TotalCounters, TotalShards, Weight};
+use tinylfu_cached::cache::proxy::admission_policy::ProxyAdmissionPolicy;
+use tinylfu_cached::cache::proxy::pool::ProxyPool;
+use tinylfu_cached::cache::types::{TotalCapacity, TotalCounters, TotalShards, Weight};
 
 use crate::benchmarks::common::execute_parallel;
 

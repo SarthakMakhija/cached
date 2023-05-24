@@ -11,9 +11,9 @@ use crate::cache::types::{ExpireAfter, KeyId};
 ///
 /// It is relevant to the clients on the invocation of `get_ref` and `map_get_ref` methods on [`crate::cache::cached::CacheD`].
 /// ```
-/// use cached::cache::cached::CacheD;
-/// use cached::cache::command::CommandStatus;
-/// use cached::cache::config::ConfigBuilder;
+/// use tinylfu_cached::cache::cached::CacheD;
+/// use tinylfu_cached::cache::command::CommandStatus;
+/// use tinylfu_cached::cache::config::ConfigBuilder;
 /// #[tokio::main]
 ///  async fn main() {
 ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
@@ -26,9 +26,9 @@ use crate::cache::types::{ExpireAfter, KeyId};
 /// }
 /// ```
 /// ```
-/// use cached::cache::cached::CacheD;
-/// use cached::cache::command::CommandStatus;
-/// use cached::cache::config::ConfigBuilder;
+/// use tinylfu_cached::cache::cached::CacheD;
+/// use tinylfu_cached::cache::command::CommandStatus;
+/// use tinylfu_cached::cache::config::ConfigBuilder;
 /// #[tokio::main]
 ///  async fn main() {
 ///     let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
