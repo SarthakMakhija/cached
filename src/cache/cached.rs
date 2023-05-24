@@ -25,8 +25,8 @@ use crate::cache::store::stored_value::StoredValue;
 use crate::cache::types::{KeyId, Weight};
 use crate::cache::unique_id::increasing_id_generator::IncreasingIdGenerator;
 
-/// `CacheD` is an LFU based, memory bound cache. Cached provides various methods including:
-/// `put`, `put_with_weight`, `get`, `get_ref`, `map_get_ref`, `delete`, `put_or_update`.
+/// `CacheD` is a high performance, LFU based in-memory cache. Cached provides various behaviors including:
+/// `put`, `put_with_weight`, `put_with_ttl`, `get`, `get_ref`, `map_get_ref`, `multi_get`, `delete`, `put_or_update`.
 ///
 /// The core abstractions that `CacheD` interacts with include:
 /// - `crate::cache::store::Store`: `Store` holds the key/value mapping.
