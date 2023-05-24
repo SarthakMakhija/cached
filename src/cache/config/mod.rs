@@ -11,12 +11,12 @@ use crate::cache::pool::{BufferSize, PoolSize};
 use crate::cache::types::{IsTimeToLiveSpecified, KeyHash, TotalCapacity, TotalCounters, TotalShards, Weight};
 pub(crate) mod weight_calculation;
 
-/// Defines the function for calculating the hash of the incoming key. This hash is used to put the in `crate::cache::policy::cache_weight::CacheWeight`
+/// Defines the function for calculating the hash of the incoming key. This hash is used to put the key in `crate::cache::policy::cache_weight::CacheWeight`.
 /// By default, DefaultHasher is used that uses SipHasher13 as the hash function.
 pub type HashFn<Key> = dyn Fn(&Key) -> KeyHash + Send + Sync;
 
 /// Defines the function for calculating the weight of the incoming key/value pair.
-/// Default is the `perform` function defined in `crate::cache::config::weight_calculation::Calculation`
+/// Default is the `perform` function defined in `crate::cache::config::weight_calculation::Calculation`.
 pub type WeightCalculationFn<Key, Value> = dyn Fn(&Key, &Value, IsTimeToLiveSpecified) -> Weight + Send + Sync;
 
 /// Each put, put_or_update, delete results in a command to `crate::cache::command::command_executor::CommandExecutor`.
@@ -32,7 +32,7 @@ const ACCESS_POOL_SIZE: PoolSize = PoolSize(32);
 /// Default capacity of the buffer is 64
 const ACCESS_BUFFER_SIZE: BufferSize = BufferSize(64);
 
-/// Determines the number of shards to use in the [`dashmap::DashMap`] inside `crate::cache::store::Store`
+/// Determines the number of shards to use in the [`dashmap::DashMap`] inside `crate::cache::store::Store`.
 /// Default is 256
 const SHARDS: usize = 256;
 
@@ -62,18 +62,18 @@ pub struct Config<Key, Value>
 impl<Key, Value> Config<Key, Value>
     where Key: Hash + 'static,
           Value: 'static {
-    /// Creates a new instance of TTLConfig
+    /// Creates a new instance of TTLConfig.
     pub(crate) fn ttl_config(&self) -> TTLConfig {
         TTLConfig::new(self.shards, self.ttl_tick_duration, self.clock.clone_box())
     }
 
-    /// Creates a new instance of CacheWeightConfig
+    /// Creates a new instance of CacheWeightConfig.
     pub(crate) fn cache_weight_config(&self) -> CacheWeightConfig {
         CacheWeightConfig::new(self.capacity, self.shards, self.total_cache_weight)
     }
 }
 
-/// Convenient builder that allows creating an instance of Config
+/// Convenient builder that allows creating an instance of Config.
 pub struct ConfigBuilder<Key, Value>
     where Key: Hash + 'static,
           Value: 'static {
@@ -94,17 +94,18 @@ impl<Key, Value> ConfigBuilder<Key, Value>
     where Key: Hash + 'static,
           Value: 'static {
 
-    /// Create a new instance of ConfigBuilder with counters, capacity and cache_weight.
-    /// `counters` are used to determine the number of counters to keep to hold the access frequency of each key.
+    /// Create a new instance of ConfigBuilder with `counters`, `capacity` and `cache_weight`.
+    ///
+    /// `counters` are used to determine the number of counters to keep that hold the access frequency of each key.
     ///
     /// If you expect your cache to hold `10_000` elements, then counters should be 10 times (`100_000`) to
-    /// get a close estimate of the access frequency
+    /// get a close estimate of the access frequency.
     ///
     /// `capacity` is used as a parameter for [`dashmap::DashMap`] inside `crate::cache::store::Store`.
-    ///  It defines the number of items that the cache may store
+    ///  It defines the number of items that the cache may store.
     ///
     /// `cache_weight` defines the total cache size. `cache_weight` is treated as the cache size in bytes.
-    /// If `cache_weight` is set to 1024, that means the cache should take only 1024 bytes of memory.
+    /// If `cache_weight` is set to `1024`, that means the cache should take only `1024 bytes` of memory.
     /// After the cache size is full, any further `put` operation will result in either of the following:
         /// - rejection of the incoming key
         ///
@@ -135,7 +136,7 @@ impl<Key, Value> ConfigBuilder<Key, Value>
         }
     }
 
-    /// Sets the key hash function
+    /// Sets the key hash function.
     ///
     /// By default, DefaultHasher is used that uses SipHasher13 as the hash function.
     pub fn key_hash_fn(mut self, key_hash: Box<HashFn<Key>>) -> ConfigBuilder<Key, Value> {
@@ -143,11 +144,11 @@ impl<Key, Value> ConfigBuilder<Key, Value>
         self
     }
 
-    /// Sets the weight calculation function
+    /// Sets the weight calculation function.
     ///
     /// Weight calculation function calculates the weight of the incoming key/value pair.
     ///
-    /// Default is the `perform` function defined in `crate::cache::config::weight_calculation::Calculation`
+    /// Default is the `perform` function defined in `crate::cache::config::weight_calculation::Calculation`.
     pub fn weight_calculation_fn(mut self, weight_calculation: Box<WeightCalculationFn<Key, Value>>) -> ConfigBuilder<Key, Value> {
         self.weight_calculation_fn = weight_calculation;
         self
@@ -159,20 +160,20 @@ impl<Key, Value> ConfigBuilder<Key, Value>
         self
     }
 
-    /// Sets the pool size
+    /// Sets the pool size.
     ///
     /// Pool represents a ring-buffer that is used to buffer the gets for various keys.
     ///
-    /// Default pool size is `32`
+    /// Default pool size is `32`.
     pub fn access_pool_size(mut self, pool_size: usize) -> ConfigBuilder<Key, Value> {
         assert!(pool_size > 0, "{}", Errors::PoolSizeGtZero);
         self.access_pool_size = PoolSize(pool_size);
         self
     }
 
-    /// Sets the size of each buffer inside Pool
+    /// Sets the size of each buffer inside Pool.
     ///
-    /// Default capacity of the buffer is `64`
+    /// Default capacity of the buffer is `64`.
     pub fn access_buffer_size(mut self, buffer_size: usize) -> ConfigBuilder<Key, Value> {
         assert!(buffer_size > 0, "{}", Errors::BufferSizeGtZero);
         self.access_buffer_size = BufferSize(buffer_size);
@@ -181,16 +182,16 @@ impl<Key, Value> ConfigBuilder<Key, Value>
 
     /// Each put, put_or_update, delete results in a command to `crate::cache::command::command_executor::CommandExecutor`.
     ///
-    /// CommandExecutor reads from a channel and the default channel size is `32 * 1024`
+    /// CommandExecutor reads from a channel and the default channel size is `32 * 1024`.
     pub fn command_buffer_size(mut self, command_buffer_size: usize) -> ConfigBuilder<Key, Value> {
         assert!(command_buffer_size > 0, "{}", Errors::CommandBufferSizeGtZero);
         self.command_buffer_size = command_buffer_size;
         self
     }
 
-    /// Sets the number of shards to use in the DashMap inside `crate::cache::store::Store`
+    /// Sets the number of shards to use in the DashMap inside `crate::cache::store::Store`.
     ///
-    /// `shards` must be a power of `2` and greater than `1`
+    /// `shards` must be a power of `2` and greater than `1`.
     pub fn shards(mut self, shards: TotalShards) -> ConfigBuilder<Key, Value> {
         assert!(shards > 1, "{}", Errors::TotalShardsGtOne);
         assert!(shards.is_power_of_two(), "{}", Errors::TotalShardsPowerOf2);
@@ -198,7 +199,7 @@ impl<Key, Value> ConfigBuilder<Key, Value>
         self
     }
 
-    /// Sets the duration of the `crate::cache::expiration::TTLTicker`]
+    /// Sets the duration of the `crate::cache::expiration::TTLTicker`.
     ///
     /// Default is every `5 seconds`.
     pub fn ttl_tick_duration(mut self, duration: Duration) -> ConfigBuilder<Key, Value> {
@@ -206,7 +207,7 @@ impl<Key, Value> ConfigBuilder<Key, Value>
         self
     }
 
-    // Builds an instance of Config with the supplied values
+    // Builds an instance of Config with the supplied values.
     pub fn build(self) -> Config<Key, Value> {
         Config {
             key_hash_fn: self.key_hash_fn,

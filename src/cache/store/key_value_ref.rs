@@ -3,7 +3,7 @@ use std::hash::Hash;
 use dashmap::mapref::one::Ref;
 
 /// KeyValueRef contains DashMap's Ref [`dashmap::mapref::one::Ref`] which internally holds
-/// a `RwLockReadGuard` for the shard.
+/// a `RwLockReadGuard` for the shard. It is returned as a response to `get_ref` method of [`crate::cache::cached::CacheD`].
 ///
 /// Any time `get_ref` method is invoked, the `Store` returns `Option<KeyValueRef<'_, Key, StoredValue<Value>>>`.
 ///

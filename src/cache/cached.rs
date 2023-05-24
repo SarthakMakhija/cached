@@ -27,20 +27,20 @@ use crate::cache::unique_id::increasing_id_generator::IncreasingIdGenerator;
 
 /// `CacheD` is an LFU based, memory bound cache. Cached provides various methods including:
 /// `put`, `put_with_weight`, `get`, `get_ref`, `map_get_ref`, `delete`, `put_or_update`.
-
+///
 /// The core abstractions that `CacheD` interacts with include:
 /// - `crate::cache::store::Store`: `Store` holds the key/value mapping.
 /// - `crate::cache::command::command_executor::CommandExecutor`: `CommandExecutor` executes various commands of type `crate::cache::command::CommandType`. Each write operation results in a command to `CommandExecutor`.
-/// - `crate::cache::policy::admission_policy::AdmissionPolicy`: `AdmissionPolicy` maintains the weight of each key in the cache and takes a decision on whether a key should be admitted
-/// - `crate::cache::expiration::TTLTicker`]: `TTLTicker` removes the expired keys.
+/// - `crate::cache::policy::admission_policy::AdmissionPolicy`: `AdmissionPolicy` maintains the weight of each key in the cache and takes a decision on whether a key should be admitted.
+/// - `crate::cache::expiration::TTLTicker`: `TTLTicker` removes the expired keys.
 ///
 /// Core design ideas behind `CacheD`:
 /// 1) LFU (least frequently used):
 ///
 ///  `CacheD` is an LFU based cache which makes it essential to store the access frequency of each key.
-///   Storing the access frequency in a `HashMap` like data structure would mean that the space used to store the frequency is directly proportional to the number of keys in the cache
-///   So, the tradeoff is to use a probabilistic data structure like count-min sketch.
-///   `Cached` uses count-min sketch inside `crate::cache::lfu::frequency_counter::FrequencyCounter` to store the frequency for each key.
+///   Storing the access frequency in a `HashMap` like data structure would mean that the space used to store the frequency is directly proportional to the number of keys in the cache.
+///   So, the tradeoff is to use a probabilistic data structure like `count-min sketch`.
+///   `Cached` uses `count-min sketch` inside `crate::cache::lfu::frequency_counter::FrequencyCounter` to store the frequency for each key.
 ///
 /// 2) Memory bound:
 ///
@@ -51,9 +51,9 @@ use crate::cache::unique_id::increasing_id_generator::IncreasingIdGenerator;
 ///
 /// 3) Admission/Rejection of incoming keys:
 ///
-///   After the space allocated to the instance of `CacheD` is full, put of a new key/value pair will result in `AdmissionPolicy`
+///   After the space allocated to the instance of `CacheD` is full, put of a new key/value pair will result in `AdmissionPolicy`.
 ///   deciding whether the incoming key/value pair should be accepted. This decision is based on estimating the access frequency of the incoming key
-///   and comparing it against the estimated access frequencies of a sample of keys. Read more in `crate::cache::policy::admission_policy::AdmissionPolicy`.
+///   and comparing it against the estimated access frequencies of a sample of keys.
 ///
 /// 4) Fine-grained locks:
 ///
@@ -110,7 +110,7 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// Weight is calculated by the weight calculation function provided as a part of `Config`.
     ///
-    /// `put` is not an immediate operation. Every invocation of `put` results in `crate::cache::command::CommandType::Put` to the `CommandExecutor`
+    /// `put` is not an immediate operation. Every invocation of `put` results in `crate::cache::command::CommandType::Put` to the `CommandExecutor`.
     /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
     /// `AdmissionPolicy` may accept or reject the key/value pair depending on the available cache weight.
     ///
@@ -136,7 +136,7 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// Weight is provided by the clients.
     ///
-    /// `put_with_weight` is not an immediate operation. Every invocation of `put_with_weight` results in `crate::cache::command::CommandType::Put` to the `CommandExecutor`
+    /// `put_with_weight` is not an immediate operation. Every invocation of `put_with_weight` results in `crate::cache::command::CommandType::Put` to the `CommandExecutor`.
     /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
     /// `AdmissionPolicy` may accept or reject the key/value pair depending on the available cache weight.
     ///
@@ -167,7 +167,7 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// Weight is calculated by the weight calculation function provided as a part of `Config`.
     ///
-    /// `put_with_ttl` is not an immediate operation. Every invocation of `put_with_ttl` results in `crate::cache::command::CommandType::PutWithTTL` to the `CommandExecutor`
+    /// `put_with_ttl` is not an immediate operation. Every invocation of `put_with_ttl` results in `crate::cache::command::CommandType::PutWithTTL` to the `CommandExecutor`.
     /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
     /// `AdmissionPolicy` may accept or reject the key/value pair depending on the available cache weight.
     ///
@@ -197,7 +197,8 @@ impl<Key, Value> CacheD<Key, Value>
     /// Puts the key/value pair with `time_to_live` in the cacheD instance and returns an instance of [` crate::cache::command::command_executor::CommandSendResult`] to the clients.
     ///
     /// Weight is provided by the clients.
-    /// `put_with_weight_and_ttl` is not an immediate operation. Every invocation of `put_with_weight_and_ttl` results in `crate::cache::command::CommandType::PutWithTTL` to the `CommandExecutor`
+    ///
+    /// `put_with_weight_and_ttl` is not an immediate operation. Every invocation of `put_with_weight_and_ttl` results in `crate::cache::command::CommandType::PutWithTTL` to the `CommandExecutor`.
     /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
     /// `AdmissionPolicy` may accept or reject the key/value pair depending on the available cache weight.
     ///
@@ -224,9 +225,8 @@ impl<Key, Value> CacheD<Key, Value>
         ))
     }
 
-    /// Performs a put or an update operation. [`PutOrUpdateRequest`] is a convenient way to perform put or update operation.
+    /// Performs a `put` if the key does not exist or an `update` operation, if the key exists. [`PutOrUpdateRequest`] is a convenient way to perform put or update operation.
     /// `put_or_update` attempts to perform the update operation on `crate::cache::store::Store` first.
-    ///
     /// If the update operation is successful then the changes are made to `TTLTicker` and `AdmissionPolicy`, if applicable.
     /// If the update is not successful then a `put` operation is performed.
     /// ```
@@ -301,7 +301,7 @@ impl<Key, Value> CacheD<Key, Value>
     /// 1) Marks the key as deleted in the `crate::cache::store::Store`. So, any `get` operations on the key would return None.
     ///    This step is immediate.
     ///
-    /// 2) Sends a `crate::cache::command::CommandType::Delete` to the `CommandExecutor` which cause the key weight to be removed from `AdmissionPolicy`.
+    /// 2) Sends a `crate::cache::command::CommandType::Delete` to the `CommandExecutor` which causes the key weight to be removed from `AdmissionPolicy`.
     ///    This step may happen at a later point in time.
     ///
     /// Since, `delete` is not an immediate operation, clients can `await` on the response to get the [`crate::cache::command::CommandStatus`]
@@ -360,7 +360,7 @@ impl<Key, Value> CacheD<Key, Value>
 
     /// Returns an optional MappedValue for key present in the instance of `Cached`.
     ///
-    /// The parameter `map_fn` is an instance of `Fn` that takes a reference to `crate::cache::store::stored_value::StoredValue` and returns any MappedValue
+    /// The parameter `map_fn` is an instance of `Fn` that takes a reference to [`crate::cache::store::stored_value::StoredValue`] and returns any MappedValue.
     /// This is an extension to `get_ref` method.
     /// If the key is present in `Cached`, it returns `Some(MappedValue)`, else returns `None`.
     /// ```
@@ -391,7 +391,7 @@ impl<Key, Value> CacheD<Key, Value>
         self.admission_policy.weight_used()
     }
 
-    /// Returns an instance of [`crate::cache::stats::StatsSummary`]
+    /// Returns an instance of [`crate::cache::stats::StatsSummary`].
     /// ```
     /// use cached::cache::cached::CacheD;
     /// use cached::cache::config::ConfigBuilder;
@@ -431,7 +431,7 @@ impl<Key, Value> CacheD<Key, Value>
     /// It becomes important to finish the future of the `put` command that has come in at the same time `shutdown` was invoked.
     ///
     /// This is how `shutdown` in `CommandExecutor` is handled, it finishes all the futures in the pipeline that are placed after the `Shutdown` command.
-    /// Refer to the documentation inside `crate::cache::command::command_executor::CommandExecutor`.
+    /// All such futures ultimately get [`crate::cache::command::CommandStatus::ShuttingDown`].
     pub fn shutdown(&self) {
         if self.is_shutting_down.compare_exchange(false, true, Ordering::Release, Ordering::Relaxed).is_ok() {
             info!("Starting to shutdown cached");
@@ -531,9 +531,9 @@ impl<Key, Value> CacheD<Key, Value>
 
     /// Returns values corresponding to multiple keys.
     ///
-    /// It takes a vector of reference of keys and returns a `HashMap` containing the key reference and the optional Value
-    /// If the value is present for a key, the returned `HashMap` will contain the key reference and `Some(Value)`
-    /// If the value is not present for a key, the returned `HashMap` will contain the key reference and `None`
+    /// It takes a vector of reference of keys and returns a `HashMap` containing the key reference and the optional Value.
+    /// If the value is present for a key, the returned `HashMap` will contain the key reference and `Some(Value)`.
+    /// If the value is not present for a key, the returned `HashMap` will contain the key reference and `None` as the value.
     ///
     /// This method is only available if the Value type is Cloneable.
     /// ```
@@ -554,7 +554,7 @@ impl<Key, Value> CacheD<Key, Value>
         keys.into_iter().map(|key| (key, self.get(key))).collect::<HashMap<_, _>>()
     }
 
-    /// Returns an instance of [`MultiGetIterator`] that allows iterating over multiple keys and getting the value corresponding to each key
+    /// Returns an instance of [`MultiGetIterator`] that allows iterating over multiple keys and getting the value corresponding to each key.
     ///
     /// It takes a vector of reference of keys and an instance of `MultiGetIterator`
     ///
@@ -579,9 +579,9 @@ impl<Key, Value> CacheD<Key, Value>
         }
     }
 
-    /// Returns an instance of [`MultiGetMapIterator`] that allows iterating over multiple keys, performing a map operation over each key and then getting the value corresponding to each key
+    /// Returns an instance of [`MultiGetMapIterator`] that allows iterating over multiple keys, performing a map operation over each key and then getting the value corresponding to each key.
     ///
-    /// It takes a vector of reference of keys and an instance of `MultiGetIterator`
+    /// It takes a vector of reference of keys and an instance of `MultiGetIterator`.
     ///
     /// This method is only available if the Value type is Cloneable.
     /// ```
@@ -609,7 +609,7 @@ impl<Key, Value> CacheD<Key, Value>
     }
 }
 
-/// `MultiGetIterator` allows iterating over multiple keys and getting the value corresponding to each key
+/// `MultiGetIterator` allows iterating over multiple keys and getting the value corresponding to each key.
 /// ```
 /// use cached::cache::cached::CacheD;
 /// use cached::cache::config::ConfigBuilder;
@@ -647,7 +647,7 @@ impl<'a, Key, Value> Iterator for MultiGetIterator<'a, Key, Value>
     }
 }
 
-/// `MultiGetMapIterator` allows iterating over multiple keys, performing a map operation over each key and then getting the value corresponding to each key
+/// `MultiGetMapIterator` allows iterating over multiple keys, performing a map operation over each key and then getting the value corresponding to each key.
 /// ```
 /// use cached::cache::cached::CacheD;
 /// use cached::cache::config::ConfigBuilder;

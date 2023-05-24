@@ -6,10 +6,10 @@ use crate::cache::types::{ExpireAfter, KeyId};
 
 /// `StoredValue` wraps the client provided Value and it is stored as a value in the `crate::cache::store::Store`.
 ///
-/// It encapsulates the `value`, `key_id`, the optional expiry of the key
+/// It encapsulates the `value`, `key_id`, the optional expiry of the key.
 /// and a flag to identify whether a key is soft deleted
 ///
-/// It is relevant to the clients on the invocation of `get_ref` and `map_get_ref` methods on [`crate::cache::cached::CacheD`]
+/// It is relevant to the clients on the invocation of `get_ref` and `map_get_ref` methods on [`crate::cache::cached::CacheD`].
 /// ```
 /// use cached::cache::cached::CacheD;
 /// use cached::cache::command::CommandStatus;

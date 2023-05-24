@@ -6,8 +6,8 @@ use std::task::{Context, Poll, Waker};
 use parking_lot::Mutex;
 use crate::cache::command::CommandStatus;
 
-/// Every command is returned a `CommandAcknowledgement` wrapped in [`crate::cache::command::command_executor::CommandSendResult`].
-/// `CommandAcknowledgement` provides a handle to the clients to perform `.await`
+/// The execution of every write operation is returned a `CommandAcknowledgement` wrapped inside [`crate::cache::command::command_executor::CommandSendResult`].
+/// `CommandAcknowledgement` provides a handle to the clients to perform `.await` to get the command status.
 ///
 /// ```
 /// use cached::cache::cached::CacheD;
@@ -30,8 +30,7 @@ pub struct CommandAcknowledgement {
 ///
 /// The initial status in the `CommandAcknowledgementHandle` is `CommandStatus::Pending`
 ///
-/// When the command is executed by the `crate::cache::command::command_executor::CommandExecutor`, the status gets updated when
-/// the `done` method of `CommandAcknowledgement` is invoked.
+/// The status gets updated when the command is executed by the `crate::cache::command::command_executor::CommandExecutor`.
 pub struct CommandAcknowledgementHandle {
     done: AtomicBool,
     status: Arc<Mutex<CommandStatus>>,
@@ -93,8 +92,8 @@ impl CommandAcknowledgementHandle {
 }
 
 /// Future implementation for CommandAcknowledgementHandle.
-/// The future is complete when the `done: AtomicBool` flag is marked true.
-/// When the `done` is marked, it returns `Poll::Ready` with a `CommandStatus`
+/// The future is complete when the the command is executed by the `crate::cache::command::command_executor::CommandExecutor`.
+/// The completion of future returns [`CommandStatus`].
 impl Future for &CommandAcknowledgementHandle {
     type Output = CommandStatus;
 

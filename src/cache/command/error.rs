@@ -3,11 +3,11 @@ use std::fmt::{Debug, Display, Formatter};
 
 const SHUTDOWN_MESSAGE: &str = "could not accept the command for execution, probably the cache is being shutdown.";
 
-/// Every command is returned a [`crate::cache::command::command_executor::CommandSendResult`].
+/// The execution of every write operation is returned a [`crate::cache::command::command_executor::CommandSendResult`].
 ///
-/// `CommandSendResult` wraps `CommandSendError` that is encountered when there is an error in sending a command to `crate::cache::command::command_executor::CommandExecutor`
+/// `CommandSendResult` wraps `CommandSendError` that is encountered when there is an error in sending a command to `crate::cache::command::command_executor::CommandExecutor`.
 ///
-/// `CommandSendError` is also returned to the clients if an attempt is made to perform any operation say `put`, `delete`, while the cache is being shutdown
+/// `CommandSendError` is also returned to the clients if an attempt is made to perform any operation say `put`, `delete`, while the cache is being shutdown.
 pub struct CommandSendError {
     command_description: String,
 }
@@ -26,7 +26,7 @@ impl CommandSendError {
     }
 }
 
-/// Display implementation for `CommandSendError`. Currently, both `Display` and `Debug` return the same message
+/// Display implementation for `CommandSendError`. Currently, both `Display` and `Debug` return the same message.
 impl Display for CommandSendError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -38,7 +38,7 @@ impl Display for CommandSendError {
     }
 }
 
-/// Debug implementation for `CommandSendError`. Currently, both `Display` and `Debug` return the same message
+/// Debug implementation for `CommandSendError`. Currently, both `Display` and `Debug` return the same message.
 impl Debug for CommandSendError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         write!(

@@ -40,15 +40,15 @@ impl<Key, Value> CommandType<Key, Value>
 
 /// CommandStatus defines the status of each command.
 ///
-/// `Pending`:        the initial status of the command, before a command is acted upon
+/// `Pending`:        the initial status of the command, before a command is acted upon.
 ///
-/// `Accepted`:       the command is successfully completed
+/// `Accepted`:       the command is successfully completed.
 ///
 /// `Rejected`:       the command is rejected.
-    /// - `Put` may be rejected for various reasons: one reason is: the weight of the the incoming key/value pair is more than the total cache weight
-    /// - `Delete` will be rejected if the key to be deleted is not preset in the cache
+    /// - `Put` may be rejected for various reasons. One reason is: the weight of the the incoming key/value pair is more than the total cache weight.
+    /// - `Delete` will be rejected if the key to be deleted is not preset in the cache.
 ///
-/// `ShuttingDown`:   all the commands that could sneak in while the cache is being shutdown will be returned with `ShuttingDown` status
+/// `ShuttingDown`:   all the commands that could sneak in while the cache is being shutdown will be returned with `ShuttingDown` status.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum CommandStatus {
     Pending,

@@ -10,25 +10,25 @@ const TOTAL_STATS: usize = 10;
 #[non_exhaustive]
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum StatsType {
-    /// Defines the number of hits for the keys
+    /// Defines the number of `hits` for the keys
     CacheHits = 0,
-    /// Defines the number of misses for the keys
+    /// Defines the number of `misses` for the keys
     CacheMisses = 1,
-    /// Defines the number of keys added
+    /// Defines the number of `keys added`
     KeysAdded = 2,
-    /// Defines the number of keys deleted
+    /// Defines the number of `keys deleted`
     KeysDeleted = 3,
-    /// Defines the number of keys updated
+    /// Defines the number of `keys updated`
     KeysUpdated = 4,
-    /// Defines the number of keys rejected
+    /// Defines the number of `keys rejected`
     KeysRejected = 5,
-    /// Defines the total weight added
+    /// Defines the `total weight added`
     WeightAdded = 6,
-    /// Defines the total weight removed
+    /// Defines the `total weight removed`
     WeightRemoved = 7,
-    /// Defines the total number of gets registered in the frequency counter
+    /// Defines the total number of `gets registered` in the frequency counter
     AccessAdded = 8,
-    /// Defines the total number of gets dropped
+    /// Defines the total number of `gets dropped`
     AccessDropped = 9,
 }
 

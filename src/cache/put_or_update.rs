@@ -5,7 +5,7 @@ use crate::cache::config::WeightCalculationFn;
 use crate::cache::errors::Errors;
 use crate::cache::types::Weight;
 
-/// `PutOrUpdateRequest` encapsulates the fields that are required `put` or an `update` operation.
+/// `PutOrUpdateRequest` encapsulates the fields that are required for a `put` or an `update` operation.
 ///
 /// It is a parameter to `put_or_update` method of [`crate::cache::cached::CacheD`].
 ///
@@ -42,7 +42,7 @@ impl<Key, Value> PutOrUpdateRequest<Key, Value>
     }
 }
 
-/// Convenient builder that allows creating an instance of PutOrUpdateRequest
+/// Convenient builder that allows creating an instance of PutOrUpdateRequest.
 pub struct PutOrUpdateRequestBuilder<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone,
           Value: Send + Sync {
@@ -57,7 +57,7 @@ impl<Key, Value> PutOrUpdateRequestBuilder<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone,
           Value: Send + Sync {
 
-    /// Creates a new instance of `PutOrUpdateRequestBuilder` with the specified Key
+    /// Creates a new instance of `PutOrUpdateRequestBuilder` with the specified Key.
     pub fn new(key: Key) -> PutOrUpdateRequestBuilder<Key, Value> {
         PutOrUpdateRequestBuilder {
             key,
@@ -68,20 +68,20 @@ impl<Key, Value> PutOrUpdateRequestBuilder<Key, Value>
         }
     }
 
-    /// Sets the value in `PutOrUpdateRequestBuilder`
+    /// Sets the value in `PutOrUpdateRequestBuilder`.
     pub fn value(mut self, value: Value) -> PutOrUpdateRequestBuilder<Key, Value> {
         self.value = Some(value);
         self
     }
 
-    /// Sets the weight, weight must be greater than zero
+    /// Sets the weight, weight must be greater than zero.
     pub fn weight(mut self, weight: Weight) -> PutOrUpdateRequestBuilder<Key, Value> {
         assert!(weight > 0, "{}", Errors::KeyWeightGtZero("PutOrUpdate request builder"));
         self.weight = Some(weight);
         self
     }
 
-    /// Sets the time_to_live
+    /// Sets the time_to_live.
     pub fn time_to_live(mut self, time_to_live: Duration) -> PutOrUpdateRequestBuilder<Key, Value> {
         self.time_to_live = Some(time_to_live);
         self
@@ -89,13 +89,13 @@ impl<Key, Value> PutOrUpdateRequestBuilder<Key, Value>
 
     /// Marks a flag to remove time_to_live.
     ///
-    /// Either of `time_to_live` or `remove_time_to_live` can be provided
+    /// Either of `time_to_live` or `remove_time_to_live` can be provided.
     pub fn remove_time_to_live(mut self) -> PutOrUpdateRequestBuilder<Key, Value> {
         self.remove_time_to_live = true;
         self
     }
 
-    /// Builds an instance of PutOrUpdateRequest
+    /// Builds an instance of PutOrUpdateRequest.
     pub fn build(self) -> PutOrUpdateRequest<Key, Value> {
         let valid_put_or_update = self.value.is_some() || self.weight.is_some() || self.time_to_live.is_some() || self.remove_time_to_live;
         assert!(valid_put_or_update, "{}", Errors::InvalidPutOrUpdate);
