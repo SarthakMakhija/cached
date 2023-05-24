@@ -8,7 +8,7 @@ High performance, LFU based in-memory cache.
 """
 readme = "README.md"
 repository = "https://github.com/SarthakMakhija/cached"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 keywords = ["cached", "LFU", "TinyLFU"]
 categories = ["caching"]
 
