@@ -7,10 +7,13 @@
 
 **Cached** is a [high performance](https://github.com/SarthakMakhija/cached/tree/main/benches/results), [LFU](https://dgraph.io/blog/refs/TinyLFU%20-%20A%20Highly%20Efficient%20Cache%20Admission%20Policy.pdf) based in-memory cache in Rust inspired by [Ristretto](https://github.com/dgraph-io/ristretto).
 
+The API documentation is available [here](https://docs.rs/tinylfu-cached/0.0.1/tinylfu_cached/cache/cached/struct.CacheD.html).
+
 ### Content organization
 * [Features](#features)
 * [Core design ideas](#core-design-ideas)
-* [Examples and usage](#examples)
+* [Usage](#usage)
+* [Examples](#examples)
 * [Measuring cache-hit ratio](#measuring-cache-hit-ratio)
 * [FAQs](#faqs)
 * [References](#references)
@@ -62,7 +65,19 @@ until the status of the `put` operation is returned.
 
 Similarly, the `put_or_update` operation takes an instance of `crate::cache::put_or_update::PutOrUpdateRequest`, thereby allowing the clients to be very explicit in the type of change they want to perform.
 
-### Examples and usage
+### Usage
+
+Add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+tinylfu-cached = "0.0.1"
+```
+
+### Examples
+
+Identify the `Config` parameter values and you are good to go.
+
 ```rust
 
 //Total counters in count-min sketch based frequency counter
