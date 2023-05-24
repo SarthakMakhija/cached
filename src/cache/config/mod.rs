@@ -95,20 +95,20 @@ impl<Key, Value> ConfigBuilder<Key, Value>
           Value: 'static {
 
     /// Create a new instance of ConfigBuilder with counters, capacity and cache_weight.
-    /// `counters` are used to determine the access (or frequency) of each key.
+    /// `counters` are used to determine the number of counters to keep to hold the access frequency of each key.
     ///
-    /// If you expect your cache to hold 100_000 elements, then counters should be 10 times 100_000 to
+    /// If you expect your cache to hold `10_000` elements, then counters should be 10 times (`100_000`) to
     /// get a close estimate of the access frequency
     ///
-    /// `capacity` is used as a parameter for [`dashmap::DashMap`] inside `crate::cache::store::Store`
+    /// `capacity` is used as a parameter for [`dashmap::DashMap`] inside `crate::cache::store::Store`.
     ///  It defines the number of items that the cache may store
     ///
-    /// `cache_weight` defines the total cache size. cache_weight is treated as the cache size in bytes
-    /// If cache_weight is set to 1024, that means the cache should take only 1024 bytes of memory.
-    ///
+    /// `cache_weight` defines the total cache size. `cache_weight` is treated as the cache size in bytes.
+    /// If `cache_weight` is set to 1024, that means the cache should take only 1024 bytes of memory.
     /// After the cache size is full, any further `put` operation will result in either of the following:
-        /// rejection of the incoming key
-        /// admission of the incoming key by causing eviction of some existing keys
+        /// - rejection of the incoming key
+        ///
+        /// - admission of the incoming key by causing eviction of some existing keys
     pub fn new(counters: TotalCounters, capacity: TotalCapacity, cache_weight: Weight) -> Self {
         assert!(counters > 0, "{}", Errors::TotalCountersGtZero);
         assert!(capacity > 0, "{}", Errors::TotalCapacityGtZero);
@@ -163,7 +163,7 @@ impl<Key, Value> ConfigBuilder<Key, Value>
     ///
     /// Pool represents a ring-buffer that is used to buffer the gets for various keys.
     ///
-    /// Default pool size is 32
+    /// Default pool size is `32`
     pub fn access_pool_size(mut self, pool_size: usize) -> ConfigBuilder<Key, Value> {
         assert!(pool_size > 0, "{}", Errors::PoolSizeGtZero);
         self.access_pool_size = PoolSize(pool_size);
@@ -172,7 +172,7 @@ impl<Key, Value> ConfigBuilder<Key, Value>
 
     /// Sets the size of each buffer inside Pool
     ///
-    /// Default capacity of the buffer is 64
+    /// Default capacity of the buffer is `64`
     pub fn access_buffer_size(mut self, buffer_size: usize) -> ConfigBuilder<Key, Value> {
         assert!(buffer_size > 0, "{}", Errors::BufferSizeGtZero);
         self.access_buffer_size = BufferSize(buffer_size);
@@ -181,7 +181,7 @@ impl<Key, Value> ConfigBuilder<Key, Value>
 
     /// Each put, put_or_update, delete results in a command to `crate::cache::command::command_executor::CommandExecutor`.
     ///
-    /// CommandExecutor reads from a channel and the default channel size is 32 * 1024
+    /// CommandExecutor reads from a channel and the default channel size is `32 * 1024`
     pub fn command_buffer_size(mut self, command_buffer_size: usize) -> ConfigBuilder<Key, Value> {
         assert!(command_buffer_size > 0, "{}", Errors::CommandBufferSizeGtZero);
         self.command_buffer_size = command_buffer_size;
@@ -190,7 +190,7 @@ impl<Key, Value> ConfigBuilder<Key, Value>
 
     /// Sets the number of shards to use in the DashMap inside `crate::cache::store::Store`
     ///
-    /// `shards` must be a power of 2 and greater than 1
+    /// `shards` must be a power of `2` and greater than `1`
     pub fn shards(mut self, shards: TotalShards) -> ConfigBuilder<Key, Value> {
         assert!(shards > 1, "{}", Errors::TotalShardsGtOne);
         assert!(shards.is_power_of_two(), "{}", Errors::TotalShardsPowerOf2);
@@ -200,7 +200,7 @@ impl<Key, Value> ConfigBuilder<Key, Value>
 
     /// Sets the duration of the `crate::cache::expiration::TTLTicker`]
     ///
-    /// Default is every 5 seconds.
+    /// Default is every `5 seconds`.
     pub fn ttl_tick_duration(mut self, duration: Duration) -> ConfigBuilder<Key, Value> {
         self.ttl_tick_duration = duration;
         self

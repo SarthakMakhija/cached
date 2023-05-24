@@ -35,26 +35,36 @@ use crate::cache::unique_id::increasing_id_generator::IncreasingIdGenerator;
 /// - `crate::cache::expiration::TTLTicker`]: `TTLTicker` removes the expired keys.
 ///
 /// Core design ideas behind `CacheD`:
-/// 1) LFU (least frequently used)
+/// 1) LFU (least frequently used):
+///
 ///  `CacheD` is an LFU based cache which makes it essential to store the access frequency of each key.
 ///   Storing the access frequency in a `HashMap` like data structure would mean that the space used to store the frequency is directly proportional to the number of keys in the cache
 ///   So, the tradeoff is to use a probabilistic data structure like count-min sketch.
 ///   `Cached` uses count-min sketch inside `crate::cache::lfu::frequency_counter::FrequencyCounter` to store the frequency for each key.
-/// 2) Memory bound
+///
+/// 2) Memory bound:
+///
 ///  `CacheD` is a memory bound cache. It uses `Weight` as the terminology to denote the space.
 ///   Every key/value pair has a weight, either the clients can provide weight while putting a key/value pair or the weight is auto-calculated.
 ///   In order to create a new instance of `CacheD`, clients provide the total weight of the cache, which signifies the total space reserved for the cache.
 ///  `CacheD` ensure that it never crosses the maximum weight of the cache.
-/// 3) Admission/Rejection of incoming keys
+///
+/// 3) Admission/Rejection of incoming keys:
+///
 ///   After the space allocated to the instance of `CacheD` is full, put of a new key/value pair will result in `AdmissionPolicy`
 ///   deciding whether the incoming key/value pair should be accepted. This decision is based on estimating the access frequency of the incoming key
 ///   and comparing it against the estimated access frequencies of a sample of keys. Read more in `crate::cache::policy::admission_policy::AdmissionPolicy`.
-/// 4) Fine-grained locks
+///
+/// 4) Fine-grained locks:
+///
 ///   `CacheD` makes an attempt to used fine grained locks over coarse grained locks wherever possible.
-/// 5) Expressive APIs
+///
+/// 5) Expressive APIs:
+///
 ///   `Cached` provides expressive APIs to the clients.
 ///   For example, `put` is not an immediate operation, it happens at a later point in time. The return type of `put` operation is an instance of
 ///   [`crate::cache::command::command_executor::CommandSendResult`] and clients can use it to `await` until the status of the `put` operation is returned.
+///
 ///   Similarly, `put_or_update` operation takes an instance of [`crate::cache::put_or_update::PutOrUpdateRequest`], thereby allowing the clients to
 ///   be very explicit in the type of change they want to perform.
 pub struct CacheD<Key, Value>
@@ -103,7 +113,6 @@ impl<Key, Value> CacheD<Key, Value>
     /// `put` is not an immediate operation. Every invocation of `put` results in `crate::cache::command::CommandType::Put` to the `CommandExecutor`
     /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
     /// `AdmissionPolicy` may accept or reject the key/value pair depending on the available cache weight.
-    /// See `crate::cache::policy::admission_policy::AdmissionPolicy` for more details.
     ///
     /// Since, `put` is not an immediate operation, clients can `await` on the response to get the [`crate::cache::command::CommandStatus`]
     /// ```
@@ -130,7 +139,6 @@ impl<Key, Value> CacheD<Key, Value>
     /// `put_with_weight` is not an immediate operation. Every invocation of `put_with_weight` results in `crate::cache::command::CommandType::Put` to the `CommandExecutor`
     /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
     /// `AdmissionPolicy` may accept or reject the key/value pair depending on the available cache weight.
-    /// See `crate::cache::policy::admission_policy::AdmissionPolicy` for more details.
     ///
     /// Since, `put_with_weight` is not an immediate operation, clients can `await` on the response to get the [`crate::cache::command::CommandStatus`]
     /// ```
@@ -162,7 +170,6 @@ impl<Key, Value> CacheD<Key, Value>
     /// `put_with_ttl` is not an immediate operation. Every invocation of `put_with_ttl` results in `crate::cache::command::CommandType::PutWithTTL` to the `CommandExecutor`
     /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
     /// `AdmissionPolicy` may accept or reject the key/value pair depending on the available cache weight.
-    /// See `crate::cache::policy::admission_policy::AdmissionPolicy` for more details.
     ///
     /// Since, `put_with_ttl` is not an immediate operation, clients can `await` on the response to get the [`crate::cache::command::CommandStatus`]
     /// ```
@@ -193,7 +200,6 @@ impl<Key, Value> CacheD<Key, Value>
     /// `put_with_weight_and_ttl` is not an immediate operation. Every invocation of `put_with_weight_and_ttl` results in `crate::cache::command::CommandType::PutWithTTL` to the `CommandExecutor`
     /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
     /// `AdmissionPolicy` may accept or reject the key/value pair depending on the available cache weight.
-    /// See `crate::cache::policy::admission_policy::AdmissionPolicy` for more details.
     ///
     /// Since, `put_with_weight_and_ttl` is not an immediate operation, clients can `await` on the response to get the [`crate::cache::command::CommandStatus`]
     /// ```
@@ -218,10 +224,10 @@ impl<Key, Value> CacheD<Key, Value>
         ))
     }
 
-    /// Performs a put or an update operation. `PutOrUpdateRequest` is a convenient way to perform put or update operation.
+    /// Performs a put or an update operation. [`PutOrUpdateRequest`] is a convenient way to perform put or update operation.
     /// `put_or_update` attempts to perform the update operation on `crate::cache::store::Store` first.
     ///
-    /// If the update operation is successful then the changes made to `TTLTicker` and `AdmissionPolicy`, if applicable.
+    /// If the update operation is successful then the changes are made to `TTLTicker` and `AdmissionPolicy`, if applicable.
     /// If the update is not successful then a `put` operation is performed.
     /// ```
     /// use cached::cache::cached::CacheD;

@@ -5,15 +5,13 @@ use crate::cache::config::WeightCalculationFn;
 use crate::cache::errors::Errors;
 use crate::cache::types::Weight;
 
-/// `PutOrUpdateRequest` encapsulates the values for `put` or an `update` operation.
+/// `PutOrUpdateRequest` encapsulates the fields that are required `put` or an `update` operation.
 ///
-/// `PutOrUpdateRequest` is a parameter to `put_or_update` method of [`crate::cache::cached::CacheD`].
+/// It is a parameter to `put_or_update` method of [`crate::cache::cached::CacheD`].
 ///
-/// `PutOrUpdateRequest` allows put operation with `value`, `weight` and `time_to_live`.
+/// It allows put operation with `value`, `weight` and `time_to_live` and also provides flexibility in updating just the `value` or the `weight` or the `time_to_live` or all of these for an existing key.
 ///
-/// `PutOrUpdateRequest` also provides flexibility in updating just the `value` or the `weight` or the `time_to_live` or all of these for an existing key.
-///
-/// `PutOrUpdateRequest` also allows removing the `time_to_live` against an existing key. Either of `time_to_live` or `remove_time_to_live` can be provided.
+/// It also allows removing the `time_to_live` against an existing key. Either of `time_to_live` or `remove_time_to_live` can be provided.
 ///
 /// If `PutOrUpdateRequest` results in a `put` operation, the flag `remove_time_to_live` will have no significance.
 pub struct PutOrUpdateRequest<Key, Value>
@@ -44,7 +42,7 @@ impl<Key, Value> PutOrUpdateRequest<Key, Value>
     }
 }
 
-/// PutOrUpdateRequestBuilder allows building `PutOrUpdateRequest`.
+/// Convenient builder that allows creating an instance of PutOrUpdateRequest
 pub struct PutOrUpdateRequestBuilder<Key, Value>
     where Key: Hash + Eq + Send + Sync + Clone,
           Value: Send + Sync {

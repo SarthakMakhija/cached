@@ -6,7 +6,7 @@ use std::task::{Context, Poll, Waker};
 use parking_lot::Mutex;
 use crate::cache::command::CommandStatus;
 
-/// Every command is returned a `CommandAcknowledgement` wrapped in [`crate::cache::command::command_executor::CommandSendResult`]
+/// Every command is returned a `CommandAcknowledgement` wrapped in [`crate::cache::command::command_executor::CommandSendResult`].
 /// `CommandAcknowledgement` provides a handle to the clients to perform `.await`
 ///
 /// ```
@@ -27,7 +27,9 @@ pub struct CommandAcknowledgement {
 }
 
 /// CommandAcknowledgementHandle implements [`std::future::Future`] and returns a [`crate::cache::command::CommandStatus`]
+///
 /// The initial status in the `CommandAcknowledgementHandle` is `CommandStatus::Pending`
+///
 /// When the command is executed by the `crate::cache::command::command_executor::CommandExecutor`, the status gets updated when
 /// the `done` method of `CommandAcknowledgement` is invoked.
 pub struct CommandAcknowledgementHandle {

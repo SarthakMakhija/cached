@@ -7,6 +7,7 @@ const TOTAL_STATS: usize = 10;
 
 /// Defines various stats that are measured in the cache.
 #[repr(usize)]
+#[non_exhaustive]
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum StatsType {
     /// Defines the number of hits for the keys
@@ -61,7 +62,7 @@ impl StatsSummary {
         }
     }
 
-    /// Returns an Option&lt;u64&gt; counter corresponding to the stats_type.
+    /// Returns an Option&lt;u64&gt; counter corresponding to the [`StatsType`].
     pub fn get(&self, stats_type: &StatsType) -> Option<u64> {
         self.stats_by_type.get(stats_type).copied()
     }
