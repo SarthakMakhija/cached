@@ -1,14 +1,14 @@
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 use criterion::{Criterion, criterion_group, criterion_main};
+use tokio::runtime::Builder;
 
 use tinylfu_cached::cache::cached::CacheD;
 use tinylfu_cached::cache::config::ConfigBuilder;
 use tinylfu_cached::cache::types::{TotalCounters, Weight};
 
-use crate::benchmarks::common::{distribution_with_exponent, execute_parallel, preload_cache};
+use crate::benchmarks::common::distribution_with_exponent;
 
 /// Defines the total number of key/value pairs that are loaded in the cache
 const CAPACITY: usize = 100_000;
@@ -31,7 +31,7 @@ const ITEMS: usize = CAPACITY * 16;
 
 const MASK: usize = CAPACITY - 1;
 
-/// This benchmark uses 1.001 as the Zipf distribution exponent.
+/// This benchmark uses 0.7, 0.9, and 1.001 as the Zipf distribution exponent.
 /// For now, this benchmark prints the cache-hit ratio on console and the cache-hits.json under results/ is manually prepared.
 
 #[derive(Debug)]
@@ -61,80 +61,111 @@ impl HitsMissRecorder {
 
 #[cfg(feature = "bench_testable")]
 #[cfg(not(tarpaulin_include))]
-pub fn cache_hits_single_threaded(criterion: &mut Criterion) {
-    let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
-    let distribution = distribution_with_exponent(ITEMS as u64, CAPACITY, 1.001);
-
-    preload_cache(&cached, &distribution, |key| key);
-
-    let mut index = 0;
-    let hit_miss_recorder = HitsMissRecorder::new();
+pub fn cache_hits_single_threaded_exponent_1_001(criterion: &mut Criterion) {
     criterion.bench_function("Cached.get() | No contention", |bencher| {
-        bencher.iter_custom(|iterations| {
-            let start = Instant::now();
-            for _ in 0..iterations {
-                let option = cached.get(&distribution[index & MASK]);
-                if option.is_some() {
-                    hit_miss_recorder.record_hit();
-                } else {
-                    hit_miss_recorder.record_miss();
+        let runtime = Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .unwrap();
+
+        bencher.to_async(runtime).iter_custom(|iterations| {
+            async move {
+                let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
+                let distribution = distribution_with_exponent(ITEMS as u64, CAPACITY, 1.001);
+
+                let hit_miss_recorder = HitsMissRecorder::new();
+                let mut index = 0;
+
+                let start = Instant::now();
+                for _ in 0..iterations {
+                    let option = cached.get(&distribution[index & MASK]);
+                    if option.is_some() {
+                        hit_miss_recorder.record_hit();
+                    } else {
+                        hit_miss_recorder.record_miss();
+                    }
+                    cached.put(distribution[index & MASK], distribution[index & MASK]).unwrap().handle().await;
+                    index += 1;
                 }
-                index += 1;
+                println!("{:?} %", hit_miss_recorder.ratio());
+                start.elapsed()
             }
-            start.elapsed()
         });
     });
-    println!("{:?} %", hit_miss_recorder.ratio());
 }
 
 #[cfg(feature = "bench_testable")]
 #[cfg(not(tarpaulin_include))]
-pub fn cache_hits_8_threads(criterion: &mut Criterion) {
-    let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
-    let distribution = distribution_with_exponent(ITEMS as u64, CAPACITY, 1.001);
-    let hit_miss_recorder = Arc::new(HitsMissRecorder::new());
+pub fn cache_hits_single_threaded_exponent_0_7(criterion: &mut Criterion) {
+    criterion.bench_function("Cached.get() | No contention", |bencher| {
+        let runtime = Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .unwrap();
 
-    preload_cache(&cached, &distribution, |key| key);
-    execute_parallel(criterion, "Cached.get() | 8 threads", prepare_execution_block(cached, Arc::new(distribution), hit_miss_recorder.clone()), 8);
-    println!("{:?} %", hit_miss_recorder.ratio());
+        bencher.to_async(runtime).iter_custom(|iterations| {
+            async move {
+                let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
+                let distribution = distribution_with_exponent(ITEMS as u64, CAPACITY, 0.7);
+
+                let hit_miss_recorder = HitsMissRecorder::new();
+                let mut index = 0;
+
+                let start = Instant::now();
+                for _ in 0..iterations {
+                    let option = cached.get(&distribution[index & MASK]);
+                    if option.is_some() {
+                        hit_miss_recorder.record_hit();
+                    } else {
+                        hit_miss_recorder.record_miss();
+                    }
+                    cached.put(distribution[index & MASK], distribution[index & MASK]).unwrap().handle().await;
+                    index += 1;
+                }
+                println!("{:?} %", hit_miss_recorder.ratio());
+                start.elapsed()
+            }
+        });
+    });
 }
 
 #[cfg(feature = "bench_testable")]
 #[cfg(not(tarpaulin_include))]
-pub fn cache_hits_16_threads(criterion: &mut Criterion) {
-    let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
-    let distribution = distribution_with_exponent(ITEMS as u64, CAPACITY, 1.001);
-    let hit_miss_recorder = Arc::new(HitsMissRecorder::new());
+pub fn cache_hits_single_threaded_exponent_0_9(criterion: &mut Criterion) {
+    criterion.bench_function("Cached.get() | No contention", |bencher| {
+        let runtime = Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .unwrap();
 
-    preload_cache(&cached, &distribution, |key| key);
-    execute_parallel(criterion, "Cached.get() | 16 threads", prepare_execution_block(cached, Arc::new(distribution), hit_miss_recorder.clone()), 16);
-    println!("{:?} %", hit_miss_recorder.ratio());
+        bencher.to_async(runtime).iter_custom(|iterations| {
+            async move {
+                let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
+                let distribution = distribution_with_exponent(ITEMS as u64, CAPACITY, 0.9);
+
+                let hit_miss_recorder = HitsMissRecorder::new();
+                let mut index = 0;
+
+                let start = Instant::now();
+                for _ in 0..iterations {
+                    let option = cached.get(&distribution[index & MASK]);
+                    if option.is_some() {
+                        hit_miss_recorder.record_hit();
+                    } else {
+                        hit_miss_recorder.record_miss();
+                    }
+                    cached.put(distribution[index & MASK], distribution[index & MASK]).unwrap().handle().await;
+                    index += 1;
+                }
+                println!("{:?} %", hit_miss_recorder.ratio());
+                start.elapsed()
+            }
+        });
+    });
 }
 
-#[cfg(feature = "bench_testable")]
-#[cfg(not(tarpaulin_include))]
-pub fn cache_hits_32_threads(criterion: &mut Criterion) {
-    let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
-    let distribution = distribution_with_exponent(ITEMS as u64, CAPACITY, 1.001);
-    let hit_miss_recorder = Arc::new(HitsMissRecorder::new());
-
-    preload_cache(&cached, &distribution, |key| key);
-    execute_parallel(criterion, "Cached.get() | 32 threads", prepare_execution_block(cached, Arc::new(distribution), hit_miss_recorder.clone()), 32);
-    println!("{:?} %", hit_miss_recorder.ratio());
-}
-
-#[cfg(not(tarpaulin_include))]
-fn prepare_execution_block(cached: CacheD<u64, u64>, distribution: Arc<Vec<u64>>, hit_miss_recorder: Arc<HitsMissRecorder>) -> Arc<impl Fn(u64) + Send + Sync + 'static> {
-    Arc::new(move |index| {
-        let key_index = index as usize;
-        let option = cached.get(&distribution[key_index & MASK]);
-        if option.is_some() {
-            hit_miss_recorder.record_hit();
-        } else {
-            hit_miss_recorder.record_miss();
-        }
-    })
-}
-
-criterion_group!(benches, cache_hits_single_threaded, cache_hits_8_threads, cache_hits_16_threads, cache_hits_32_threads);
+criterion_group!(benches,  cache_hits_single_threaded_exponent_1_001, cache_hits_single_threaded_exponent_0_7, cache_hits_single_threaded_exponent_0_9);
 criterion_main!(benches);

@@ -3,11 +3,11 @@
     "reason": "benchmark-complete",
     "id": "Cached.get() | No contention",
     "capacity": "100_000",
-    "weight": "100_000 * 39",
-    "hit_ratio": "75.58 %",
+    "weight": "100_000 * 40",
+    "hit_ratio": "95 %",
     "distribution": {
       "type": "Zipf",
-      "exponent": "1.001",
+      "exponent": "0.7",
       "items": "100_000 * 16"
     }
   },
@@ -16,79 +16,19 @@
     "id": "Cached.get() | No contention",
     "capacity": "100_000",
     "weight": "100_000 * 40",
-    "hit_ratio": "98 %",
+    "hit_ratio": "96 %",
     "distribution": {
       "type": "Zipf",
-      "exponent": "1.001",
+      "exponent": "0.9",
       "items": "100_000 * 16"
     }
   },
   {
     "reason": "benchmark-complete",
-    "id": "Cached.get() | 8 threads",
-    "capacity": "100_000",
-    "weight": "100_000 * 39",
-    "hit_ratio": "70.91 %",
-    "distribution": {
-      "type": "Zipf",
-      "exponent": "1.001",
-      "items": "100_000 * 16"
-    }
-  },
-  {
-    "reason": "benchmark-complete",
-    "id": "Cached.get() | 8 threads",
+    "id": "Cached.get() | No contention",
     "capacity": "100_000",
     "weight": "100_000 * 40",
-    "hit_ratio": "98 %",
-    "distribution": {
-      "type": "Zipf",
-      "exponent": "1.001",
-      "items": "100_000 * 16"
-    }
-  },
-  {
-    "reason": "benchmark-complete",
-    "id": "Cached.get() | 16 threads",
-    "capacity": "100_000",
-    "weight": "100_000 * 39",
-    "hit_ratio": "69.69 %",
-    "distribution": {
-      "type": "Zipf",
-      "exponent": "1.001",
-      "items": "100_000 * 16"
-    }
-  },
-  {
-    "reason": "benchmark-complete",
-    "id": "Cached.get() | 16 threads",
-    "capacity": "100_000",
-    "weight": "100_000 * 40",
-    "hit_ratio": "98 %",
-    "distribution": {
-      "type": "Zipf",
-      "exponent": "1.001",
-      "items": "100_000 * 16"
-    }
-  },
-  {
-    "reason": "benchmark-complete",
-    "id": "Cached.get() | 32 threads",
-    "capacity": "100_000",
-    "weight": "100_000 * 39",
-    "hit_ratio": "71.83 %",
-    "distribution": {
-      "type": "Zipf",
-      "exponent": "1.001",
-      "items": "100_000 * 16"
-    }
-  },
-  {
-    "reason": "benchmark-complete",
-    "id": "Cached.get() | 32 threads",
-    "capacity": "100_000",
-    "weight": "100_000 * 40",
-    "hit_ratio": "98 %",
+    "hit_ratio": "97 %",
     "distribution": {
       "type": "Zipf",
       "exponent": "1.001",
