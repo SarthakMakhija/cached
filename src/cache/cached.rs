@@ -157,9 +157,6 @@ impl<Key, Value> CacheD<Key, Value>
         if self.is_shutting_down() { return shutdown_result(); }
 
         assert!(weight > 0, "{}", Errors::KeyWeightGtZero("put_with_weight"));
-        if self.store.is_present(&key) {
-
-        }
         self.command_executor.send(CommandType::Put(
             self.key_description(key, weight),
             value,
@@ -267,9 +264,14 @@ impl<Key, Value> CacheD<Key, Value>
             assert!(weight > 0, "{}", Errors::KeyWeightGtZero("PutOrUpdate"));
 
             return if let Some(time_to_live) = time_to_live {
-                self.put_with_weight_and_ttl(key, value, weight, time_to_live)
+                self.command_executor.send(CommandType::PutWithTTL(
+                    self.key_description(key, weight), value, time_to_live,
+                ))
             } else {
-                self.put_with_weight(key, value, weight)
+                self.command_executor.send(CommandType::Put(
+                    self.key_description(key, weight),
+                    value,
+                ))
             };
         }
 

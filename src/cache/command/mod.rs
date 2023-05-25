@@ -57,7 +57,6 @@ pub enum CommandStatus {
     ShuttingDown,
 }
 
-
 /// RejectionReason defines the reason for a command getting rejected. Available since v0.0.2.
 ///
 /// `EnoughSpaceIsNotAvailableAndKeyFailedToEvictOthers`: If the cache weight is full, and the incoming key can not evict others.
