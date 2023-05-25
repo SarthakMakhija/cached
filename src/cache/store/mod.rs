@@ -164,6 +164,11 @@ impl<Key, Value> Store<Key, Value>
         &self.stats_counter
     }
 
+    pub(crate) fn is_present(&self, key: &Key) -> bool {
+        let maybe_value = self.store.get(key);
+        maybe_value.is_some()
+    }
+
     fn contains(&self, key: &Key) -> Option<KeyValueRef<Key, StoredValue<Value>>> {
         let maybe_value = self.store.get(key);
         maybe_value
@@ -526,6 +531,25 @@ mod tests {
         assert_eq!(None, value);
     }
 
+    #[test]
+    fn is_not_present() {
+        let clock = SystemClock::boxed();
+        let store: Arc<Store<&str, &str>> = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
+
+        let is_present = store.is_present(&"non-existing");
+        assert!(!is_present)
+    }
+
+    #[test]
+    fn is_present() {
+        let clock = SystemClock::boxed();
+        let store = Store::new(clock, Arc::new(ConcurrentStatsCounter::new()), DEFAULT_CAPACITY, DEFAULT_SHARDS);
+
+        store.put("topic", "microservices", 1);
+
+        let is_present = store.is_present(&"topic");
+        assert!(is_present)
+    }
 }
 
 #[cfg(test)]
