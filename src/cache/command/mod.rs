@@ -44,7 +44,7 @@ impl<Key, Value> CommandType<Key, Value>
 ///
 /// `Accepted`:       the command is successfully completed.
 ///
-/// `Rejected`:       the command is rejected. RejectionReason is now available with Rejected status (v0.0.2)
+/// `Rejected`:       the command is rejected. `RejectionReason` is now available with the `Rejected` status (v0.0.2)
     /// - `Put` may be rejected for various reasons. One reason is: the weight of the the incoming key/value pair is more than the total cache weight.
     /// - `Delete` will be rejected if the key to be deleted is not preset in the cache.
 ///
@@ -61,7 +61,7 @@ pub enum CommandStatus {
 ///
 /// `EnoughSpaceIsNotAvailableAndKeyFailedToEvictOthers`: If the cache weight is full, and the incoming key can not evict others.
 ///
-/// `KeyWeightIsGreaterThanCacheWeight`: The weight of incoming key is greater than the total cache weight.
+/// `KeyWeightIsGreaterThanCacheWeight`: The weight of the incoming key is greater than the total cache weight.
 ///
 /// `KeyDoesNotExist`: Key does not exist during delete operation.
 ///
