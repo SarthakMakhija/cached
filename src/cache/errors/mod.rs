@@ -13,9 +13,9 @@ const ERROR_MESSAGE_WEIGHT_CALCULATION_GT_ZERO: &str = "Weight of the input key/
 const ERROR_MESSAGE_PUT_OR_UPDATE_VALUE_MISSING: &str = "PutOrUpdate has resulted in a put request, value must be specified";
 const ERROR_MESSAGE_INVALID_PUT_OR_UPDATE: &str = "PutOrUpdate request is invalid, either 'value', 'weight', 'time_to_live' or 'remove_time_to_live' must be specified";
 const ERROR_MESSAGE_INVALID_PUT_OR_UPDATE_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE: &str = "PutOrUpdate request is invalid, only one of 'time_to_live' or 'remove_time_to_live' must be specified";
+const ERROR_MESSAGE_ALREADY_EXISTING_KEY: &str = "Key already exists, can perform the operation";
 
 /// Errors enum define various application errors.
-/// Currently, errors are categorized either as OperationError or ConfigError under [`ErrorType`] enum.
 #[derive(Eq, PartialEq, Debug)]
 pub(crate) enum Errors {
     TotalCountersGtZero,
@@ -31,20 +31,24 @@ pub(crate) enum Errors {
     PutOrUpdateValueMissing,
     InvalidPutOrUpdate,
     InvalidPutOrUpdateEitherTimeToLiveOrRemoveTimeToLive,
+    KeyAlreadyExists(&'static str),
 }
 
 pub(crate) enum ErrorType {
-    ConfigError,
-    OperationError(&'static str),
+    Config,
+    PutOrUpdateRequestBuilder,
+    Operation(&'static str),
 }
 
 impl Display for ErrorType {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrorType::ConfigError =>
-                write!(formatter, "Config error"),
-            ErrorType::OperationError(operation) =>
+            ErrorType::Config =>
+                write!(formatter, "Config"),
+            ErrorType::Operation(operation) =>
                 write!(formatter, "Operation {}", operation),
+            ErrorType::PutOrUpdateRequestBuilder =>
+                write!(formatter, "PutOrUpdate request builder"),
         }
     }
 }
@@ -57,38 +61,40 @@ impl Display for Errors {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Errors::TotalCountersGtZero =>
-                write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_COUNTERS_GT_ZERO),
+                write!(formatter, "[{}]: {}", ErrorType::Config, ERROR_MESSAGE_TOTAL_COUNTERS_GT_ZERO),
             Errors::TotalCacheWeightGtZero =>
-                write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_CACHE_WEIGHT_GT_ZERO),
+                write!(formatter, "[{}]: {}", ErrorType::Config, ERROR_MESSAGE_TOTAL_CACHE_WEIGHT_GT_ZERO),
             Errors::TotalCapacityGtZero =>
-                write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_CAPACITY_GT_ZERO),
+                write!(formatter, "[{}]: {}", ErrorType::Config, ERROR_MESSAGE_TOTAL_CAPACITY_GT_ZERO),
             Errors::TotalShardsGtOne =>
-                write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_SHARDS_GT_ONE),
+                write!(formatter, "[{}]: {}", ErrorType::Config, ERROR_MESSAGE_TOTAL_SHARDS_GT_ONE),
             Errors::TotalShardsPowerOf2 =>
-                write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_SHARDS_POWER_OF_2),
+                write!(formatter, "[{}]: {}", ErrorType::Config, ERROR_MESSAGE_TOTAL_SHARDS_POWER_OF_2),
             Errors::PoolSizeGtZero =>
-                write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_POOL_SIZE_GT_ZERO),
+                write!(formatter, "[{}]: {}", ErrorType::Config, ERROR_MESSAGE_POOL_SIZE_GT_ZERO),
             Errors::BufferSizeGtZero =>
-                write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO),
+                write!(formatter, "[{}]: {}", ErrorType::Config, ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO),
             Errors::CommandBufferSizeGtZero =>
-                write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_COMMAND_BUFFER_SIZE_GT_ZERO),
+                write!(formatter, "[{}]: {}", ErrorType::Config, ERROR_MESSAGE_COMMAND_BUFFER_SIZE_GT_ZERO),
             Errors::WeightCalculationGtZero =>
-                write!(formatter, "[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_WEIGHT_CALCULATION_GT_ZERO),
+                write!(formatter, "[{}]: {}", ErrorType::Config, ERROR_MESSAGE_WEIGHT_CALCULATION_GT_ZERO),
             Errors::KeyWeightGtZero(operation) =>
-                write!(formatter, "[{}]: {}", ErrorType::OperationError(operation), ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO),
+                write!(formatter, "[{}]: {}", ErrorType::Operation(operation), ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO),
             Errors::PutOrUpdateValueMissing =>
-                write!(formatter, "[{}]: {}", ErrorType::OperationError("PutOrUpdate"), ERROR_MESSAGE_PUT_OR_UPDATE_VALUE_MISSING),
+                write!(formatter, "[{}]: {}", ErrorType::Operation("PutOrUpdate"), ERROR_MESSAGE_PUT_OR_UPDATE_VALUE_MISSING),
             Errors::InvalidPutOrUpdate =>
-                write!(formatter, "[{}]: {}", ErrorType::OperationError("PutOrUpdate request builder"), ERROR_MESSAGE_INVALID_PUT_OR_UPDATE),
+                write!(formatter, "[{}]: {}", ErrorType::PutOrUpdateRequestBuilder, ERROR_MESSAGE_INVALID_PUT_OR_UPDATE),
             Errors::InvalidPutOrUpdateEitherTimeToLiveOrRemoveTimeToLive =>
-                write!(formatter, "[{}]: {}", ErrorType::OperationError("PutOrUpdate request builder"), ERROR_MESSAGE_INVALID_PUT_OR_UPDATE_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE),
+                write!(formatter, "[{}]: {}", ErrorType::PutOrUpdateRequestBuilder, ERROR_MESSAGE_INVALID_PUT_OR_UPDATE_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE),
+            Errors::KeyAlreadyExists(operation) =>
+                write!(formatter, "[{}]: {}", ErrorType::Operation(operation), ERROR_MESSAGE_ALREADY_EXISTING_KEY),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::cache::errors::{ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO, ERROR_MESSAGE_TOTAL_CAPACITY_GT_ZERO, ERROR_MESSAGE_TOTAL_SHARDS_POWER_OF_2};
+    use crate::cache::errors::{ERROR_MESSAGE_ALREADY_EXISTING_KEY, ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO, ERROR_MESSAGE_TOTAL_CAPACITY_GT_ZERO, ERROR_MESSAGE_TOTAL_SHARDS_POWER_OF_2};
     use crate::cache::errors::ERROR_MESSAGE_COMMAND_BUFFER_SIZE_GT_ZERO;
     use crate::cache::errors::ERROR_MESSAGE_INVALID_PUT_OR_UPDATE;
     use crate::cache::errors::ERROR_MESSAGE_INVALID_PUT_OR_UPDATE_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE;
@@ -105,78 +111,85 @@ mod tests {
     #[test]
     fn error_total_counters() {
         let error = Errors::TotalCountersGtZero;
-        assert_eq!(format!("[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_COUNTERS_GT_ZERO), error.to_string());
+        assert_eq!(format!("[{}]: {}", ErrorType::Config, ERROR_MESSAGE_TOTAL_COUNTERS_GT_ZERO), error.to_string());
     }
 
     #[test]
     fn error_total_cache_weight() {
         let error = Errors::TotalCacheWeightGtZero;
-        assert_eq!(format!("[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_CACHE_WEIGHT_GT_ZERO), error.to_string());
+        assert_eq!(format!("[{}]: {}", ErrorType::Config, ERROR_MESSAGE_TOTAL_CACHE_WEIGHT_GT_ZERO), error.to_string());
     }
 
     #[test]
     fn error_total_capacity() {
         let error = Errors::TotalCapacityGtZero;
-        assert_eq!(format!("[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_CAPACITY_GT_ZERO), error.to_string());
+        assert_eq!(format!("[{}]: {}", ErrorType::Config, ERROR_MESSAGE_TOTAL_CAPACITY_GT_ZERO), error.to_string());
     }
 
     #[test]
     fn error_total_shards() {
         let error = Errors::TotalShardsGtOne;
-        assert_eq!(format!("[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_SHARDS_GT_ONE), error.to_string());
+        assert_eq!(format!("[{}]: {}", ErrorType::Config, ERROR_MESSAGE_TOTAL_SHARDS_GT_ONE), error.to_string());
     }
 
     #[test]
     fn error_total_shards_power_of_2() {
         let error = Errors::TotalShardsPowerOf2;
-        assert_eq!(format!("[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_TOTAL_SHARDS_POWER_OF_2), error.to_string());
+        assert_eq!(format!("[{}]: {}", ErrorType::Config, ERROR_MESSAGE_TOTAL_SHARDS_POWER_OF_2), error.to_string());
     }
 
     #[test]
     fn error_pool_size() {
         let error = Errors::PoolSizeGtZero;
-        assert_eq!(format!("[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_POOL_SIZE_GT_ZERO), error.to_string());
+        assert_eq!(format!("[{}]: {}", ErrorType::Config, ERROR_MESSAGE_POOL_SIZE_GT_ZERO), error.to_string());
     }
 
     #[test]
     fn error_buffer_size() {
         let error = Errors::BufferSizeGtZero;
-        assert_eq!(format!("[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO), error.to_string());
+        assert_eq!(format!("[{}]: {}", ErrorType::Config, ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO), error.to_string());
     }
 
     #[test]
     fn error_command_buffer_size() {
         let error = Errors::CommandBufferSizeGtZero;
-        assert_eq!(format!("[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_COMMAND_BUFFER_SIZE_GT_ZERO), error.to_string());
+        assert_eq!(format!("[{}]: {}", ErrorType::Config, ERROR_MESSAGE_COMMAND_BUFFER_SIZE_GT_ZERO), error.to_string());
     }
 
     #[test]
     fn error_key_weight_calculation() {
         let error = Errors::WeightCalculationGtZero;
-        assert_eq!(format!("[{}]: {}", ErrorType::ConfigError, ERROR_MESSAGE_WEIGHT_CALCULATION_GT_ZERO), error.to_string());
+        assert_eq!(format!("[{}]: {}", ErrorType::Config, ERROR_MESSAGE_WEIGHT_CALCULATION_GT_ZERO), error.to_string());
     }
 
     #[test]
     fn error_key_weight() {
         let error = Errors::KeyWeightGtZero("put_with_weight");
-        assert_eq!(format!("[{}]: {}", ErrorType::OperationError("put_with_weight"), ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO), error.to_string());
+        assert_eq!(format!("[{}]: {}", ErrorType::Operation("put_with_weight"), ERROR_MESSAGE_KEY_WEIGHT_GT_ZERO), error.to_string());
     }
 
     #[test]
     fn error_put_or_update_value_missing() {
         let error = Errors::PutOrUpdateValueMissing;
-        assert_eq!(format!("[{}]: {}", ErrorType::OperationError("PutOrUpdate"), ERROR_MESSAGE_PUT_OR_UPDATE_VALUE_MISSING), error.to_string());
+        assert_eq!(format!("[{}]: {}", ErrorType::Operation("PutOrUpdate"), ERROR_MESSAGE_PUT_OR_UPDATE_VALUE_MISSING), error.to_string());
     }
 
     #[test]
     fn error_put_or_update_invalid() {
         let error = Errors::InvalidPutOrUpdate;
-        assert_eq!(format!("[{}]: {}", ErrorType::OperationError("PutOrUpdate request builder"), ERROR_MESSAGE_INVALID_PUT_OR_UPDATE), error.to_string());
+        assert_eq!(format!("[{}]: {}", ErrorType::PutOrUpdateRequestBuilder, ERROR_MESSAGE_INVALID_PUT_OR_UPDATE), error.to_string());
     }
 
     #[test]
     fn error_put_or_update_invalid_time_to_live() {
         let error = Errors::InvalidPutOrUpdateEitherTimeToLiveOrRemoveTimeToLive;
-        assert_eq!(format!("[{}]: {}", ErrorType::OperationError("PutOrUpdate request builder"), ERROR_MESSAGE_INVALID_PUT_OR_UPDATE_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE), error.to_string());
+        assert_eq!(format!("[{}]: {}", ErrorType::PutOrUpdateRequestBuilder, ERROR_MESSAGE_INVALID_PUT_OR_UPDATE_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE), error.to_string());
+    }
+
+    #[test]
+    fn error_key_already_exists() {
+        let operation = "put";
+        let error = Errors::KeyAlreadyExists(operation);
+        assert_eq!(format!("[{}]: {}", ErrorType::Operation(operation), ERROR_MESSAGE_ALREADY_EXISTING_KEY), error.to_string());
     }
 }
