@@ -9,7 +9,7 @@ use log::info;
 
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
 use crate::cache::command::command_executor::{CommandExecutor, CommandSendResult, shutdown_result};
-use crate::cache::command::CommandType;
+use crate::cache::command::{CommandType, RejectionReason};
 use crate::cache::config::Config;
 use crate::cache::config::weight_calculation::Calculation;
 use crate::cache::errors::Errors;
@@ -157,6 +157,9 @@ impl<Key, Value> CacheD<Key, Value>
         if self.is_shutting_down() { return shutdown_result(); }
 
         assert!(weight > 0, "{}", Errors::KeyWeightGtZero("put_with_weight"));
+        if self.store.is_present(&key) {
+            return Ok(CommandAcknowledgement::rejected(RejectionReason::KeyAlreadyExists))
+        }
         self.command_executor.send(CommandType::Put(
             self.key_description(key, weight),
             value,
@@ -189,6 +192,9 @@ impl<Key, Value> CacheD<Key, Value>
 
         let weight = (self.config.weight_calculation_fn)(&key, &value, true);
         assert!(weight > 0, "{}", Errors::WeightCalculationGtZero);
+        if self.store.is_present(&key) {
+            return Ok(CommandAcknowledgement::rejected(RejectionReason::KeyAlreadyExists))
+        }
         self.command_executor.send(CommandType::PutWithTTL(
             self.key_description(key, weight), value, time_to_live)
         )
@@ -220,6 +226,9 @@ impl<Key, Value> CacheD<Key, Value>
         if self.is_shutting_down() { return shutdown_result(); }
 
         assert!(weight > 0, "{}", Errors::KeyWeightGtZero("put_with_weight_and_ttl"));
+        if self.store.is_present(&key) {
+            return Ok(CommandAcknowledgement::rejected(RejectionReason::KeyAlreadyExists))
+        }
         self.command_executor.send(CommandType::PutWithTTL(
             self.key_description(key, weight), value, time_to_live,
         ))
@@ -698,6 +707,7 @@ mod tests {
     use std::time::Duration;
 
     use crate::cache::cached::CacheD;
+    use crate::cache::command::{CommandStatus, RejectionReason};
     use crate::cache::config::{ConfigBuilder, WeightCalculationFn};
     use crate::cache::put_or_update::{PutOrUpdateRequest, PutOrUpdateRequestBuilder};
     use crate::cache::stats::StatsType;
@@ -845,6 +855,30 @@ mod tests {
 
         assert_eq!(1000, stored_value.value());
         assert_eq!(Some(64), cached.admission_policy.weight_of(&key_id));
+        assert!(stored_value.expire_after().is_some());
+    }
+
+    #[tokio::test]
+    async fn put_the_same_key_value_again() {
+        let cached = CacheD::new(ConfigBuilder::new(100, 10, 100).build());
+
+        let key: u64 = 100;
+        let value: u64 = 1000;
+
+        let acknowledgement = cached.put(key, value).unwrap();
+        acknowledgement.handle().await;
+
+        let acknowledgement = cached.put(key, value).unwrap();
+        let status = acknowledgement.handle().await;
+
+        assert_eq!(CommandStatus::Rejected(RejectionReason::KeyAlreadyExists), status);
+
+        let value = cached.get_ref(&100);
+        let value_ref = value.unwrap();
+        let stored_value = value_ref.value();
+
+        assert_eq!(1000, stored_value.value());
+        assert_eq!(40, cached.total_weight_used());
     }
 
     #[tokio::test]
@@ -865,6 +899,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn put_a_key_value_with_weight_again() {
+        let cached = CacheD::new(test_config_builder().build());
+
+        let acknowledgement =
+            cached.put_with_weight("topic", "microservices", 50).unwrap();
+        acknowledgement.handle().await;
+
+        let acknowledgement =
+            cached.put_with_weight("topic", "microservices", 50).unwrap();
+        let status = acknowledgement.handle().await;
+
+        assert_eq!(CommandStatus::Rejected(RejectionReason::KeyAlreadyExists), status);
+
+        let value = cached.get_ref(&"topic");
+        let value_ref = value.unwrap();
+        let stored_value = value_ref.value();
+        let key_id = stored_value.key_id();
+
+        assert_eq!("microservices", stored_value.value());
+        assert_eq!(Some(50), cached.admission_policy.weight_of(&key_id));
+        assert_eq!(50, cached.total_weight_used());
+    }
+
+    #[tokio::test]
     async fn put_a_key_value_with_ttl() {
         let cached = CacheD::new(test_config_builder().build());
 
@@ -874,6 +932,54 @@ mod tests {
 
         let value = cached.get(&"topic");
         assert_eq!(Some("microservices"), value);
+    }
+
+    #[tokio::test]
+    async fn put_a_key_value_with_ttl_again() {
+        let cached = CacheD::new(test_config_builder().build());
+
+        let acknowledgement =
+            cached.put_with_ttl("topic", "microservices", Duration::from_secs(120)).unwrap();
+        acknowledgement.handle().await;
+
+        let acknowledgement =
+            cached.put_with_ttl("topic", "microservices", Duration::from_secs(120)).unwrap();
+        let status = acknowledgement.handle().await;
+
+        assert_eq!(CommandStatus::Rejected(RejectionReason::KeyAlreadyExists), status);
+
+        let value = cached.get(&"topic");
+        assert_eq!(Some("microservices"), value);
+    }
+
+    #[tokio::test]
+    async fn put_a_key_value_with_weight_and_ttl() {
+        let cached = CacheD::new(test_config_builder().build());
+
+        let acknowledgement =
+            cached.put_with_weight_and_ttl("topic", "microservices", 10, Duration::from_secs(120)).unwrap();
+        acknowledgement.handle().await;
+
+        let value = cached.get(&"topic");
+        assert_eq!(Some("microservices"), value);
+    }
+
+    #[tokio::test]
+    async fn put_a_key_value_with_weight_and_ttl_again() {
+        let cached = CacheD::new(test_config_builder().build());
+
+        let acknowledgement =
+            cached.put_with_weight_and_ttl("topic", "microservices", 10, Duration::from_secs(120)).unwrap();
+        acknowledgement.handle().await;
+
+        let acknowledgement =
+            cached.put_with_weight_and_ttl("topic", "microservices", 10, Duration::from_secs(120)).unwrap();
+        let status = acknowledgement.handle().await;
+        assert_eq!(CommandStatus::Rejected(RejectionReason::KeyAlreadyExists), status);
+
+        let value = cached.get(&"topic");
+        assert_eq!(Some("microservices"), value);
+        assert_eq!(10, cached.total_weight_used());
     }
 
     #[tokio::test]
@@ -889,18 +995,6 @@ mod tests {
 
         thread::sleep(Duration::from_millis(20));
         assert_eq!(None, cached.get(&"topic"));
-    }
-
-    #[tokio::test]
-    async fn put_a_key_value_with_weight_and_ttl() {
-        let cached = CacheD::new(test_config_builder().build());
-
-        let acknowledgement =
-            cached.put_with_weight_and_ttl("topic", "microservices", 10, Duration::from_secs(120)).unwrap();
-        acknowledgement.handle().await;
-
-        let value = cached.get(&"topic");
-        assert_eq!(Some("microservices"), value);
     }
 
     #[test]

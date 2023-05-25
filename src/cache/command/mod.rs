@@ -65,12 +65,14 @@ pub enum CommandStatus {
 ///
 /// `KeyDoesNotExist`: Key does not exist during delete operation.
 ///
+/// `KeyAlreadyExists`: Key already exists during put operation.
 #[non_exhaustive]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum RejectionReason {
     EnoughSpaceIsNotAvailableAndKeyFailedToEvictOthers,
     KeyWeightIsGreaterThanCacheWeight,
     KeyDoesNotExist,
+    KeyAlreadyExists,
 }
 
 #[cfg(test)]

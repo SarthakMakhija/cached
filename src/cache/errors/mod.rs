@@ -13,7 +13,6 @@ const ERROR_MESSAGE_WEIGHT_CALCULATION_GT_ZERO: &str = "Weight of the input key/
 const ERROR_MESSAGE_PUT_OR_UPDATE_VALUE_MISSING: &str = "PutOrUpdate has resulted in a put request, value must be specified";
 const ERROR_MESSAGE_INVALID_PUT_OR_UPDATE: &str = "PutOrUpdate request is invalid, either 'value', 'weight', 'time_to_live' or 'remove_time_to_live' must be specified";
 const ERROR_MESSAGE_INVALID_PUT_OR_UPDATE_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE: &str = "PutOrUpdate request is invalid, only one of 'time_to_live' or 'remove_time_to_live' must be specified";
-const ERROR_MESSAGE_ALREADY_EXISTING_KEY: &str = "Key already exists, can perform the operation";
 
 /// Errors enum define various application errors.
 #[derive(Eq, PartialEq, Debug)]
@@ -31,7 +30,6 @@ pub(crate) enum Errors {
     PutOrUpdateValueMissing,
     InvalidPutOrUpdate,
     InvalidPutOrUpdateEitherTimeToLiveOrRemoveTimeToLive,
-    KeyAlreadyExists(&'static str),
 }
 
 pub(crate) enum ErrorType {
@@ -86,15 +84,13 @@ impl Display for Errors {
                 write!(formatter, "[{}]: {}", ErrorType::PutOrUpdateRequestBuilder, ERROR_MESSAGE_INVALID_PUT_OR_UPDATE),
             Errors::InvalidPutOrUpdateEitherTimeToLiveOrRemoveTimeToLive =>
                 write!(formatter, "[{}]: {}", ErrorType::PutOrUpdateRequestBuilder, ERROR_MESSAGE_INVALID_PUT_OR_UPDATE_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE),
-            Errors::KeyAlreadyExists(operation) =>
-                write!(formatter, "[{}]: {}", ErrorType::Operation(operation), ERROR_MESSAGE_ALREADY_EXISTING_KEY),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::cache::errors::{ERROR_MESSAGE_ALREADY_EXISTING_KEY, ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO, ERROR_MESSAGE_TOTAL_CAPACITY_GT_ZERO, ERROR_MESSAGE_TOTAL_SHARDS_POWER_OF_2};
+    use crate::cache::errors::{ERROR_MESSAGE_BUFFER_SIZE_GT_ZERO, ERROR_MESSAGE_TOTAL_CAPACITY_GT_ZERO, ERROR_MESSAGE_TOTAL_SHARDS_POWER_OF_2};
     use crate::cache::errors::ERROR_MESSAGE_COMMAND_BUFFER_SIZE_GT_ZERO;
     use crate::cache::errors::ERROR_MESSAGE_INVALID_PUT_OR_UPDATE;
     use crate::cache::errors::ERROR_MESSAGE_INVALID_PUT_OR_UPDATE_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE;
@@ -184,12 +180,5 @@ mod tests {
     fn error_put_or_update_invalid_time_to_live() {
         let error = Errors::InvalidPutOrUpdateEitherTimeToLiveOrRemoveTimeToLive;
         assert_eq!(format!("[{}]: {}", ErrorType::PutOrUpdateRequestBuilder, ERROR_MESSAGE_INVALID_PUT_OR_UPDATE_EITHER_TIME_TO_LIVE_OR_REMOVE_TIME_TO_LIVE), error.to_string());
-    }
-
-    #[test]
-    fn error_key_already_exists() {
-        let operation = "put";
-        let error = Errors::KeyAlreadyExists(operation);
-        assert_eq!(format!("[{}]: {}", ErrorType::Operation(operation), ERROR_MESSAGE_ALREADY_EXISTING_KEY), error.to_string());
     }
 }

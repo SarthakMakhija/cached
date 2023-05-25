@@ -4,7 +4,7 @@ use std::sync::{Arc};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::task::{Context, Poll, Waker};
 use parking_lot::Mutex;
-use crate::cache::command::CommandStatus;
+use crate::cache::command::{CommandStatus, RejectionReason};
 
 /// The execution of every write operation is returned a `CommandAcknowledgement` wrapped inside [`crate::cache::command::command_executor::CommandSendResult`].
 /// `CommandAcknowledgement` provides a handle to the clients to perform `.await` to get the command status.
@@ -69,6 +69,19 @@ impl CommandAcknowledgement {
             }
         )
     }
+    pub(crate) fn rejected(reason: RejectionReason) -> Arc<CommandAcknowledgement> {
+        Arc::new(
+            CommandAcknowledgement {
+                handle: CommandAcknowledgementHandle {
+                    done: AtomicBool::new(true),
+                    status: Arc::new(Mutex::new(CommandStatus::Rejected(reason))),
+                    waker_state: Arc::new(Mutex::new(WakerState {
+                        waker: None
+                    })),
+                },
+            }
+        )
+    }
 
     /// Invokes the `done()` method of `CommandAcknowledgementHandle` which changes the `CommandStatus`
     pub(crate) fn done(&self, status: CommandStatus) {
@@ -119,7 +132,7 @@ impl Future for &CommandAcknowledgementHandle {
 #[cfg(test)]
 mod tests {
     use crate::cache::command::acknowledgement::CommandAcknowledgement;
-    use crate::cache::command::CommandStatus;
+    use crate::cache::command::{CommandStatus, RejectionReason};
 
     #[tokio::test]
     async fn acknowledge() {
@@ -140,5 +153,12 @@ mod tests {
         let acknowledgement = CommandAcknowledgement::accepted();
         let response = acknowledgement.handle().await;
         assert_eq!(CommandStatus::Accepted, response);
+    }
+
+    #[tokio::test]
+    async fn rejected() {
+        let acknowledgement = CommandAcknowledgement::rejected(RejectionReason::KeyAlreadyExists);
+        let response = acknowledgement.handle().await;
+        assert_eq!(CommandStatus::Rejected(RejectionReason::KeyAlreadyExists), response);
     }
 }
