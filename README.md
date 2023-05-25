@@ -193,15 +193,15 @@ const WEIGHT: Weight = (CAPACITY * 40) as Weight;
 
 /// Defines the total sample size that is used for generating Zipf distribution.
 /// Here, ITEMS is 16 times the CAPACITY to provide a larger sample for Zipf distribution.
-/// W/C = 16, W denotes the sample size, and C is the cache size (denoted by CAPA: TinyLFU)
+/// W/C = 16, W denotes the sample size, and C is the cache size 
 const ITEMS: usize = CAPACITY * 16;
 ```
 
-| **Weight**   	 | **Zipf exponent** 	 | **Cache-hit ratio** 	 | **Comments**                                                                                    	               |
-|----------------|---------------------|-----------------------|-----------------------------------------------------------------------------------------------------------------|
-| 100_000*40 	   | 1.001             	 | 98%                 	 | Cache weight allows all the incoming keys to be accepted.                                       	               |
-| 100_000*39 	   | 1.001             	 | 71%                 	 | Cache weight is less than the total weight of the incoming keys, so some of the incoming keys may be rejected 	 |
-| 100_000*35 	   | 1.001             	 | 64%                 	 | Cache weight is less than the total weight of the incoming keys, so some of the incoming keys may be rejected 	 |
+| **Weight**   	 | **Zipf exponent** 	 | **Cache-hit ratio** 	 |
+|----------------|---------------------|-----------------------|
+| 100_000 * 40 	 | 0.7               	 | ~95%                	 |
+| 100_000 * 40 	 | 0.9               	 | ~96%                	 |
+| 100_000 * 40 	 | 1.001             	 | ~97%                	 |
 
 Benchmark for Cache-hit is available [here](https://github.com/SarthakMakhija/cached/blob/main/benches/benchmarks/cache_hits.rs) and its result is available 
 [here](https://github.com/SarthakMakhija/cached/blob/main/benches/results/cache_hits.json).
