@@ -1,6 +1,5 @@
-use std::ops::Div;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use tokio::runtime::Builder;
@@ -8,7 +7,7 @@ use tokio::runtime::Builder;
 use tinylfu_cached::cache::cached::CacheD;
 use tinylfu_cached::cache::config::ConfigBuilder;
 use tinylfu_cached::cache::types::{TotalCounters, Weight};
-use crate::benchmarks::common::distribution;
+use crate::benchmarks::common::{distribution, execute_async};
 
 /// Defines the total number of key/value pairs that are loaded in the cache
 const CAPACITY: usize = 2 << 20;
@@ -62,72 +61,55 @@ pub fn async_put_single_task(criterion: &mut Criterion) {
 
 #[cfg(not(tarpaulin_include))]
 pub fn async_put_8_tasks(criterion: &mut Criterion) {
-    let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
-    put_async(criterion, "Async Cached.put() | 8 tasks", Arc::new(cached), 8, 8);
+    let cached = Arc::new(CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build()));
+    let distribution = Arc::new(distribution(ITEMS as u64, CAPACITY));
+
+    let block = move |index| {
+        let cached = cached.clone();
+        let distribution = distribution.clone();
+
+        async move {
+            let key_index = index as usize;
+            cached.put(distribution[key_index & MASK], distribution[key_index & MASK]).unwrap().handle().await;
+        }
+    };
+    execute_async(criterion, "Async Cached.put() | 8 tasks", Arc::new(block), 8, 8);
 }
 
 #[cfg(not(tarpaulin_include))]
 pub fn async_put_16_tasks(criterion: &mut Criterion) {
-    let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
-    put_async(criterion, "Async Cached.put() | 16 tasks", Arc::new(cached), 8, 16);
+    let cached = Arc::new(CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build()));
+    let distribution = Arc::new(distribution(ITEMS as u64, CAPACITY));
+
+    let block = move |index| {
+        let cached = cached.clone();
+        let distribution = distribution.clone();
+
+        async move {
+            let key_index = index as usize;
+            cached.put(distribution[key_index & MASK], distribution[key_index & MASK]).unwrap().handle().await;
+        }
+    };
+
+    execute_async(criterion, "Async Cached.put() | 16 tasks", Arc::new(block), 8, 16);
 }
 
 #[cfg(not(tarpaulin_include))]
 pub fn async_put_32_tasks(criterion: &mut Criterion) {
-    let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
-    put_async(criterion, "Async Cached.put() | 32 tasks", Arc::new(cached), 8, 32);
-}
+    let cached = Arc::new(CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build()));
+    let distribution = Arc::new(distribution(ITEMS as u64, CAPACITY));
 
-#[cfg(feature = "bench_testable")]
-#[cfg(not(tarpaulin_include))]
-pub fn put_async(
-    criterion: &mut Criterion,
-    id: &'static str,
-    cached: Arc<CacheD<u64, u64>>,
-    thread_count: usize,
-    task_count: usize) {
+    let block = move |index| {
+        let cached = cached.clone();
+        let distribution = distribution.clone();
 
-    criterion.bench_function(id, |bencher| {
-        let runtime = Builder::new_multi_thread()
-            .worker_threads(thread_count)
-            .enable_all()
-            .build()
-            .unwrap();
+        async move {
+            let key_index = index as usize;
+            cached.put(distribution[key_index & MASK], distribution[key_index & MASK]).unwrap().handle().await;
+        }
+    };
 
-        bencher.to_async(runtime).iter_custom(|iterations| {
-            let cached = cached.clone();
-            async move {
-                let per_task_iterations = iterations / task_count as u64;
-                let mut current_start = 0;
-                let mut current_end = current_start + per_task_iterations;
-                let distribution = Arc::new(distribution(ITEMS as u64, CAPACITY));
-
-                let mut tasks = Vec::new();
-                for _task_id in 1..=task_count {
-                    let cached = cached.clone();
-                    let distribution = distribution.clone();
-
-                    tasks.push(tokio::spawn(async move {
-                        let start = Instant::now();
-                        for index in current_start..current_end {
-                            let key_index = index as usize;
-                            cached.put(distribution[key_index & MASK], distribution[key_index & MASK]).unwrap().handle().await;
-                        }
-                        start.elapsed()
-                    }));
-                    current_start = current_end;
-                    current_end += per_task_iterations;
-                }
-
-                let mut total_time = Duration::from_nanos(0);
-                for task in tasks {
-                    let elapsed = task.await.unwrap();
-                    total_time += elapsed;
-                }
-                total_time.div(task_count as u32)
-            }
-        });
-    });
+    execute_async(criterion, "Async Cached.put() | 32 tasks", Arc::new(block), 8, 32);
 }
 
 criterion_group!(benches, async_put_single_task, async_put_8_tasks, async_put_16_tasks, async_put_32_tasks);

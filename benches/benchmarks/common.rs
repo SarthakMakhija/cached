@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::ops::Div;
 use std::sync::Arc;
 use std::thread;
@@ -7,6 +8,7 @@ use std::time::{Duration, Instant};
 use criterion::Criterion;
 use rand::{Rng, thread_rng};
 use rand_distr::Zipf;
+use tokio::runtime::Builder;
 
 use tinylfu_cached::cache::cached::CacheD;
 
@@ -32,6 +34,57 @@ pub fn execute_parallel<F>(
 
 #[cfg(feature = "bench_testable")]
 #[cfg(not(tarpaulin_include))]
+pub fn execute_async<F, T>(
+    criterion: &mut Criterion,
+    id: &'static str,
+    block: Arc<F>,
+    thread_count: usize,
+    task_count: usize)
+    where F: Fn(u64) -> T + Send + Sync + 'static,
+          T: Future<Output = ()> + Send {
+
+    criterion.bench_function(id, |bencher| {
+        let runtime = Builder::new_multi_thread()
+            .worker_threads(thread_count)
+            .enable_all()
+            .build()
+            .unwrap();
+
+        bencher.to_async(runtime).iter_custom(|iterations| {
+            let block = block.clone();
+            async move {
+                let per_task_iterations = iterations / task_count as u64;
+                let mut current_start = 0;
+                let mut current_end = current_start + per_task_iterations;
+
+                let mut tasks = Vec::new();
+                for _task_id in 1..=task_count {
+                    let block = block.clone();
+
+                    tasks.push(tokio::spawn(async move {
+                        let start = Instant::now();
+                        for index in current_start..current_end {
+                            block(index).await;
+                        }
+                        start.elapsed()
+                    }));
+                    current_start = current_end;
+                    current_end += per_task_iterations;
+                }
+
+                let mut total_time = Duration::from_nanos(0);
+                for task in tasks {
+                    let elapsed = task.await.unwrap();
+                    total_time += elapsed;
+                }
+                total_time.div(task_count as u32)
+            }
+        });
+    });
+}
+
+#[cfg(feature = "bench_testable")]
+#[cfg(not(tarpaulin_include))]
 pub fn distribution(items: u64, capacity: usize) -> Vec<u64> {
     distribution_with_exponent(items, capacity, 1.01)
 }
@@ -47,7 +100,7 @@ pub fn distribution_with_exponent(items: u64, capacity: usize, exponent: f64) ->
 pub fn preload_cache<Value, F>(cached: &CacheD<u64, Value>, distribution: &Vec<u64>, value_generation: F)
     where Value: Send + Sync + 'static,
           F: Fn(u64) -> Value {
-    tokio::runtime::Builder::new_current_thread()
+    Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap()
