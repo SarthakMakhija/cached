@@ -8,7 +8,8 @@ use log::{debug, info, warn};
 use parking_lot::RwLock;
 
 use crate::cache::buffer_event::{BufferConsumer, BufferEvent};
-use crate::cache::command::CommandStatus;
+use crate::cache::command::{CommandStatus, RejectionReason};
+use crate::cache::command::RejectionReason::EnoughSpaceIsNotAvailableAndKeyFailedToEvictOthers;
 use crate::cache::key_description::KeyDescription;
 use crate::cache::lfu::tiny_lfu::TinyLFU;
 use crate::cache::policy::cache_weight::CacheWeight;
@@ -109,7 +110,7 @@ impl<Key> AdmissionPolicy<Key>
                 "Rejecting key with id {} and weight {}, given its weight is greater than the max cache weight {}",
                 key_description.id, key_description.weight, self.cache_weight.get_max_weight()
             );
-            return CommandStatus::Rejected;
+            return CommandStatus::Rejected(RejectionReason::KeyWeightIsGreaterThanCacheWeight);
         }
         let (space_left, is_enough_space_available) = self.cache_weight.is_space_available_for(key_description.weight);
         if is_enough_space_available {
@@ -194,7 +195,7 @@ impl<Key> AdmissionPolicy<Key>
                         "Rejecting key with id {} and estimated frequency {}, given its frequency is less than the sampled key with frequency {}",
                         key_description.id, incoming_key_access_frequency, sampled_key.estimated_frequency
                     );
-                    return CommandStatus::Rejected;
+                    return CommandStatus::Rejected(EnoughSpaceIsNotAvailableAndKeyFailedToEvictOthers);
                 }
 
                 self.cache_weight.delete(&sampled_key.id, delete_hook);
@@ -207,7 +208,7 @@ impl<Key> AdmissionPolicy<Key>
                 if is_enough_space_available {
                     return CommandStatus::Accepted;
                 }
-                return CommandStatus::Rejected;
+                return CommandStatus::Rejected(EnoughSpaceIsNotAvailableAndKeyFailedToEvictOthers);
             }
         }
         CommandStatus::Accepted
@@ -253,6 +254,7 @@ mod tests {
 
     use crate::cache::buffer_event::{BufferConsumer, BufferEvent};
     use crate::cache::command::CommandStatus;
+    use crate::cache::command::RejectionReason::{EnoughSpaceIsNotAvailableAndKeyFailedToEvictOthers, KeyWeightIsGreaterThanCacheWeight};
     use crate::cache::key_description::KeyDescription;
     use crate::cache::policy::admission_policy::AdmissionPolicy;
     use crate::cache::policy::config::CacheWeightConfig;
@@ -343,7 +345,7 @@ mod tests {
         let policy = AdmissionPolicy::new(10, test_cache_weight_config(), Arc::new(ConcurrentStatsCounter::new()));
         let no_operation_delete_hook = |_key| {};
 
-        assert_eq!(CommandStatus::Rejected,
+        assert_eq!(CommandStatus::Rejected(KeyWeightIsGreaterThanCacheWeight),
                    policy.maybe_add(&KeyDescription::new("topic", 1, 3018, 100), &no_operation_delete_hook)
         );
     }
@@ -420,7 +422,7 @@ mod tests {
         assert_eq!(CommandStatus::Accepted, status);
 
         let status = policy.maybe_add(&KeyDescription::new("SSD", 3, 90, 9), &delete_hook);
-        assert_eq!(CommandStatus::Rejected, status);
+        assert_eq!(CommandStatus::Rejected(EnoughSpaceIsNotAvailableAndKeyFailedToEvictOthers), status);
 
         assert!(policy.contains(&2));
         assert_eq!(3, policy.cache_weight.get_weight_used());

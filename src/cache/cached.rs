@@ -157,6 +157,9 @@ impl<Key, Value> CacheD<Key, Value>
         if self.is_shutting_down() { return shutdown_result(); }
 
         assert!(weight > 0, "{}", Errors::KeyWeightGtZero("put_with_weight"));
+        if self.store.is_present(&key) {
+
+        }
         self.command_executor.send(CommandType::Put(
             self.key_description(key, weight),
             value,

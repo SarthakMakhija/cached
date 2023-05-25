@@ -44,7 +44,7 @@ impl<Key, Value> CommandType<Key, Value>
 ///
 /// `Accepted`:       the command is successfully completed.
 ///
-/// `Rejected`:       the command is rejected.
+/// `Rejected`:       the command is rejected. RejectionReason is now available with Rejected status (v0.0.2)
     /// - `Put` may be rejected for various reasons. One reason is: the weight of the the incoming key/value pair is more than the total cache weight.
     /// - `Delete` will be rejected if the key to be deleted is not preset in the cache.
 ///
@@ -53,8 +53,25 @@ impl<Key, Value> CommandType<Key, Value>
 pub enum CommandStatus {
     Pending,
     Accepted,
-    Rejected,
+    Rejected(RejectionReason),
     ShuttingDown,
+}
+
+
+/// RejectionReason defines the reason for a command getting rejected. Available since v0.0.2.
+///
+/// `EnoughSpaceIsNotAvailableAndKeyFailedToEvictOthers`: If the cache weight is full, and the incoming key can not evict others.
+///
+/// `KeyWeightIsGreaterThanCacheWeight`: The weight of incoming key is greater than the total cache weight.
+///
+/// `KeyDoesNotExist`: Key does not exist during delete operation.
+///
+#[non_exhaustive]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum RejectionReason {
+    EnoughSpaceIsNotAvailableAndKeyFailedToEvictOthers,
+    KeyWeightIsGreaterThanCacheWeight,
+    KeyDoesNotExist,
 }
 
 #[cfg(test)]

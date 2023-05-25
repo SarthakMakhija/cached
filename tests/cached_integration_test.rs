@@ -7,6 +7,7 @@ use std::time::Duration;
 use tinylfu_cached::cache::cached::CacheD;
 use tinylfu_cached::cache::command::acknowledgement::CommandAcknowledgement;
 use tinylfu_cached::cache::command::CommandStatus;
+use tinylfu_cached::cache::command::RejectionReason::EnoughSpaceIsNotAvailableAndKeyFailedToEvictOthers;
 use tinylfu_cached::cache::config::ConfigBuilder;
 use tinylfu_cached::cache::put_or_update::PutOrUpdateRequestBuilder;
 
@@ -112,7 +113,7 @@ async fn weight_of_the_cache_does_not_exceed_the_maximum_weight_100() {
     thread::sleep(Duration::from_secs(3));
 
     let status = cached.put_with_weight(11, 11*10, 8).unwrap().handle().await;
-    assert_eq!(CommandStatus::Rejected, status);
+    assert_eq!(CommandStatus::Rejected(EnoughSpaceIsNotAvailableAndKeyFailedToEvictOthers), status);
     assert_eq!(100, cached.total_weight_used());
 }
 

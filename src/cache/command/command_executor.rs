@@ -9,6 +9,7 @@ use log::{error, info};
 use crate::cache::command::{CommandStatus, CommandType};
 use crate::cache::command::acknowledgement::CommandAcknowledgement;
 use crate::cache::command::error::CommandSendError;
+use crate::cache::command::RejectionReason::KeyDoesNotExist;
 use crate::cache::expiration::TTLTicker;
 use crate::cache::key_description::KeyDescription;
 use crate::cache::policy::admission_policy::AdmissionPolicy;
@@ -232,7 +233,7 @@ impl<Key, Value> CommandExecutor<Key, Value>
             }
             return CommandStatus::Accepted;
         }
-        CommandStatus::Rejected
+        CommandStatus::Rejected(KeyDoesNotExist)
     }
 }
 
@@ -245,6 +246,7 @@ mod tests {
     use crate::cache::clock::{ClockType, SystemClock};
     use crate::cache::command::{CommandStatus, CommandType};
     use crate::cache::command::command_executor::{CommandExecutor, shutdown_result};
+    use crate::cache::command::RejectionReason::{KeyDoesNotExist, KeyWeightIsGreaterThanCacheWeight};
     use crate::cache::expiration::config::TTLConfig;
     use crate::cache::expiration::TTLTicker;
     use crate::cache::key_description::KeyDescription;
@@ -379,7 +381,7 @@ mod tests {
 
         command_executor.shutdown().unwrap().handle().await;
         assert_eq!(None, store.get(&"topic"));
-        assert_eq!(CommandStatus::Rejected, status);
+        assert_eq!(CommandStatus::Rejected(KeyWeightIsGreaterThanCacheWeight), status);
     }
 
     #[tokio::test]
@@ -403,7 +405,7 @@ mod tests {
         let status = command_acknowledgement.handle().await;
 
         command_executor.shutdown().unwrap().handle().await;
-        assert_eq!(CommandStatus::Rejected, status);
+        assert_eq!(CommandStatus::Rejected(KeyWeightIsGreaterThanCacheWeight), status);
         assert_eq!(1, stats_counter.keys_rejected());
     }
 
@@ -549,7 +551,7 @@ mod tests {
         let status = acknowledgement.handle().await;
 
         command_executor.shutdown().unwrap().handle().await;
-        assert_eq!(CommandStatus::Rejected, status);
+        assert_eq!(CommandStatus::Rejected(KeyDoesNotExist), status);
     }
 }
 
