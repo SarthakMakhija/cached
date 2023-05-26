@@ -7,7 +7,7 @@
 
 **Cached** is a [high performance](https://github.com/SarthakMakhija/cached/tree/main/benches/results), [LFU](https://dgraph.io/blog/refs/TinyLFU%20-%20A%20Highly%20Efficient%20Cache%20Admission%20Policy.pdf) based in-memory cache in Rust inspired by [Ristretto](https://github.com/dgraph-io/ristretto).
 
-The API documentation is available [here](https://docs.rs/tinylfu-cached/0.0.1/tinylfu_cached/index.html).
+The API documentation is available [here](https://docs.rs/tinylfu-cached/latest/tinylfu_cached/index.html).
 
 ### Content organization
 * [Features](#features)
