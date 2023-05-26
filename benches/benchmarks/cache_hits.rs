@@ -25,9 +25,7 @@ const WEIGHT: Weight = (CAPACITY * 40) as Weight;
 /// [TinyLFU](https://dgraph.io/blog/refs/TinyLFU%20-%20A%20Highly%20Efficient%20Cache%20Admission%20Policy.pdf)
 const ITEMS: usize = CAPACITY * 16;
 
-const MASK: usize = CAPACITY - 1;
-
-/// This benchmark uses 0.7, 0.9, and 1.001 as the Zipf distribution exponent.
+/// This benchmark uses 0.9, and 1.001 as the Zipf distribution exponent.
 /// For now, this benchmark prints the cache-hit ratio on console and the cache-hits.json under results/ is manually prepared.
 
 #[derive(Debug)]
