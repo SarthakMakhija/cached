@@ -71,7 +71,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tinylfu-cached = "0.0.1"
+tinylfu-cached = "0.0.3"
 ```
 
 ### Examples

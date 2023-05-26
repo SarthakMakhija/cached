@@ -110,7 +110,7 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// Weight is calculated by the weight calculation function provided as a part of `Config`.
     ///
-    ///  [`crate::cache::command::CommandStatus::Rejected`] is returned to the clients if the key already exists, since v0.0.2.
+    ///  [`crate::cache::command::CommandStatus::Rejected`] is returned to the clients if the key already exists, since v0.0.3.
     ///
     /// `put` is not an immediate operation. Every invocation of `put` results in `crate::cache::command::CommandType::Put` to the `CommandExecutor`.
     /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
@@ -138,7 +138,7 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// Weight is provided by the clients.
     ///
-    ///  [`crate::cache::command::CommandStatus::Rejected`] is returned to the clients if the key already exists, since v0.0.2.
+    ///  [`crate::cache::command::CommandStatus::Rejected`] is returned to the clients if the key already exists, since v0.0.3.
     ///
     /// `put_with_weight` is not an immediate operation. Every invocation of `put_with_weight` results in `crate::cache::command::CommandType::Put` to the `CommandExecutor`.
     /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
@@ -174,7 +174,7 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// Weight is calculated by the weight calculation function provided as a part of `Config`.
     ///
-    /// [`crate::cache::command::CommandStatus::Rejected`] is returned to the clients if the key already exists, since v0.0.2.
+    /// [`crate::cache::command::CommandStatus::Rejected`] is returned to the clients if the key already exists, since v0.0.3.
     ///
     /// `put_with_ttl` is not an immediate operation. Every invocation of `put_with_ttl` results in `crate::cache::command::CommandType::PutWithTTL` to the `CommandExecutor`.
     /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
@@ -210,7 +210,7 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// Weight is provided by the clients.
     ///
-    /// [`crate::cache::command::CommandStatus::Rejected`] is returned to the clients if the key already exists, since v0.0.2.
+    /// [`crate::cache::command::CommandStatus::Rejected`] is returned to the clients if the key already exists, since v0.0.3.
     ///
     /// `put_with_weight_and_ttl` is not an immediate operation. Every invocation of `put_with_weight_and_ttl` results in `crate::cache::command::CommandType::PutWithTTL` to the `CommandExecutor`.
     /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
