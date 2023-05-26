@@ -66,6 +66,11 @@ impl StatsSummary {
     pub fn get(&self, stats_type: &StatsType) -> Option<u64> {
         self.stats_by_type.get(stats_type).copied()
     }
+
+    /// Returns an hit ratio as %. Performs `round()`. since v0.0.4.
+    pub fn hit_ratio_as_percentage(&self) -> f64 {
+        (self.hit_ratio * 100.0).round()
+    }
 }
 
 #[repr(transparent)]
@@ -351,6 +356,17 @@ mod tests {
 
         assert_eq!(0.5, summary.hit_ratio);
         assert_eq!(stats_by_type, summary.stats_by_type);
+    }
+
+    #[test]
+    fn stats_summary_with_hit_ratio() {
+        let stats_counter = ConcurrentStatsCounter::new();
+        stats_counter.found_a_hit();
+        stats_counter.found_a_miss();
+        stats_counter.found_a_miss();
+
+        let summary = stats_counter.summary();
+        assert_eq!(33.0, summary.hit_ratio_as_percentage());
     }
 }
 
