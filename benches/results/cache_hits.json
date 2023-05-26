@@ -4,19 +4,7 @@
     "id": "Cached.get() | No contention",
     "capacity": "100_000",
     "weight": "100_000 * 40",
-    "hit_ratio": "95 %",
-    "distribution": {
-      "type": "Zipf",
-      "exponent": "0.7",
-      "items": "100_000 * 16"
-    }
-  },
-  {
-    "reason": "benchmark-complete",
-    "id": "Cached.get() | No contention",
-    "capacity": "100_000",
-    "weight": "100_000 * 40",
-    "hit_ratio": "96 %",
+    "hit_ratio": "57.47 %",
     "distribution": {
       "type": "Zipf",
       "exponent": "0.9",
@@ -28,7 +16,7 @@
     "id": "Cached.get() | No contention",
     "capacity": "100_000",
     "weight": "100_000 * 40",
-    "hit_ratio": "97 %",
+    "hit_ratio": "73.41 %",
     "distribution": {
       "type": "Zipf",
       "exponent": "1.001",

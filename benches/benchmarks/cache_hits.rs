@@ -72,58 +72,23 @@ pub fn cache_hits_single_threaded_exponent_1_001(criterion: &mut Criterion) {
         bencher.to_async(runtime).iter_custom(|iterations| {
             async move {
                 let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
-                let distribution = distribution_with_exponent(ITEMS as u64, CAPACITY, 1.001);
+                let distribution = distribution_with_exponent(ITEMS as u64, ITEMS, 1.001);
 
                 let hit_miss_recorder = HitsMissRecorder::new();
                 let mut index = 0;
 
                 let start = Instant::now();
-                for _ in 0..iterations {
-                    let option = cached.get(&distribution[index & MASK]);
+                for _ in 0..CAPACITY*16 {
+                    let option = cached.get(&distribution[index]);
                     if option.is_some() {
                         hit_miss_recorder.record_hit();
                     } else {
                         hit_miss_recorder.record_miss();
                     }
-                    cached.put(distribution[index & MASK], distribution[index & MASK]).unwrap().handle().await;
+                    cached.put_with_weight(distribution[index], distribution[index], 40).unwrap().handle().await;
                     index += 1;
                 }
-                println!("{:?} %", hit_miss_recorder.ratio());
-                start.elapsed()
-            }
-        });
-    });
-}
-
-#[cfg(feature = "bench_testable")]
-#[cfg(not(tarpaulin_include))]
-pub fn cache_hits_single_threaded_exponent_0_7(criterion: &mut Criterion) {
-    criterion.bench_function("Cached.get() | No contention", |bencher| {
-        let runtime = Builder::new_multi_thread()
-            .worker_threads(1)
-            .enable_all()
-            .build()
-            .unwrap();
-
-        bencher.to_async(runtime).iter_custom(|iterations| {
-            async move {
-                let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
-                let distribution = distribution_with_exponent(ITEMS as u64, CAPACITY, 0.7);
-
-                let hit_miss_recorder = HitsMissRecorder::new();
-                let mut index = 0;
-
-                let start = Instant::now();
-                for _ in 0..iterations {
-                    let option = cached.get(&distribution[index & MASK]);
-                    if option.is_some() {
-                        hit_miss_recorder.record_hit();
-                    } else {
-                        hit_miss_recorder.record_miss();
-                    }
-                    cached.put(distribution[index & MASK], distribution[index & MASK]).unwrap().handle().await;
-                    index += 1;
-                }
+                cached.shutdown();
                 println!("{:?} %", hit_miss_recorder.ratio());
                 start.elapsed()
             }
@@ -144,22 +109,23 @@ pub fn cache_hits_single_threaded_exponent_0_9(criterion: &mut Criterion) {
         bencher.to_async(runtime).iter_custom(|iterations| {
             async move {
                 let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, WEIGHT).build());
-                let distribution = distribution_with_exponent(ITEMS as u64, CAPACITY, 0.9);
+                let distribution = distribution_with_exponent(ITEMS as u64, ITEMS, 0.9);
 
                 let hit_miss_recorder = HitsMissRecorder::new();
                 let mut index = 0;
 
                 let start = Instant::now();
-                for _ in 0..iterations {
-                    let option = cached.get(&distribution[index & MASK]);
+                for _ in 0..CAPACITY*16 {
+                    let option = cached.get(&distribution[index]);
                     if option.is_some() {
                         hit_miss_recorder.record_hit();
                     } else {
                         hit_miss_recorder.record_miss();
                     }
-                    cached.put(distribution[index & MASK], distribution[index & MASK]).unwrap().handle().await;
+                    cached.put_with_weight(distribution[index], distribution[index], 40).unwrap().handle().await;
                     index += 1;
                 }
+                cached.shutdown();
                 println!("{:?} %", hit_miss_recorder.ratio());
                 start.elapsed()
             }
@@ -167,5 +133,5 @@ pub fn cache_hits_single_threaded_exponent_0_9(criterion: &mut Criterion) {
     });
 }
 
-criterion_group!(benches,  cache_hits_single_threaded_exponent_1_001, cache_hits_single_threaded_exponent_0_7, cache_hits_single_threaded_exponent_0_9);
+criterion_group!(benches,  cache_hits_single_threaded_exponent_1_001, cache_hits_single_threaded_exponent_0_9);
 criterion_main!(benches);
