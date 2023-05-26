@@ -178,7 +178,7 @@ Check [Weight calculation](https://github.com/SarthakMakhija/cached/blob/main/sr
 The benchmark runs with the following parameters:
 
 ```rust
-/// Defines the total number of key/value pairs that are loaded in the cache
+/// Defines the total number of key/value pairs that may be loaded in the cache
 const CAPACITY: usize = 100_000;
 
 /// Defines the total number of counters used to measure the access frequency.
@@ -197,11 +197,10 @@ const WEIGHT: Weight = (CAPACITY * 40) as Weight;
 const ITEMS: usize = CAPACITY * 16;
 ```
 
-| **Weight**   	 | **Zipf exponent** 	 | **Cache-hit ratio** 	 |
-|----------------|---------------------|-----------------------|
-| 100_000 * 40 	 | 0.7               	 | ~95%                	 |
-| 100_000 * 40 	 | 0.9               	 | ~96%                	 |
-| 100_000 * 40 	 | 1.001             	 | ~97%                	 |
+| **Weight**   	 | **Zipf exponent** 	 | **Cache-hit ratio** 	    |
+|----------------|---------------------|--------------------------|
+| 100_000 * 40 	 | 0.9               	 | ~57.47%                	 |
+| 100_000 * 40 	 | 1.001             	 | ~73.41%                	 |
 
 Benchmark for Cache-hit is available [here](https://github.com/SarthakMakhija/cached/blob/main/benches/benchmarks/cache_hits.rs) and its result is available 
 [here](https://github.com/SarthakMakhija/cached/blob/main/benches/results/cache_hits.json).

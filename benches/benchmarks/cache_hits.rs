@@ -10,7 +10,7 @@ use tinylfu_cached::cache::types::{TotalCounters, Weight};
 
 use crate::benchmarks::common::distribution_with_exponent;
 
-/// Defines the total number of key/value pairs that are loaded in the cache
+/// Defines the total number of key/value pairs that may be loaded in the cache
 const CAPACITY: usize = 100_000;
 
 /// Defines the total number of counters used to measure the access frequency.
