@@ -110,6 +110,8 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// Weight is calculated by the weight calculation function provided as a part of `Config`.
     ///
+    ///  [`crate::cache::command::CommandStatus::Rejected`] is returned to the clients if the key already exists, since v0.0.2.
+    ///
     /// `put` is not an immediate operation. Every invocation of `put` results in `crate::cache::command::CommandType::Put` to the `CommandExecutor`.
     /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
     /// `AdmissionPolicy` may accept or reject the key/value pair depending on the available cache weight.
@@ -135,6 +137,8 @@ impl<Key, Value> CacheD<Key, Value>
     /// Puts the key/value pair in the cacheD instance and returns an instance of [` crate::cache::command::command_executor::CommandSendResult`] to the clients.
     ///
     /// Weight is provided by the clients.
+    ///
+    ///  [`crate::cache::command::CommandStatus::Rejected`] is returned to the clients if the key already exists, since v0.0.2.
     ///
     /// `put_with_weight` is not an immediate operation. Every invocation of `put_with_weight` results in `crate::cache::command::CommandType::Put` to the `CommandExecutor`.
     /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
@@ -170,6 +174,8 @@ impl<Key, Value> CacheD<Key, Value>
     ///
     /// Weight is calculated by the weight calculation function provided as a part of `Config`.
     ///
+    /// [`crate::cache::command::CommandStatus::Rejected`] is returned to the clients if the key already exists, since v0.0.2.
+    ///
     /// `put_with_ttl` is not an immediate operation. Every invocation of `put_with_ttl` results in `crate::cache::command::CommandType::PutWithTTL` to the `CommandExecutor`.
     /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
     /// `AdmissionPolicy` may accept or reject the key/value pair depending on the available cache weight.
@@ -203,6 +209,8 @@ impl<Key, Value> CacheD<Key, Value>
     /// Puts the key/value pair with `time_to_live` in the cacheD instance and returns an instance of [` crate::cache::command::command_executor::CommandSendResult`] to the clients.
     ///
     /// Weight is provided by the clients.
+    ///
+    /// [`crate::cache::command::CommandStatus::Rejected`] is returned to the clients if the key already exists, since v0.0.2.
     ///
     /// `put_with_weight_and_ttl` is not an immediate operation. Every invocation of `put_with_weight_and_ttl` results in `crate::cache::command::CommandType::PutWithTTL` to the `CommandExecutor`.
     /// `CommandExecutor` in turn delegates to the `AdmissionPolicy` to perform the put operation.
