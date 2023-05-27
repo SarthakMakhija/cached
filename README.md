@@ -218,7 +218,7 @@ const CACHE_WEIGHT: Weight    = 1024;
 
 let cached = CacheD::new(ConfigBuilder::new(COUNTERS, CAPACITY, CACHE_WEIGHT).build());
 ```
-This example creates an instance of **Cached** with a total size of 1024 bytes. 
+This example creates an instance of **CacheD** with a total size of 1024 bytes. 
 After the space is full, `put` of a new key/value pair will result in `AdmissionPolicy` deciding whether the incoming key/value pair should be accepted. 
 If the new key/value pair gets accepted, some existing key/value pairs are evicted to create the required space.
 
