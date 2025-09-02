@@ -13,24 +13,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    container:
-      image: xd009642/tarpaulin:develop-nightly
-      options: --security-opt seccomp=unconfined
-
     steps:
     - uses: actions/checkout@v3
 
-    - name: Update nightly toolchain
-      run: rustup update nightly
-      
-    - name: Install Clippy
-      run: rustup component add clippy --toolchain nightly
-      
-    # - name: Run Clippy
-    #   run: cargo clippy --all-targets --all-features
+    - name: Install Rust stable with Clippy
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        components: clippy
+        override: true
 
-    - name: Generate code coverage
-      run: cargo +nightly tarpaulin --verbose --workspace --timeout 120 --out Xml -- --show-output
+    - name: Build
+      run: cargo build --all --all-features --verbose
 
-    - name: Upload to codecov.io
-      uses: codecov/codecov-action@v3
+    - name: Run Clippy
+      run: cargo clippy --all-targets --all-features -- -D warnings
+
+    - name: Run Tests
+      run: cargo test --all --all-features --verbose
