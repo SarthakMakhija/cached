@@ -20,6 +20,9 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - name: Update nightly toolchain
+      run: rustup update nightly
+      
     - name: Install Clippy
       run: rustup component add clippy --toolchain nightly
       
