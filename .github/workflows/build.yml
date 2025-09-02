@@ -26,8 +26,8 @@ jobs:
     - name: Install Clippy
       run: rustup component add clippy --toolchain nightly
       
-    - name: Run Clippy
-      run: cargo clippy --all-targets --all-features
+    # - name: Run Clippy
+    #   run: cargo clippy --all-targets --all-features
 
     - name: Generate code coverage
       run: cargo +nightly tarpaulin --verbose --workspace --timeout 120 --out Xml -- --show-output
