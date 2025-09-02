@@ -9,7 +9,7 @@
 
 The API documentation is available [here](https://docs.rs/tinylfu-cached/latest/tinylfu_cached/index.html).
 
-Read the blog on [Designing an in-memory LFU cache](https://tech-lessons.in/blog/designing_lfu_cache/).
+Read the blog  on [Designing an in-memory LFU cache](https://tech-lessons.in/blog/designing_lfu_cache/).
 
 ### Content organization
 * [Features](#features)
